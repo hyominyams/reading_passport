@@ -14,14 +14,12 @@ export async function POST(request: NextRequest) {
       fullPrompt = `${prompt}\nConsistently depict these characters: ${refDescs}`;
     }
 
-    // Use DALL-E 3 for image generation
-    // In production, this would be replaced with Nanobanana2 API
+    // Use GPT Image model for image generation
     const response = await openai.images.generate({
-      model: 'dall-e-3',
+      model: 'gpt-image-1',
       prompt: `Children's book illustration: ${fullPrompt}. Style: warm, friendly, appropriate for elementary school students.`,
       n: 1,
       size: '1024x1024',
-      quality: 'standard',
     });
 
     const imageUrl = response.data?.[0]?.url;

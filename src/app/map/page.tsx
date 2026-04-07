@@ -17,10 +17,10 @@ export default async function MapPage() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page header */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-2xl sm:text-3xl font-heading text-foreground mb-2">
             세계 지도
           </h1>
-          <p className="text-muted">
+          <p className="text-muted text-sm">
             나라를 선택하여 독서 여행을 시작하세요
           </p>
         </div>

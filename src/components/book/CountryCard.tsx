@@ -22,38 +22,47 @@ export default function CountryCard({
       whileHover={{ scale: 1.05, y: -4 }}
       whileTap={{ scale: 0.97 }}
       className={`
-        relative w-full rounded-2xl overflow-hidden shadow-md
-        transition-colors duration-200 text-left
+        relative w-full rounded-2xl overflow-hidden
+        transition-all duration-200 text-left
         ${isSelected
-          ? 'ring-3 ring-primary shadow-lg'
+          ? 'ring-3 ring-secondary shadow-xl'
           : 'ring-1 ring-border hover:shadow-lg'
         }
       `}
     >
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10" />
+      {/* Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-card via-muted-light to-secondary/10" />
 
-      <div className="relative p-5 flex flex-col items-center gap-3">
+      <div className="relative p-5 flex flex-col items-center gap-2.5">
         {/* Flag */}
-        <span className="text-5xl">{country.flag}</span>
+        <span className="text-5xl drop-shadow-sm">{country.flag}</span>
 
-        {/* Country name */}
-        <h3 className="text-lg font-bold text-foreground">{country.name}</h3>
+        {/* Country name - wooden nameplate style */}
+        <div className="bg-gradient-to-b from-primary/15 to-primary/25 rounded-lg px-4 py-1.5 shadow-inner">
+          <h3 className="text-base font-heading text-foreground">{country.name}</h3>
+        </div>
 
         {/* Description */}
         <p className="text-xs text-muted">{country.description}</p>
 
-        {/* Book count badge */}
+        {/* Book count */}
         <span
           className={`
-            inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium
+            inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
             ${bookCount > 0
-              ? 'bg-primary/10 text-primary'
+              ? 'bg-secondary/15 text-secondary-dark'
               : 'bg-muted-light text-muted'
             }
           `}
         >
-          {bookCount > 0 ? `${bookCount}권의 책` : '준비 중'}
+          {bookCount > 0 ? (
+            <>
+              <span className="text-sm">📚</span>
+              {bookCount}권
+            </>
+          ) : (
+            '준비 중'
+          )}
         </span>
       </div>
     </motion.button>

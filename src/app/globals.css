@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #1a1a2e;
-  --primary: #3b82f6;
-  --primary-dark: #2563eb;
-  --secondary: #f59e0b;
-  --secondary-dark: #d97706;
-  --accent: #10b981;
-  --accent-dark: #059669;
-  --error: #ef4444;
-  --success: #22c55e;
-  --muted: #6b7280;
-  --muted-light: #f3f4f6;
-  --border: #e5e7eb;
-  --card: #ffffff;
-  --card-hover: #f9fafb;
-  --stamp-gold: #fbbf24;
-  --stamp-silver: #9ca3af;
+  --background: #FDF6EC;
+  --foreground: #2C1810;
+  --primary: #6B4F36;
+  --primary-dark: #4A3525;
+  --secondary: #C4845A;
+  --secondary-dark: #A66A3E;
+  --accent: #5D9E6B;
+  --accent-dark: #437A4E;
+  --error: #C44038;
+  --success: #4D9E6E;
+  --muted: #7D6D5D;
+  --muted-light: #F5EBD9;
+  --border: #D4C4A8;
+  --card: #FFF8F0;
+  --card-hover: #FFF3E5;
+  --stamp-gold: #C49835;
+  --stamp-silver: #A89888;
 }
 
 @theme inline {
@@ -38,13 +38,34 @@
   --color-card-hover: var(--card-hover);
   --color-stamp-gold: var(--stamp-gold);
   --color-stamp-silver: var(--stamp-silver);
-  --font-sans: var(--font-noto-sans-kr);
+  --font-sans: var(--font-gowun-dodum);
+  --font-heading: var(--font-jua);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-noto-sans-kr), 'Noto Sans KR', sans-serif;
+  font-family: var(--font-gowun-dodum), 'Gowun Dodum', sans-serif;
+}
+
+.font-heading {
+  font-family: var(--font-jua), 'Jua', sans-serif;
+}
+
+/* Landing page entrance animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+.animate-fade-in-scale {
+  animation: fadeInScale 0.7s ease-out forwards;
 }
 
 /* Custom scrollbar */
@@ -57,10 +78,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--muted);
+  background: var(--border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground);
+  background: var(--muted);
 }

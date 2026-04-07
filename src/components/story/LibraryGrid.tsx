@@ -1,7 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import BookshelfRow from './BookshelfRow';
+import { countries } from '@/lib/data/countries';
 
 export interface LibraryStoryItem {
   id: string;
@@ -30,27 +32,38 @@ export interface LibraryStoryItem {
     pdf_url_translated: string | null;
     visibility: string;
     created_at: string;
+    author?: { nickname: string | null };
   };
 }
 
 interface LibraryGridProps {
-  items: LibraryStoryItem[];
+  itemsByCountry: Record<string, LibraryStoryItem[]>;
   onItemClick: (item: LibraryStoryItem) => void;
   onLike?: (storyId: string) => void;
   likedStories?: Set<string>;
 }
 
 export default function LibraryGrid({
-  items,
+  itemsByCountry,
   onItemClick,
   onLike,
   likedStories = new Set(),
 }: LibraryGridProps) {
-  if (items.length === 0) {
+  const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
+
+  const countryIds = Object.keys(itemsByCountry);
+
+  if (countryIds.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="text-5xl mb-4">📚</div>
-        <h3 className="text-lg font-bold text-foreground mb-2">
+        <div className="w-32 h-24 mb-6 relative">
+          {/* Empty bookshelf illustration */}
+          <div className="absolute bottom-0 w-full h-3 bg-gradient-to-r from-[#8B7355] via-[#A08760] to-[#8B7355] rounded shadow-md" />
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-4xl opacity-40">
+            📚
+          </div>
+        </div>
+        <h3 className="text-lg font-heading text-foreground mb-2">
           아직 이야기가 없어요
         </h3>
         <p className="text-sm text-muted">
@@ -60,73 +73,28 @@ export default function LibraryGrid({
     );
   }
 
+  // Auto-expand if there's only one country
+  const effectiveExpanded = countryIds.length === 1 ? countryIds[0] : expandedCountry;
+
   return (
-    <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
-      {items.map((item, index) => {
-        const coverImage =
-          item.story.scene_images?.[0] || null;
-
+    <div className="space-y-2">
+      {countryIds.map((countryId) => {
+        const countryData = countries.find((c) => c.id === countryId);
         return (
-          <motion.div
-            key={item.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            className="break-inside-avoid"
-          >
-            <button
-              onClick={() => onItemClick(item)}
-              className="w-full text-left bg-card rounded-xl border border-border overflow-hidden hover:shadow-md transition-all group"
-            >
-              {/* Cover image */}
-              {coverImage ? (
-                <div className="aspect-[4/3] overflow-hidden">
-                  <img
-                    src={coverImage}
-                    alt="Story cover"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-              ) : (
-                <div className="aspect-[4/3] bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
-                  <span className="text-4xl">📖</span>
-                </div>
-              )}
-
-              {/* Info */}
-              <div className="p-3">
-                <p className="text-xs text-muted mb-1">
-                  {item.country_id}
-                </p>
-                <p className="text-sm text-foreground line-clamp-2">
-                  {item.story.final_text?.[0]?.slice(0, 50) || '이야기'}
-                </p>
-
-                {/* Likes */}
-                <div className="flex items-center gap-3 mt-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onLike?.(item.story_id);
-                    }}
-                    className={`flex items-center gap-1 text-xs ${
-                      likedStories.has(item.story_id)
-                        ? 'text-error'
-                        : 'text-muted hover:text-error'
-                    } transition-colors`}
-                  >
-                    <svg className="w-3.5 h-3.5" fill={likedStories.has(item.story_id) ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                    {item.likes}
-                  </button>
-                  <span className="text-xs text-muted">
-                    조회 {item.views}
-                  </span>
-                </div>
-              </div>
-            </button>
-          </motion.div>
+          <BookshelfRow
+            key={countryId}
+            countryId={countryId}
+            countryName={countryData?.name ?? countryId}
+            countryFlag={countryData?.flag ?? '🌍'}
+            items={itemsByCountry[countryId]}
+            isExpanded={effectiveExpanded === countryId}
+            onToggle={() =>
+              setExpandedCountry((prev) => (prev === countryId ? null : countryId))
+            }
+            onItemClick={onItemClick}
+            onLike={(storyId) => onLike?.(storyId)}
+            likedStories={likedStories}
+          />
         );
       })}
     </div>

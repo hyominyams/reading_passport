@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { Book, Activity, Language } from '@/types/database';
 
 export async function getBooksByCountry(): Promise<Record<string, Book[]>> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data, error } = await supabase
     .from('books')
@@ -27,7 +28,7 @@ export async function getBooksByCountry(): Promise<Record<string, Book[]>> {
 }
 
 export async function getBookById(bookId: string): Promise<Book | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data, error } = await supabase
     .from('books')

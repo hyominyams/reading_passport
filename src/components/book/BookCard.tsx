@@ -18,9 +18,10 @@ export default function BookCard({ book, onClick }: BookCardProps) {
       whileTap={{ scale: 0.98 }}
       className="flex gap-4 p-4 rounded-xl bg-card border border-border
                  hover:shadow-md transition-shadow text-left w-full"
+      style={{ boxShadow: '-4px 0 8px -4px rgba(141,110,76,0.15)' }}
     >
-      {/* Cover image */}
-      <div className="w-20 h-28 rounded-lg bg-muted-light overflow-hidden flex-shrink-0">
+      {/* Cover image with book-spine effect */}
+      <div className="w-20 h-28 rounded-lg bg-muted-light overflow-hidden flex-shrink-0 border border-border/50 shadow-sm">
         {book.cover_url ? (
           <img
             src={book.cover_url}
@@ -28,15 +29,15 @@ export default function BookCard({ book, onClick }: BookCardProps) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-3xl">
-            📚
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/20 to-primary/20 text-3xl">
+            📖
           </div>
         )}
       </div>
 
       {/* Book info */}
       <div className="flex flex-col justify-center gap-2 min-w-0">
-        <h4 className="text-base font-semibold text-foreground truncate">
+        <h4 className="text-base font-heading text-foreground truncate">
           {book.title}
         </h4>
 

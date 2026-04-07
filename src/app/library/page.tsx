@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import LibraryGrid, { type LibraryStoryItem } from '@/components/story/LibraryGrid';
@@ -8,37 +8,29 @@ import BookViewerModal from '@/components/story/BookViewerModal';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 
-interface TeacherComment {
+interface Comment {
   author: string;
   text: string;
   date: string;
 }
 
 export default function LibraryPage() {
-  const { user, loading: authLoading, isTeacher } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [items, setItems] = useState<LibraryStoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<LibraryStoryItem | null>(null);
   const [likedStories, setLikedStories] = useState<Set<string>>(new Set());
-  const [filterCountry, setFilterCountry] = useState<string>('');
-  const [countries, setCountries] = useState<string[]>([]);
-  const [teacherComments, setTeacherComments] = useState<TeacherComment[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
 
   const fetchLibrary = useCallback(async () => {
     const supabase = createClient();
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('library')
-      .select('*, story:stories(*)')
+      .select('*, story:stories(*, author:users!stories_student_id_fkey(nickname))')
       .order('likes', { ascending: false });
-
-    if (filterCountry) {
-      query = query.eq('country_id', filterCountry);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching library:', error);
@@ -48,19 +40,13 @@ export default function LibraryPage() {
 
     const libraryItems = (data ?? []) as LibraryStoryItem[];
 
-    // Filter to only show items with visible stories
     const visibleItems = libraryItems.filter(
       (item) => item.story && item.story.visibility !== 'private'
     );
 
     setItems(visibleItems);
-
-    // Extract unique countries
-    const uniqueCountries = [...new Set(visibleItems.map((i) => i.country_id))];
-    setCountries(uniqueCountries);
-
     setLoading(false);
-  }, [filterCountry]);
+  }, []);
 
   useEffect(() => {
     fetchLibrary();
@@ -81,6 +67,17 @@ export default function LibraryPage() {
     };
     fetchLikes();
   }, [user]);
+
+  // Group items by country
+  const itemsByCountry = useMemo(() => {
+    const grouped: Record<string, LibraryStoryItem[]> = {};
+    for (const item of items) {
+      const country = item.country_id;
+      if (!grouped[country]) grouped[country] = [];
+      grouped[country].push(item);
+    }
+    return grouped;
+  }, [items]);
 
   const handleLike = async (storyId: string) => {
     if (!user) return;
@@ -134,17 +131,17 @@ export default function LibraryPage() {
       .order('created_at', { ascending: true });
 
     if (data) {
-      const comments: TeacherComment[] = data.map((c: Record<string, unknown>) => {
+      const parsed: Comment[] = data.map((c: Record<string, unknown>) => {
         const u = c.user as { nickname: string | null; role: string } | null;
         return {
-          author: u?.nickname ?? '선생님',
+          author: u?.nickname ?? '사용자',
           text: c.content as string,
           date: new Date(c.created_at as string).toLocaleDateString('ko-KR'),
         };
       });
-      setTeacherComments(comments);
+      setComments(parsed);
     } else {
-      setTeacherComments([]);
+      setComments([]);
     }
   };
 
@@ -173,10 +170,9 @@ export default function LibraryPage() {
 
   const handleItemClick = async (item: LibraryStoryItem) => {
     setSelectedItem(item);
-    setTeacherComments([]);
+    setComments([]);
     setCommentText('');
 
-    // Fetch comments for this story
     await fetchComments(item.story_id);
 
     // Increment views
@@ -203,92 +199,42 @@ export default function LibraryPage() {
       <Header />
       <main className="flex-1 px-4 py-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              우리들의 도서관
-            </h1>
-            <p className="text-sm text-muted mt-1">
-              학생들이 만든 이야기를 감상하세요
-            </p>
-          </div>
-
-          {/* Country filter */}
-          {countries.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted">필터:</span>
-              <select
-                value={filterCountry}
-                onChange={(e) => setFilterCountry(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-border bg-white text-sm text-foreground focus:outline-none focus:border-primary"
-              >
-                <option value="">전체</option>
-                {countries.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        <div className="text-center mb-8">
+          <h1 className="text-2xl sm:text-3xl font-heading text-foreground mb-2">
+            우리들의 도서관
+          </h1>
+          <p className="text-sm text-muted">
+            학생들이 만든 이야기를 감상하세요
+          </p>
         </div>
 
-        {/* Grid */}
+        {/* Bookshelf Grid */}
         <LibraryGrid
-          items={items}
+          itemsByCountry={itemsByCountry}
           onItemClick={handleItemClick}
           onLike={handleLike}
           likedStories={likedStories}
         />
 
-        {/* Book Viewer Modal */}
+        {/* Book Viewer Modal with inline comments */}
         {selectedItem && selectedItem.story.final_text && (
-          <>
-            <BookViewerModal
-              isOpen={!!selectedItem}
-              onClose={() => {
-                setSelectedItem(null);
-                setTeacherComments([]);
-                setCommentText('');
-              }}
-              pages={selectedItem.story.final_text}
-              sceneImages={selectedItem.story.scene_images || []}
-              translatedPages={selectedItem.story.translation_text || undefined}
-              teacherComments={teacherComments}
-            />
-            {/* Teacher comment input (floating overlay when modal is open) */}
-            {isTeacher && (
-              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-full max-w-xl px-4">
-                <div className="bg-white rounded-2xl shadow-2xl border border-border p-4">
-                  <p className="text-xs font-bold text-foreground mb-2">
-                    선생님 코멘트 작성
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="학생 이야기에 대한 코멘트를 남겨주세요..."
-                      className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-primary"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSubmitComment();
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handleSubmitComment}
-                      disabled={!commentText.trim() || submittingComment}
-                      className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
-                    >
-                      {submittingComment ? '...' : '등록'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
+          <BookViewerModal
+            isOpen={!!selectedItem}
+            onClose={() => {
+              setSelectedItem(null);
+              setComments([]);
+              setCommentText('');
+            }}
+            pages={selectedItem.story.final_text}
+            sceneImages={selectedItem.story.scene_images || []}
+            translatedPages={selectedItem.story.translation_text || undefined}
+            comments={comments}
+            canComment={!!user}
+            commentText={commentText}
+            onCommentChange={setCommentText}
+            onSubmitComment={handleSubmitComment}
+            submittingComment={submittingComment}
+          />
         )}
       </main>
     </>

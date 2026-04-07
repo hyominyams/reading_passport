@@ -71,9 +71,9 @@ export default function OnboardingPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-muted-light px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-card rounded-2xl shadow-lg p-8 border border-border">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-primary mb-2">
+            <h1 className="text-2xl font-heading text-primary mb-2">
               World Docent에 오신 것을 환영해요!
             </h1>
             <p className="text-sm text-muted">
@@ -82,7 +82,7 @@ export default function OnboardingPage() {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-error">
+            <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
               {error}
             </div>
           )}
@@ -135,7 +135,7 @@ export default function OnboardingPage() {
           <button
             onClick={handleSubmit}
             disabled={submitting || !nickname.trim() || !selectedAvatar}
-            className="w-full py-3 bg-primary text-white rounded-xl font-bold text-base hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-primary text-white rounded-full font-heading text-base hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             {submitting ? '저장 중...' : '시작하기'}
           </button>

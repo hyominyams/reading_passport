@@ -1,8 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface Comment {
+  author: string;
+  text: string;
+  date: string;
+}
 
 interface BookViewerModalProps {
   isOpen: boolean;
@@ -10,7 +16,12 @@ interface BookViewerModalProps {
   pages: string[];
   sceneImages: string[];
   translatedPages?: string[];
-  teacherComments?: { author: string; text: string; date: string }[];
+  comments?: Comment[];
+  canComment?: boolean;
+  commentText?: string;
+  onCommentChange?: (text: string) => void;
+  onSubmitComment?: () => void;
+  submittingComment?: boolean;
 }
 
 export default function BookViewerModal({
@@ -19,17 +30,31 @@ export default function BookViewerModal({
   pages,
   sceneImages,
   translatedPages,
-  teacherComments = [],
+  comments = [],
+  canComment = false,
+  commentText = '',
+  onCommentChange,
+  onSubmitComment,
+  submittingComment = false,
 }: BookViewerModalProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [showTranslation, setShowTranslation] = useState(false);
+  const hasReachedEndRef = useRef(false);
+  const isLastPage = currentPage === pages.length - 1;
 
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(0);
       setShowTranslation(false);
+      hasReachedEndRef.current = false;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isLastPage && !hasReachedEndRef.current) {
+      hasReachedEndRef.current = true;
+    }
+  }, [isLastPage]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -57,7 +82,7 @@ export default function BookViewerModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
@@ -65,12 +90,12 @@ export default function BookViewerModal({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+          className="bg-card rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div className="flex items-center gap-4">
-              <span className="text-sm font-bold text-foreground">
+              <span className="text-sm font-heading text-foreground">
                 {currentPage + 1} / {pages.length}
               </span>
               {translatedPages && translatedPages.length > 0 && (
@@ -79,7 +104,7 @@ export default function BookViewerModal({
                     onClick={() => setShowTranslation(false)}
                     className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                       !showTranslation
-                        ? 'bg-white text-foreground shadow-sm'
+                        ? 'bg-card text-foreground shadow-sm'
                         : 'text-muted'
                     }`}
                   >
@@ -89,7 +114,7 @@ export default function BookViewerModal({
                     onClick={() => setShowTranslation(true)}
                     className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                       showTranslation
-                        ? 'bg-white text-foreground shadow-sm'
+                        ? 'bg-card text-foreground shadow-sm'
                         : 'text-muted'
                     }`}
                   >
@@ -136,30 +161,64 @@ export default function BookViewerModal({
               </motion.div>
             </AnimatePresence>
 
-            {/* Teacher comments */}
-            {teacherComments.length > 0 && currentPage === pages.length - 1 && (
+            {/* Comments section - visible on last page */}
+            {isLastPage && (
               <div className="px-6 pb-6">
-                <h4 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  선생님 코멘트
-                </h4>
-                <div className="space-y-3">
-                  {teacherComments.map((comment, idx) => (
-                    <div key={idx} className="bg-muted-light rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-foreground">
-                          {comment.author}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {comment.date}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground">{comment.text}</p>
+                {/* Existing comments */}
+                {comments.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-heading text-foreground mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      감상 ({comments.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {comments.map((comment, idx) => (
+                        <div key={idx} className="bg-muted-light rounded-xl p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-foreground">
+                              {comment.author}
+                            </span>
+                            <span className="text-xs text-muted">
+                              {comment.date}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground">{comment.text}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+
+                {/* Comment input */}
+                {canComment && hasReachedEndRef.current && (
+                  <div className="border-t border-border pt-4">
+                    <p className="text-xs font-heading text-muted mb-2">감상 남기기</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={commentText}
+                        onChange={(e) => onCommentChange?.(e.target.value)}
+                        placeholder="이 이야기에 대한 감상을 남겨주세요..."
+                        className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            onSubmitComment?.();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={onSubmitComment}
+                        disabled={!commentText?.trim() || submittingComment}
+                        className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-heading hover:bg-primary-dark transition-colors disabled:opacity-50"
+                      >
+                        {submittingComment ? '...' : '등록'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -179,7 +238,7 @@ export default function BookViewerModal({
                   key={idx}
                   onClick={() => setCurrentPage(idx)}
                   className={`w-2 h-2 rounded-full transition-colors ${
-                    currentPage === idx ? 'bg-primary' : 'bg-border'
+                    currentPage === idx ? 'bg-secondary' : 'bg-border'
                   }`}
                 />
               ))}

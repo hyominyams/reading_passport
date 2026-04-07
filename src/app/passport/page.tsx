@@ -15,10 +15,10 @@ const stampLabels: Record<StampType, string> = {
 };
 
 const stampColors: Record<StampType, string> = {
-  read: '#3B82F6',
-  hidden: '#8B5CF6',
-  character: '#F59E0B',
-  mystory: '#10B981',
+  read: '#8D6E4C',
+  hidden: '#7DAE8B',
+  character: '#D4956A',
+  mystory: '#D4A855',
 };
 
 const allStampTypes: StampType[] = ['read', 'hidden', 'character', 'mystory'];
@@ -105,7 +105,7 @@ export default function PassportPage() {
   return (
     <main className="flex-1 px-4 py-6 max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-foreground">나의 독서 여권</h1>
+        <h1 className="text-2xl font-heading text-foreground">나의 독서 여권</h1>
         <p className="text-sm text-muted mt-2">
           나라별 독서 활동을 확인하세요
         </p>
@@ -122,17 +122,17 @@ export default function PassportPage() {
               className={`
                 relative p-6 rounded-2xl border-2
                 ${isComplete
-                  ? 'border-stamp-gold bg-amber-50/50'
-                  : 'border-border bg-cream-50'
+                  ? 'border-stamp-gold bg-stamp-gold/5'
+                  : 'border-border'
                 }
               `}
-              style={{ backgroundColor: isComplete ? undefined : '#FFFBF0' }}
+              style={{ backgroundColor: isComplete ? undefined : 'var(--muted-light)' }}
             >
               {/* Country header */}
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-3xl">{data.flag}</span>
                 <div>
-                  <h3 className="font-bold text-foreground">{data.countryName}</h3>
+                  <h3 className="font-heading text-foreground">{data.countryName}</h3>
                   {data.bookTitle && (
                     <p className="text-xs text-muted">{data.bookTitle}</p>
                   )}

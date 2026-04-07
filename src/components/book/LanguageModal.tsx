@@ -28,7 +28,7 @@ export default function LanguageModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 z-50"
+            className="fixed inset-0 bg-foreground/40 z-50"
           />
 
           {/* Modal */}
@@ -38,9 +38,9 @@ export default function LanguageModal({
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="bg-card rounded-2xl shadow-xl max-w-sm w-full p-6 border border-border">
               {/* Title */}
-              <h3 className="text-lg font-bold text-foreground text-center mb-2">
+              <h3 className="text-lg font-heading text-foreground text-center mb-2">
                 이 책의 언어를 선택해주세요
               </h3>
               <p className="text-sm text-muted text-center mb-6">
