@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { updateSession } from '@/lib/supabase/middleware';
 
 const protectedRoutes = ['/map', '/book', '/library', '/teacher', '/admin', '/onboarding', '/passport'];
@@ -6,7 +7,7 @@ const teacherRoutes = ['/teacher'];
 const adminRoutes = ['/admin'];
 
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user, supabase } = await updateSession(request);
+  const { supabaseResponse, user } = await updateSession(request);
   const pathname = request.nextUrl.pathname;
 
   // Check if the route is protected
@@ -26,7 +27,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Check role-based access
+  // Check role-based access using service role (bypasses RLS)
   const isTeacherRoute = teacherRoutes.some((route) =>
     pathname.startsWith(route)
   );
@@ -35,7 +36,11 @@ export async function middleware(request: NextRequest) {
   );
 
   if (isTeacherRoute || isAdminRoute) {
-    const { data: profile } = await supabase
+    const serviceClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: profile } = await serviceClient
       .from('users')
       .select('role')
       .eq('id', user.id)
