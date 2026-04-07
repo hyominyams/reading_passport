@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -18,43 +18,86 @@ interface CommentBoxProps {
 }
 
 export default function CommentBox({ storyId }: CommentBoxProps) {
-  const { user, profile } = useAuth();
+  const { user, isTeacher } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchComments = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from('teacher_comments')
-      .select('*')
-      .eq('story_id', storyId)
-      .order('created_at', { ascending: true });
-
-    setComments((data ?? []) as Comment[]);
-  }, [storyId]);
-
   useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    let active = true;
+
+    const fetchComments = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('story_comments')
+        .select('id, story_id, user_id, content, created_at, user:users(nickname)')
+        .eq('story_id', storyId)
+        .order('created_at', { ascending: true });
+
+      if (!active) return;
+
+      if (error) {
+        console.error('Error fetching comments:', error);
+        setComments([]);
+        return;
+      }
+
+      const parsed = (data ?? []).map((row: Record<string, unknown>) => {
+        const userRow = row.user as { nickname: string | null } | null;
+        return {
+          id: String(row.id),
+          story_id: String(row.story_id),
+          user_id: String(row.user_id),
+          content: String(row.content ?? ''),
+          created_at: String(row.created_at),
+          user_nickname: userRow?.nickname ?? '교사',
+        };
+      });
+
+      setComments(parsed);
+    };
+
+    void fetchComments();
+
+    return () => {
+      active = false;
+    };
+  }, [storyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !user) return;
+    if (!newComment.trim() || !user || !isTeacher) return;
 
     setSubmitting(true);
     const supabase = createClient();
 
-    const { error } = await supabase.from('teacher_comments').insert({
+    const { error } = await supabase.from('story_comments').insert({
       story_id: storyId,
       user_id: user.id,
       content: newComment.trim(),
-      user_nickname: profile?.nickname ?? '교사',
     });
 
     if (!error) {
       setNewComment('');
-      fetchComments();
+      const { data } = await supabase
+        .from('story_comments')
+        .select('id, story_id, user_id, content, created_at, user:users(nickname)')
+        .eq('story_id', storyId)
+        .order('created_at', { ascending: true });
+
+      const parsed = (data ?? []).map((row: Record<string, unknown>) => {
+        const userRow = row.user as { nickname: string | null } | null;
+        return {
+          id: String(row.id),
+          story_id: String(row.story_id),
+          user_id: String(row.user_id),
+          content: String(row.content ?? ''),
+          created_at: String(row.created_at),
+          user_nickname: userRow?.nickname ?? '교사',
+        };
+      });
+
+      setComments(parsed);
     }
     setSubmitting(false);
   };

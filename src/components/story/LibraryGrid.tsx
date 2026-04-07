@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { useState } from 'react';
@@ -12,6 +11,11 @@ export interface LibraryStoryItem {
   book_id: string;
   likes: number;
   views: number;
+  book?: {
+    id: string;
+    title?: string | null;
+    cover_url?: string | null;
+  } | null;
   story: {
     id: string;
     student_id: string;
@@ -36,24 +40,81 @@ export interface LibraryStoryItem {
   };
 }
 
+export interface LibraryBookShelf {
+  bookId: string;
+  bookTitle: string;
+  bookCoverUrl?: string | null;
+  items: LibraryStoryItem[];
+}
+
+export interface LibraryCountryShelf {
+  countryId: string;
+  countryName: string;
+  countryFlag: string;
+  books: LibraryBookShelf[];
+}
+
 interface LibraryGridProps {
-  itemsByCountry: Record<string, LibraryStoryItem[]>;
+  itemsByCountry?: Record<string, LibraryStoryItem[]>;
+  countryShelves?: LibraryCountryShelf[];
   onItemClick: (item: LibraryStoryItem) => void;
   onLike?: (storyId: string) => void;
   likedStories?: Set<string>;
 }
 
+function buildCountryShelves(
+  itemsByCountry: Record<string, LibraryStoryItem[]>
+): LibraryCountryShelf[] {
+  return Object.entries(itemsByCountry).map(([countryId, items]) => {
+    const countryData = countries.find((c) => c.id === countryId);
+    const bookGroups = new Map<string, LibraryBookShelf>();
+
+    for (const item of items) {
+      const bookId = item.book?.id ?? item.story.book_id ?? item.book_id;
+      const existing = bookGroups.get(bookId);
+      const bookTitle =
+        item.book?.title?.trim() ||
+        `원작 책 ${bookGroups.size + 1}`;
+      const bookCoverUrl = item.book?.cover_url ?? null;
+
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        bookGroups.set(bookId, {
+          bookId,
+          bookTitle,
+          bookCoverUrl,
+          items: [item],
+        });
+      }
+    }
+
+    const books = Array.from(bookGroups.values()).map((group) => ({
+      ...group,
+      items: [...group.items].sort((a, b) => b.likes - a.likes),
+    }));
+
+    return {
+      countryId,
+      countryName: countryData?.name ?? countryId,
+      countryFlag: countryData?.flag ?? '🌍',
+      books,
+    };
+  });
+}
+
 export default function LibraryGrid({
-  itemsByCountry,
+  itemsByCountry = {},
+  countryShelves,
   onItemClick,
   onLike,
   likedStories = new Set(),
 }: LibraryGridProps) {
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
 
-  const countryIds = Object.keys(itemsByCountry);
+  const shelves = countryShelves ?? buildCountryShelves(itemsByCountry);
 
-  if (countryIds.length === 0) {
+  if (shelves.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-32 h-24 mb-6 relative">
@@ -74,29 +135,26 @@ export default function LibraryGrid({
   }
 
   // Auto-expand if there's only one country
-  const effectiveExpanded = countryIds.length === 1 ? countryIds[0] : expandedCountry;
+  const effectiveExpanded = shelves.length === 1 ? shelves[0].countryId : expandedCountry;
 
   return (
     <div className="space-y-2">
-      {countryIds.map((countryId) => {
-        const countryData = countries.find((c) => c.id === countryId);
-        return (
-          <BookshelfRow
-            key={countryId}
-            countryId={countryId}
-            countryName={countryData?.name ?? countryId}
-            countryFlag={countryData?.flag ?? '🌍'}
-            items={itemsByCountry[countryId]}
-            isExpanded={effectiveExpanded === countryId}
-            onToggle={() =>
-              setExpandedCountry((prev) => (prev === countryId ? null : countryId))
-            }
-            onItemClick={onItemClick}
-            onLike={(storyId) => onLike?.(storyId)}
-            likedStories={likedStories}
-          />
-        );
-      })}
+      {shelves.map((shelf) => (
+        <BookshelfRow
+          key={shelf.countryId}
+          countryId={shelf.countryId}
+          countryName={shelf.countryName}
+          countryFlag={shelf.countryFlag}
+          bookShelves={shelf.books}
+          isExpanded={effectiveExpanded === shelf.countryId}
+          onToggle={() =>
+            setExpandedCountry((prev) => (prev === shelf.countryId ? null : shelf.countryId))
+          }
+          onItemClick={onItemClick}
+          onLike={(storyId) => onLike?.(storyId)}
+          likedStories={likedStories}
+        />
+      ))}
     </div>
   );
 }

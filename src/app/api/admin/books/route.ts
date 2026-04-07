@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { country_id, title, cover_url, pdf_url_ko, pdf_url_en } = body;
+  const { country_id, title, cover_url, pdf_url_ko, pdf_url_en, character_analysis } = body;
 
   if (!country_id || !title || !cover_url) {
     return NextResponse.json({ error: '필수 항목을 입력해주세요' }, { status: 400 });
@@ -55,6 +55,10 @@ export async function POST(request: NextRequest) {
     cover_url,
     pdf_url_ko: pdf_url_ko || null,
     pdf_url_en: pdf_url_en || null,
+    character_analysis:
+      character_analysis && typeof character_analysis === 'object'
+        ? character_analysis
+        : undefined,
     created_by: user.id,
   });
 

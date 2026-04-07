@@ -34,6 +34,27 @@ export default function ContentManager() {
     fetchBooks();
   }, []);
 
+  useEffect(() => {
+    if (!selectedBookId) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      setLoading(true);
+      const res = await fetch(`/api/teacher/content?bookId=${selectedBookId}`);
+      const data = await res.json();
+
+      if (cancelled) return;
+
+      setContent(data.content ?? []);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBookId]);
+
   const fetchContent = useCallback(async () => {
     if (!selectedBookId) return;
     setLoading(true);
@@ -42,12 +63,6 @@ export default function ContentManager() {
     setContent(data.content ?? []);
     setLoading(false);
   }, [selectedBookId]);
-
-  useEffect(() => {
-    if (selectedBookId) {
-      fetchContent();
-    }
-  }, [selectedBookId, fetchContent]);
 
   const handleReorder = async (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;

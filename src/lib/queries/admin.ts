@@ -1,5 +1,26 @@
 import { createClient } from '@/lib/supabase/server';
-import type { User, Book, ApprovalRequest, HiddenContent, Story, LibraryItem } from '@/types/database';
+import type { User, Book, ApprovalRequest, HiddenContent, Story, LibraryItem, Language } from '@/types/database';
+
+function computeLanguagesAvailable(
+  pdfUrlKo?: string | null,
+  pdfUrlEn?: string | null
+): Language[] {
+  const languages: Language[] = [];
+
+  if (pdfUrlKo) {
+    languages.push('ko');
+  }
+  if (pdfUrlEn) {
+    languages.push('en');
+  }
+
+  // Keep Korean as the fallback so new books remain readable even before PDF URLs are finalized.
+  if (languages.length === 0) {
+    languages.push('ko');
+  }
+
+  return languages;
+}
 
 export async function getAllTeachers(): Promise<User[]> {
   const supabase = await createClient();
@@ -40,6 +61,7 @@ export async function processApproval(
   status: 'approved' | 'rejected',
   reviewerId: string
 ): Promise<{ success: boolean; error?: string }> {
+  void reviewerId;
   const supabase = await createClient();
 
   // Get the approval request first
@@ -106,6 +128,7 @@ export async function createBook(data: {
   cover_url: string;
   pdf_url_ko?: string | null;
   pdf_url_en?: string | null;
+  character_analysis?: Record<string, unknown>;
   created_by: string;
 }): Promise<{ success: boolean; bookId?: string; error?: string }> {
   const supabase = await createClient();
@@ -118,8 +141,8 @@ export async function createBook(data: {
       cover_url: data.cover_url,
       pdf_url_ko: data.pdf_url_ko ?? null,
       pdf_url_en: data.pdf_url_en ?? null,
-      languages_available: ['ko'],
-      character_analysis: {},
+      languages_available: computeLanguagesAvailable(data.pdf_url_ko, data.pdf_url_en),
+      character_analysis: data.character_analysis ?? {},
       created_by: data.created_by,
       scope: 'global',
       approved: true,
@@ -144,13 +167,34 @@ export async function updateBook(
     pdf_url_ko: string | null;
     pdf_url_en: string | null;
     approved: boolean;
+    character_analysis: Record<string, unknown>;
   }>
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
 
+  const { data: currentBook, error: fetchError } = await supabase
+    .from('books')
+    .select('pdf_url_ko, pdf_url_en')
+    .eq('id', bookId)
+    .single();
+
+  if (fetchError || !currentBook) {
+    console.error('Error fetching book before update:', fetchError);
+    return { success: false, error: fetchError?.message ?? '도서를 찾을 수 없습니다' };
+  }
+
+  const nextPdfUrlKo = data.pdf_url_ko !== undefined ? data.pdf_url_ko : currentBook.pdf_url_ko;
+  const nextPdfUrlEn = data.pdf_url_en !== undefined ? data.pdf_url_en : currentBook.pdf_url_en;
+  const nextLanguages = computeLanguagesAvailable(nextPdfUrlKo, nextPdfUrlEn);
+
   const { error } = await supabase
     .from('books')
-    .update(data)
+    .update({
+      ...data,
+      pdf_url_ko: nextPdfUrlKo,
+      pdf_url_en: nextPdfUrlEn,
+      languages_available: nextLanguages,
+    })
     .eq('id', bookId);
 
   if (error) {

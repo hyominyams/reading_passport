@@ -1,0 +1,11 @@
+[    9696ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431
+[    9749ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431
+[   12358ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431
+[   12406ms] [LOG] [Fast Refresh] done in 78ms @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431
+[   52136ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/_next/image?url=%2FStory%2Ftanzania-who-is-real-hero.pdf&w=128&q=75:0
+[   53930ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/_next/image?url=%2FStory%2Ftanzania-who-is-real-hero.pdf&w=128&q=75:0
+[   76669ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/_next/image?url=%2FStory%2Ftanzania-who-is-real-hero.pdf&w=640&q=75:0
+[  201215ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431
+[  201821ms] [LOG] [Fast Refresh] done in 589ms @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431
+[  202089ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431
+[  202100ms] [LOG] [Fast Refresh] done in 112ms @ http://localhost:3000/_next/static/chunks/0xof_next_dist_06_~z64._.js:2431

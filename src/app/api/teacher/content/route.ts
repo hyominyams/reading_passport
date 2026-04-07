@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getTeacherHiddenContent } from '@/lib/queries/teacher';
+import { ensureTeacherClassRecord } from '@/lib/classroom';
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('role, class')
+    .select('role, class, school, grade')
     .eq('id', user.id)
     .single();
 
@@ -54,6 +55,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '필수 항목을 입력해주세요' }, { status: 400 });
   }
 
+  let classId: string | null = null;
+  if (scope !== 'global') {
+    const classRecord = await ensureTeacherClassRecord(supabase, {
+      id: user.id,
+      class: profile.class,
+      school: profile.school,
+      grade: profile.grade,
+    });
+    classId = classRecord.id;
+  }
+
   const insertData: Record<string, unknown> = {
     book_id: bookId,
     country_id: countryId || '',
@@ -63,7 +75,7 @@ export async function POST(request: NextRequest) {
     order: order || 0,
     created_by: user.id,
     scope: scope === 'global' ? 'global' : 'class',
-    class_id: scope === 'class' ? (profile.class || null) : null,
+    class_id: classId,
     approved: scope === 'class', // class-only auto-approved, global needs admin
   };
 

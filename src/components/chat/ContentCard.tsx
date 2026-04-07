@@ -38,6 +38,13 @@ export default function ContentCard({
 }: ContentCardProps) {
   const config = typeConfig[type];
   const ytThumb = type === 'video' ? getYouTubeThumbnail(url) : null;
+  const imageStyle = ytThumb || type === 'image'
+    ? {
+        backgroundImage: `url(${ytThumb ?? url})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : undefined;
 
   return (
     <motion.button
@@ -49,21 +56,18 @@ export default function ContentCard({
       whileTap={{ scale: 0.99 }}
     >
       {/* Thumbnail area */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <div className="relative w-full h-36 bg-muted-light flex items-center justify-center overflow-hidden">
         {ytThumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={ytThumb}
-            alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          <div
+            aria-label={title}
+            className="absolute inset-0 transition-transform duration-300 group-hover:scale-105"
+            style={imageStyle}
           />
         ) : type === 'image' ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          <div
+            aria-label={title}
+            className="absolute inset-0 transition-transform duration-300 group-hover:scale-105"
+            style={imageStyle}
           />
         ) : (
           <span className="text-4xl">{config.icon}</span>

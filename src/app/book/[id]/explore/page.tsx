@@ -10,6 +10,7 @@ import ContentViewer from '@/components/chat/ContentViewer';
 import ExplorationProgress from '@/components/chat/ExplorationProgress';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
+import { resolveUserClassId } from '@/lib/classroom';
 import type { HiddenContent, Activity, ContentType } from '@/types/database';
 
 export default function ExplorePage() {
@@ -29,7 +30,6 @@ export default function ExplorePage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [activeContent, setActiveContent] = useState<HiddenContent | null>(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const supabase = useMemo(() => createClient(), []);
 
   const fetchData = useCallback(async () => {
@@ -45,13 +45,15 @@ export default function ExplorePage() {
         .eq('approved', true)
         .order('order', { ascending: true });
 
-      if (profile?.class) {
+      const classId = await resolveUserClassId(supabase, profile);
+
+      if (classId) {
         query = supabase
           .from('hidden_content')
           .select('*')
           .eq('book_id', bookId)
           .eq('approved', true)
-          .or(`scope.eq.global,class_id.eq.${profile.class}`)
+          .or(`scope.eq.global,class_id.eq.${classId}`)
           .order('order', { ascending: true });
       }
 
@@ -75,7 +77,7 @@ export default function ExplorePage() {
     } finally {
       setLoading(false);
     }
-  }, [user, bookId, profile?.class, supabase]);
+  }, [user, bookId, profile, supabase]);
 
   useEffect(() => {
     if (!authLoading && user) {

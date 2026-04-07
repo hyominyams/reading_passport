@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import StampBadge from '@/components/common/StampBadge';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import BookCoverImage from '@/components/book/BookCoverImage';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { countries } from '@/lib/data/countries';
@@ -69,18 +70,15 @@ export default function BookIntroClient({ book, language }: BookIntroClientProps
       className="flex flex-col items-center gap-8"
     >
       {/* Cover image */}
-      <div className="w-full max-w-xs aspect-[3/4] rounded-2xl overflow-hidden shadow-xl bg-muted-light">
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-6xl bg-gradient-to-br from-primary/20 to-secondary/20">
-            📚
-          </div>
-        )}
+      <div className="relative w-full max-w-xs aspect-[3/4] rounded-2xl overflow-hidden shadow-xl bg-muted-light">
+        <BookCoverImage
+          key={book.cover_url}
+          title={book.title}
+          coverUrl={book.cover_url}
+          sizes="(max-width: 640px) 100vw, 320px"
+          fallbackClassName="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20"
+          iconClassName="h-12 w-12 text-primary/40"
+        />
       </div>
 
       {/* Book info */}

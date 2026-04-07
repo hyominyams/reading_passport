@@ -1,0 +1,90 @@
+- generic [ref=e1]:
+  - generic [ref=e6] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e7]:
+      - img [ref=e8]
+    - generic [ref=e11]:
+      - button "Open issues overlay" [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: "0"
+          - generic [ref=e15]: "1"
+        - generic [ref=e16]: Issue
+      - button "Collapse issues badge" [ref=e17]:
+        - img [ref=e18]
+  - banner [ref=e20]:
+    - generic [ref=e22]:
+      - link "World Stories" [ref=e23] [cursor=pointer]:
+        - /url: /map
+        - img [ref=e25]
+        - generic [ref=e27]: World Stories
+      - navigation [ref=e28]:
+        - link "세계지도" [ref=e29] [cursor=pointer]:
+          - /url: /map
+          - img [ref=e30]
+          - generic [ref=e32]: 세계지도
+        - link "도서관" [ref=e33] [cursor=pointer]:
+          - /url: /library
+          - img [ref=e34]
+          - generic [ref=e36]: 도서관
+        - generic [ref=e37]:
+          - generic [ref=e38]: "?"
+          - button "로그아웃" [ref=e39]
+  - main [ref=e40]:
+    - generic [ref=e41]:
+      - paragraph [ref=e42]: Select a Country
+      - heading "세계의 이야기" [level=1] [ref=e43]
+    - generic [ref=e44]:
+      - button "콜롬비아 🇨🇴 콜롬비아 커피와 음악의 나라" [ref=e45]:
+        - img "콜롬비아" [ref=e47]
+        - generic [ref=e49]:
+          - generic [ref=e50]: 🇨🇴
+          - heading "콜롬비아" [level=3] [ref=e51]
+          - paragraph [ref=e52]: 커피와 음악의 나라
+      - button "탄자니아 1 🇹🇿 탄자니아 킬리만자로의 나라" [active] [ref=e53]:
+        - img "탄자니아" [ref=e55]
+        - generic [ref=e57]: "1"
+        - generic [ref=e58]:
+          - generic [ref=e59]: 🇹🇿
+          - heading "탄자니아" [level=3] [ref=e60]
+          - paragraph [ref=e61]: 킬리만자로의 나라
+        - img [ref=e96]
+      - button "캄보디아 🇰🇭 캄보디아 앙코르와트의 나라" [ref=e62]:
+        - img "캄보디아" [ref=e64]
+        - generic [ref=e66]:
+          - generic [ref=e67]: 🇰🇭
+          - heading "캄보디아" [level=3] [ref=e68]
+          - paragraph [ref=e69]: 앙코르와트의 나라
+      - button "네팔 🇳🇵 네팔 히말라야의 나라" [ref=e70]:
+        - img "네팔" [ref=e72]
+        - generic [ref=e74]:
+          - generic [ref=e75]: 🇳🇵
+          - heading "네팔" [level=3] [ref=e76]
+          - paragraph [ref=e77]: 히말라야의 나라
+      - button "페루 🇵🇪 페루 잉카 문명의 나라" [ref=e78]:
+        - img "페루" [ref=e80]
+        - generic [ref=e82]:
+          - generic [ref=e83]: 🇵🇪
+          - heading "페루" [level=3] [ref=e84]
+          - paragraph [ref=e85]: 잉카 문명의 나라
+      - button "케냐 🇰🇪 케냐 사파리의 나라" [ref=e86]:
+        - img "케냐" [ref=e88]
+        - generic [ref=e90]:
+          - generic [ref=e91]: 🇰🇪
+          - heading "케냐" [level=3] [ref=e92]
+          - paragraph [ref=e93]: 사파리의 나라
+    - generic [ref=e99]:
+      - generic [ref=e100]:
+        - generic [ref=e101]:
+          - generic [ref=e102]: 🇹🇿
+          - generic [ref=e103]:
+            - heading "탄자니아" [level=2] [ref=e104]
+            - paragraph [ref=e105]: 1권의 도서
+        - button [ref=e106]:
+          - img [ref=e107]
+      - button "Who is the Real Hero? KO EN" [ref=e111]:
+        - generic [ref=e117]:
+          - heading "Who is the Real Hero?" [level=4] [ref=e118]
+          - generic [ref=e119]:
+            - generic [ref=e120]: KO
+            - generic [ref=e121]: EN
+        - img [ref=e123]
+  - alert [ref=e94]

@@ -11,6 +11,8 @@ interface ConfettiPiece {
   color: string;
   size: number;
   delay: number;
+  duration: number;
+  borderRadius: string;
 }
 
 interface ConfettiAnimationProps {
@@ -29,6 +31,8 @@ function generatePieces(count: number): ConfettiPiece[] {
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
     size: 6 + Math.random() * 8,
     delay: Math.random() * 0.8,
+    duration: 2.5 + Math.random() * 1.5,
+    borderRadius: Math.random() > 0.5 ? '50%' : '2px',
   }));
 }
 
@@ -40,12 +44,23 @@ export default function ConfettiAnimation({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (show) {
-      setPieces(generatePieces(60));
-      setVisible(true);
-      const timer = setTimeout(() => setVisible(false), duration);
-      return () => clearTimeout(timer);
-    }
+    const timers: number[] = [];
+
+    const timer = window.setTimeout(() => {
+      if (show) {
+        setPieces(generatePieces(60));
+        setVisible(true);
+        timers.push(window.setTimeout(() => setVisible(false), duration));
+      } else {
+        setVisible(false);
+      }
+    }, 0);
+
+    timers.push(timer);
+
+    return () => {
+      timers.forEach((id) => clearTimeout(id));
+    };
   }, [show, duration]);
 
   return (
@@ -67,7 +82,7 @@ export default function ConfettiAnimation({
                 opacity: [1, 1, 0.8, 0],
               }}
               transition={{
-                duration: 2.5 + Math.random() * 1.5,
+                duration: piece.duration,
                 delay: piece.delay,
                 ease: [0.25, 0.46, 0.45, 0.94],
               }}
@@ -76,7 +91,7 @@ export default function ConfettiAnimation({
                 width: piece.size,
                 height: piece.size,
                 backgroundColor: piece.color,
-                borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                borderRadius: piece.borderRadius,
               }}
             />
           ))}

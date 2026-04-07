@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import type { Story, User, LibraryItem } from '@/types/database';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -19,19 +20,25 @@ export default function LibraryAdmin() {
   } | null>(null);
 
   useEffect(() => {
-    fetchItems();
+    let cancelled = false;
+
+    void (async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('library')
+        .select('*, story:stories(*, student:users(*))')
+        .order('likes', { ascending: false });
+
+      if (cancelled) return;
+
+      setItems((data ?? []) as LibraryItemWithStory[]);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  async function fetchItems() {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from('library')
-      .select('*, story:stories(*, student:users(*))')
-      .order('likes', { ascending: false });
-
-    setItems((data ?? []) as LibraryItemWithStory[]);
-    setLoading(false);
-  }
 
   async function handleRemove(libraryId: string) {
     const supabase = createClient();
@@ -103,9 +110,11 @@ export default function LibraryAdmin() {
               {/* Thumbnail */}
               <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted-light shrink-0">
                 {item.story?.scene_images?.[0] ? (
-                  <img
+                  <Image
                     src={item.story.scene_images[0]}
                     alt="작품"
+                    width={48}
+                    height={48}
                     className="w-full h-full object-cover"
                   />
                 ) : (

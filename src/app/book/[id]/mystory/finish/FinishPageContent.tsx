@@ -27,6 +27,11 @@ export default function FinishPageContent() {
   const [translatedPages, setTranslatedPages] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const sourceLanguage = story?.language ?? 'ko';
+  const targetLanguage = sourceLanguage === 'ko' ? 'en' : 'ko';
+  const translateButtonLabel =
+    targetLanguage === 'en' ? '영어로 번역하기' : '한국어로 번역하기';
+
   const handleDownloadPdf = (mode: 'original' | 'translated') => {
     if (!story?.final_text || !story?.scene_images) return;
     const pages = mode === 'translated' && translatedPages ? translatedPages : story.final_text;
@@ -168,8 +173,8 @@ export default function FinishPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pages: story.final_text,
-          source_language: 'ko',
-          target_language: 'en',
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
         }),
       });
       const { translated_pages } = await res.json();
@@ -324,7 +329,7 @@ export default function FinishPageContent() {
                   disabled={translating}
                   className="px-6 py-3 bg-accent text-white rounded-xl font-medium hover:bg-accent-dark transition-colors disabled:opacity-50"
                 >
-                  {translating ? '번역 중...' : '영어로 번역하기'}
+                  {translating ? '번역 중...' : translateButtonLabel}
                 </button>
               )}
             </div>

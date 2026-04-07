@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "repair:students": "node scripts/repair-student-auth.mjs",
+    "repair:hidden-content": "node scripts/repair-hidden-content-class-ids.mjs",
+    "repair:legacy": "npm run repair:students && npm run repair:hidden-content"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",

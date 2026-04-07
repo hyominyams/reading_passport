@@ -36,7 +36,7 @@ export default async function ReadPage({
   return (
     <>
       <Header />
-      <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ReadPageClient book={book} pdfUrl={pdfUrl} language={language} />
       </main>
     </>

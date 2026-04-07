@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { Book } from '@/types/database';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import BookCoverImage from '@/components/book/BookCoverImage';
 
 export default function BookManager() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -21,6 +22,7 @@ export default function BookManager() {
     pdf_url_ko: '',
     pdf_url_en: '',
   });
+  const [analysisText, setAnalysisText] = useState('');
 
   useEffect(() => {
     fetchBooks();
@@ -36,6 +38,7 @@ export default function BookManager() {
   function openCreateForm() {
     setFormData({ country_id: '', title: '', cover_url: '', pdf_url_ko: '', pdf_url_en: '' });
     setEditingBook(null);
+    setAnalysisText('');
     setShowForm(true);
     setError('');
   }
@@ -49,6 +52,7 @@ export default function BookManager() {
       pdf_url_en: book.pdf_url_en ?? '',
     });
     setEditingBook(book);
+    setAnalysisText('');
     setShowForm(true);
     setError('');
   }
@@ -64,6 +68,27 @@ export default function BookManager() {
 
     setSaving(true);
     try {
+      let targetBookId = editingBook?.id ?? null;
+      const manualAnalysisText = analysisText.trim();
+      const nextPdfUrlKo = formData.pdf_url_ko.trim() || null;
+      const nextPdfUrlEn = formData.pdf_url_en.trim() || null;
+      const pdfChanged =
+        !!editingBook &&
+        (
+          (editingBook.pdf_url_ko ?? null) !== nextPdfUrlKo ||
+          (editingBook.pdf_url_en ?? null) !== nextPdfUrlEn
+        );
+      const hasExistingAnalysis =
+        !!editingBook &&
+        !!editingBook.character_analysis &&
+        Object.keys(editingBook.character_analysis).length > 0;
+      const shouldAnalyze =
+        !!manualAnalysisText ||
+        (
+          (!!nextPdfUrlKo || !!nextPdfUrlEn) &&
+          (!editingBook || pdfChanged || !hasExistingAnalysis)
+        );
+
       if (editingBook) {
         const res = await fetch('/api/admin/books', {
           method: 'PUT',
@@ -93,14 +118,53 @@ export default function BookManager() {
             pdf_url_en: formData.pdf_url_en.trim() || null,
           }),
         });
+        const data = await res.json();
         if (!res.ok) {
-          const data = await res.json();
           throw new Error(data.error || '등록에 실패했습니다');
+        }
+
+        targetBookId = data.bookId ?? null;
+
+        if (targetBookId) {
+          setEditingBook({
+            id: targetBookId,
+            country_id: formData.country_id.trim(),
+            title: formData.title.trim(),
+            cover_url: formData.cover_url.trim(),
+            pdf_url_ko: formData.pdf_url_ko.trim() || null,
+            pdf_url_en: formData.pdf_url_en.trim() || null,
+            languages_available: formData.pdf_url_en.trim()
+              ? (formData.pdf_url_ko.trim() ? ['ko', 'en'] : ['en'])
+              : ['ko'],
+            character_analysis: {},
+            created_by: '',
+            scope: 'global',
+            class_id: null,
+            approved: true,
+            created_at: new Date().toISOString(),
+          } as Book);
+        }
+      }
+
+      if (targetBookId && shouldAnalyze) {
+        const analysisRes = await fetch('/api/scan/characters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookId: targetBookId,
+            ...(manualAnalysisText ? { bookText: manualAnalysisText } : {}),
+          }),
+        });
+        const analysisData = await analysisRes.json();
+        if (!analysisRes.ok) {
+          throw new Error(analysisData.error || '캐릭터 분석에 실패했습니다');
         }
       }
 
       setShowForm(false);
-      fetchBooks();
+      setEditingBook(null);
+      setAnalysisText('');
+      await fetchBooks();
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다');
     } finally {
@@ -150,18 +214,15 @@ export default function BookManager() {
               className="flex items-center gap-4 p-4 border border-border rounded-xl hover:bg-card-hover transition-colors"
             >
               {/* Cover thumbnail */}
-              <div className="w-12 h-16 rounded-lg overflow-hidden bg-muted-light shrink-0">
-                {book.cover_url ? (
-                  <img
-                    src={book.cover_url}
-                    alt={book.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted">
-                    \uD83D\uDCDA
-                  </div>
-                )}
+              <div className="relative w-12 h-16 rounded-lg overflow-hidden bg-muted-light shrink-0">
+                <BookCoverImage
+                  key={book.cover_url}
+                  title={book.title}
+                  coverUrl={book.cover_url}
+                  sizes="48px"
+                  iconClassName="h-5 w-5 text-muted"
+                  fallbackClassName="flex h-full w-full items-center justify-center bg-muted-light"
+                />
               </div>
 
               <div className="flex-1 min-w-0">
@@ -173,6 +234,15 @@ export default function BookManager() {
                       : 'bg-secondary/10 text-secondary-dark'
                   }`}>
                     {book.approved ? '공개' : '비공개'}
+                  </span>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${
+                    book.character_analysis && Object.keys(book.character_analysis).length > 0
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted-light text-muted'
+                  }`}>
+                    {book.character_analysis && Object.keys(book.character_analysis).length > 0
+                      ? '분석됨'
+                      : '분석 필요'}
                   </span>
                 </div>
                 <p className="text-xs text-muted">
@@ -284,6 +354,22 @@ export default function BookManager() {
                 />
               </div>
 
+            <div>
+              <label className="block text-sm font-medium text-muted mb-1">
+                  도서 본문/분석용 텍스트(선택)
+              </label>
+              <textarea
+                value={analysisText}
+                onChange={(e) => setAnalysisText(e.target.value)}
+                placeholder="비워두면 저장 후 PDF에서 자동으로 텍스트를 추출합니다"
+                rows={5}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"
+              />
+              <p className="text-xs text-muted mt-1">
+                전체 본문이 있으면 그 텍스트를 우선 사용합니다. 비워두면 한국어 PDF, 없으면 영어 PDF에서 자동 추출합니다.
+              </p>
+            </div>
+
               {error && <p className="text-sm text-error">{error}</p>}
 
               <div className="flex gap-2 pt-2">
@@ -299,7 +385,11 @@ export default function BookManager() {
                   disabled={saving}
                   className="flex-1 px-4 py-2.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
                 >
-                  {saving ? '저장 중...' : editingBook ? '수정' : '등록'}
+                  {saving
+                    ? '저장 및 분석 중...'
+                    : editingBook
+                      ? '수정 후 자동 분석'
+                      : '등록 후 자동 분석'}
                 </button>
               </div>
             </form>

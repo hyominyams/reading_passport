@@ -121,6 +121,25 @@ export interface Story {
   created_at: string;
 }
 
+export interface StoryReadProgress {
+  id: string;
+  story_id: string;
+  user_id: string;
+  last_page: number;
+  total_pages_snapshot: number;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface StoryComment {
+  id: string;
+  story_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+}
+
 export interface LibraryItem {
   id: string;
   story_id: string;

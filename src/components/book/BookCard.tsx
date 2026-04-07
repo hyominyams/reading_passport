@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import type { Book } from '@/types/database';
+import BookCoverImage from '@/components/book/BookCoverImage';
 
 interface BookCardProps {
   book: Book;
@@ -12,47 +13,45 @@ export default function BookCard({ book, onClick }: BookCardProps) {
   return (
     <motion.button
       onClick={onClick}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.03 }}
+      whileHover={{ y: -2 }}
       whileTap={{ scale: 0.98 }}
-      className="flex gap-4 p-4 rounded-xl bg-card border border-border
-                 hover:shadow-md transition-shadow text-left w-full"
-      style={{ boxShadow: '-4px 0 8px -4px rgba(141,110,76,0.15)' }}
+      className="flex gap-4 p-4 rounded-xl bg-white border border-border
+                 hover:shadow-md hover:border-foreground/10 transition-all text-left w-full"
     >
-      {/* Cover image with book-spine effect */}
-      <div className="w-20 h-28 rounded-lg bg-muted-light overflow-hidden flex-shrink-0 border border-border/50 shadow-sm">
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/20 to-primary/20 text-3xl">
-            📖
-          </div>
-        )}
+      {/* Cover */}
+      <div className="relative w-16 h-22 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
+        <BookCoverImage
+          key={book.cover_url}
+          title={book.title}
+          coverUrl={book.cover_url}
+          sizes="64px"
+        />
       </div>
 
-      {/* Book info */}
-      <div className="flex flex-col justify-center gap-2 min-w-0">
-        <h4 className="text-base font-heading text-foreground truncate">
+      {/* Info */}
+      <div className="flex flex-col justify-center gap-1.5 min-w-0">
+        <h4 className="text-sm font-medium text-foreground truncate">
           {book.title}
         </h4>
-
-        {/* Language badges */}
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {book.languages_available.map((lang) => (
             <span
               key={lang}
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                         bg-accent/10 text-accent-dark"
+              className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-muted"
             >
-              {lang === 'ko' ? '🇰🇷 한국어' : '🇺🇸 English'}
+              {lang === 'ko' ? 'KO' : 'EN'}
             </span>
           ))}
         </div>
+      </div>
+
+      {/* Arrow */}
+      <div className="flex items-center ml-auto">
+        <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+        </svg>
       </div>
     </motion.button>
   );

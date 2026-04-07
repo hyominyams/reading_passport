@@ -45,6 +45,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { action, nicknames, classId, studentId } = body;
+  const isAdmin = profile.role === 'admin';
+  const resolvedClassId = isAdmin
+    ? classId || profile.class || ''
+    : profile.class || '';
 
   if (action === 'bulk_create') {
     if (!nicknames || !Array.isArray(nicknames) || nicknames.length === 0) {
@@ -54,7 +58,7 @@ export async function POST(request: NextRequest) {
     const result = await bulkCreateStudents(
       user.id,
       nicknames,
-      classId || profile.class || ''
+      resolvedClassId
     );
 
     if (!result.success) {
@@ -69,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '학생 ID가 필요합니다' }, { status: 400 });
     }
 
-    const result = await resetStudentCode(studentId);
+    const result = await resetStudentCode(studentId, user.id, isAdmin);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 });
     }

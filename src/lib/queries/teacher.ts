@@ -1,4 +1,6 @@
+import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { User, Activity, ChatLog, Book, HiddenContent, Story } from '@/types/database';
 
 export async function getClassStudents(teacherId: string): Promise<User[]> {
@@ -71,64 +73,147 @@ export function generateStudentCode(): string {
   return code;
 }
 
+function buildStudentEmail(studentId: string): string {
+  return `student-${studentId}@student.worlddocent.local`;
+}
+
+async function loadExistingStudentCodes(): Promise<Set<string>> {
+  const supabase = createServiceClient();
+  const existingCodes = new Set<string>();
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('student_code')
+    .not('student_code', 'is', null);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of data ?? []) {
+    if (row.student_code) {
+      existingCodes.add(row.student_code);
+    }
+  }
+
+  return existingCodes;
+}
+
+function nextUniqueStudentCode(existingCodes: Set<string>): string {
+  let code = generateStudentCode();
+  while (existingCodes.has(code)) {
+    code = generateStudentCode();
+  }
+  existingCodes.add(code);
+  return code;
+}
+
 export async function bulkCreateStudents(
   teacherId: string,
   nicknames: string[],
   classId: string
 ): Promise<{ success: boolean; students?: { nickname: string; code: string }[]; error?: string }> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
+  const cleanNicknames = nicknames.map((nickname) => nickname.trim()).filter(Boolean);
+  const createdAuthUserIds: string[] = [];
 
-  // Generate unique codes for each student
-  const students: { nickname: string; code: string }[] = [];
-  const existingCodes = new Set<string>();
-
-  // Fetch existing codes to avoid duplicates
-  const { data: existingStudents } = await supabase
-    .from('users')
-    .select('student_code')
-    .not('student_code', 'is', null);
-
-  if (existingStudents) {
-    for (const s of existingStudents) {
-      if (s.student_code) existingCodes.add(s.student_code);
-    }
+  if (cleanNicknames.length === 0) {
+    return { success: false, error: '학생 닉네임을 입력해주세요' };
   }
 
-  for (const nickname of nicknames) {
-    let code = generateStudentCode();
-    while (existingCodes.has(code)) {
-      code = generateStudentCode();
+  try {
+    const existingCodes = await loadExistingStudentCodes();
+    const students: { nickname: string; code: string }[] = [];
+
+    for (const nickname of cleanNicknames) {
+      const code = nextUniqueStudentCode(existingCodes);
+      const authUserId = randomUUID();
+      const internalEmail = buildStudentEmail(authUserId);
+
+      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+        id: authUserId,
+        email: internalEmail,
+        password: randomUUID(),
+        email_confirm: true,
+        user_metadata: {
+          nickname,
+          student_code: code,
+          teacher_id: teacherId,
+        },
+        app_metadata: {
+          role: 'student',
+        },
+      });
+
+      if (authError || !authUser.user) {
+        throw authError ?? new Error('학생 계정을 생성할 수 없습니다.');
+      }
+
+      createdAuthUserIds.push(authUser.user.id);
+
+      const { error: profileError } = await supabase.from('users').insert({
+        id: authUser.user.id,
+        email: internalEmail,
+        role: 'student',
+        nickname,
+        student_code: code,
+        teacher_id: teacherId,
+        class: classId,
+      });
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      students.push({ nickname, code });
     }
-    existingCodes.add(code);
-    students.push({ nickname: nickname.trim(), code });
-  }
 
-  // Use Supabase auth admin to create users, or insert directly into users table
-  // Since students use code-based login, we insert directly
-  const inserts = students.map((s) => ({
-    role: 'student' as const,
-    nickname: s.nickname,
-    student_code: s.code,
-    teacher_id: teacherId,
-    class: classId,
-  }));
-
-  const { error } = await supabase.from('users').insert(inserts);
-
-  if (error) {
+    return { success: true, students };
+  } catch (error) {
     console.error('Error bulk creating students:', error);
-    return { success: false, error: error.message };
-  }
 
-  return { success: true, students };
+    // Best-effort rollback of auth users if profile insertion fails mid-batch.
+    for (const id of createdAuthUserIds.reverse()) {
+      await supabase.auth.admin.deleteUser(id);
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '학생 생성에 실패했습니다',
+    };
+  }
 }
 
 export async function resetStudentCode(
-  studentId: string
+  studentId: string,
+  teacherId: string,
+  isAdmin = false
 ): Promise<{ success: boolean; newCode?: string; error?: string }> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
+  const { data: target, error: targetError } = await supabase
+    .from('users')
+    .select('id, teacher_id, role, student_code')
+    .eq('id', studentId)
+    .single();
 
-  const newCode = generateStudentCode();
+  if (targetError || !target) {
+    return { success: false, error: '학생을 찾을 수 없습니다.' };
+  }
+
+  if (target.role !== 'student') {
+    return { success: false, error: '학생 코드만 재발급할 수 있습니다.' };
+  }
+
+  if (!isAdmin && target.teacher_id !== teacherId) {
+    return { success: false, error: '학생 코드 재발급 권한이 없습니다.' };
+  }
+
+  const existingCodes = await loadExistingStudentCodes();
+  if (target.student_code) {
+    existingCodes.delete(target.student_code);
+  }
+
+  const newCode = nextUniqueStudentCode(existingCodes);
 
   const { error } = await supabase
     .from('users')

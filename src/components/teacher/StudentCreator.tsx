@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import type { User } from '@/types/database';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 

@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e4]:
+      - link "World Stories" [ref=e5] [cursor=pointer]:
+        - /url: /map
+        - img [ref=e7]
+        - generic [ref=e9]: World Stories
+      - navigation [ref=e10]:
+        - link "세계지도" [ref=e11] [cursor=pointer]:
+          - /url: /map
+          - img [ref=e12]
+          - generic [ref=e14]: 세계지도
+        - link "도서관" [ref=e15] [cursor=pointer]:
+          - /url: /library
+          - img [ref=e16]
+          - generic [ref=e18]: 도서관
+        - generic [ref=e19]:
+          - generic [ref=e20]: "?"
+          - button "로그아웃" [ref=e21]
+  - main [ref=e22]:
+    - generic [ref=e23]:
+      - paragraph [ref=e24]: Select a Country
+      - heading "세계의 이야기" [level=1] [ref=e25]
+    - generic [ref=e26]:
+      - button "콜롬비아 🇨🇴 콜롬비아 커피와 음악의 나라" [ref=e27]:
+        - img "콜롬비아" [ref=e29]
+        - generic [ref=e31]:
+          - generic [ref=e32]: 🇨🇴
+          - heading "콜롬비아" [level=3] [ref=e33]
+          - paragraph [ref=e34]: 커피와 음악의 나라
+      - button "탄자니아 1 🇹🇿 탄자니아 킬리만자로의 나라" [ref=e35]:
+        - img "탄자니아" [ref=e37]
+        - generic [ref=e39]: "1"
+        - generic [ref=e40]:
+          - generic [ref=e41]: 🇹🇿
+          - heading "탄자니아" [level=3] [ref=e42]
+          - paragraph [ref=e43]: 킬리만자로의 나라
+      - button "캄보디아 🇰🇭 캄보디아 앙코르와트의 나라" [ref=e44]:
+        - img "캄보디아" [ref=e46]
+        - generic [ref=e48]:
+          - generic [ref=e49]: 🇰🇭
+          - heading "캄보디아" [level=3] [ref=e50]
+          - paragraph [ref=e51]: 앙코르와트의 나라
+      - button "네팔 🇳🇵 네팔 히말라야의 나라" [ref=e52]:
+        - img "네팔" [ref=e54]
+        - generic [ref=e56]:
+          - generic [ref=e57]: 🇳🇵
+          - heading "네팔" [level=3] [ref=e58]
+          - paragraph [ref=e59]: 히말라야의 나라
+      - button "페루 🇵🇪 페루 잉카 문명의 나라" [ref=e60]:
+        - img "페루" [ref=e62]
+        - generic [ref=e64]:
+          - generic [ref=e65]: 🇵🇪
+          - heading "페루" [level=3] [ref=e66]
+          - paragraph [ref=e67]: 잉카 문명의 나라
+      - button "케냐 🇰🇪 케냐 사파리의 나라" [ref=e68]:
+        - img "케냐" [ref=e70]
+        - generic [ref=e72]:
+          - generic [ref=e73]: 🇰🇪
+          - heading "케냐" [level=3] [ref=e74]
+          - paragraph [ref=e75]: 사파리의 나라
+  - button "Open Next.js Dev Tools" [ref=e81] [cursor=pointer]:
+    - img [ref=e82]
+  - alert [ref=e85]

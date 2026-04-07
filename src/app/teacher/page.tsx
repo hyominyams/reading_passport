@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import type { User, Activity, Book, ChatLog } from '@/types/database';
@@ -34,67 +34,76 @@ export default function TeacherPage() {
   const [selectedStudent, setSelectedStudent] = useState<StudentWithActivity | null>(null);
   const [selectedChat, setSelectedChat] = useState<ChatLog | null>(null);
 
-  const fetchStudentOverview = useCallback(async () => {
-    if (!user) return;
-    const supabase = createClient();
-
-    // Get all students for this teacher
-    const { data: studentsData } = await supabase
-      .from('users')
-      .select('*')
-      .eq('teacher_id', user.id)
-      .eq('role', 'student')
-      .order('nickname', { ascending: true });
-
-    const studentList = (studentsData ?? []) as User[];
-    const studentIds = studentList.map((s) => s.id);
-
-    if (studentIds.length === 0) {
-      setStudents([]);
-      setLoadingStudents(false);
-      return;
-    }
-
-    // Get activities with books
-    const { data: activitiesData } = await supabase
-      .from('activities')
-      .select('*, book:books(*)')
-      .in('student_id', studentIds)
-      .order('created_at', { ascending: false });
-
-    // Get flagged chat info
-    const { data: flaggedChats } = await supabase
-      .from('chat_logs')
-      .select('student_id')
-      .in('student_id', studentIds)
-      .eq('flagged', true);
-
-    const activities = (activitiesData ?? []) as (Activity & { book?: Book })[];
-    const flaggedStudentIds = new Set((flaggedChats ?? []).map((c) => c.student_id));
-
-    // Map most recent activity per student
-    const studentActivityMap = new Map<string, Activity & { book?: Book }>();
-    for (const act of activities) {
-      if (!studentActivityMap.has(act.student_id)) {
-        studentActivityMap.set(act.student_id, act);
-      }
-    }
-
-    const enriched: StudentWithActivity[] = studentList.map((s) => ({
-      ...s,
-      currentActivity: studentActivityMap.get(s.id),
-      hasFlaggedChat: flaggedStudentIds.has(s.id),
-    }));
-
-    setStudents(enriched);
-    setLoadingStudents(false);
-  }, [user]);
-
   useEffect(() => {
-    if (activeTab === 'overview') {
-      fetchStudentOverview();
-    }
-  }, [activeTab, fetchStudentOverview]);
+    if (activeTab !== 'overview' || !user) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      const supabase = createClient();
+
+      // Get all students for this teacher.
+      const { data: studentsData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('teacher_id', user.id)
+        .eq('role', 'student')
+        .order('nickname', { ascending: true });
+
+      if (cancelled) return;
+
+      const studentList = (studentsData ?? []) as User[];
+      const studentIds = studentList.map((s) => s.id);
+
+      if (studentIds.length === 0) {
+        setStudents([]);
+        setLoadingStudents(false);
+        return;
+      }
+
+      // Get activities with books.
+      const { data: activitiesData } = await supabase
+        .from('activities')
+        .select('*, book:books(*)')
+        .in('student_id', studentIds)
+        .order('created_at', { ascending: false });
+
+      if (cancelled) return;
+
+      // Get flagged chat info.
+      const { data: flaggedChats } = await supabase
+        .from('chat_logs')
+        .select('student_id')
+        .in('student_id', studentIds)
+        .eq('flagged', true);
+
+      if (cancelled) return;
+
+      const activities = (activitiesData ?? []) as (Activity & { book?: Book })[];
+      const flaggedStudentIds = new Set((flaggedChats ?? []).map((c) => c.student_id));
+
+      // Map most recent activity per student.
+      const studentActivityMap = new Map<string, Activity & { book?: Book }>();
+      for (const act of activities) {
+        if (!studentActivityMap.has(act.student_id)) {
+          studentActivityMap.set(act.student_id, act);
+        }
+      }
+
+      const enriched: StudentWithActivity[] = studentList.map((s) => ({
+        ...s,
+        currentActivity: studentActivityMap.get(s.id),
+        hasFlaggedChat: flaggedStudentIds.has(s.id),
+      }));
+
+      setStudents(enriched);
+      setLoadingStudents(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, user]);
 
   const handleSelectStudent = (student: StudentWithActivity) => {
     setSelectedStudent(student);

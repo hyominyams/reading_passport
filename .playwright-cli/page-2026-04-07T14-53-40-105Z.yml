@@ -1,0 +1,83 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - button "휠을 내리거나 탭해서 히어로 영상을 시작하세요" [ref=e8]: 휠을 내리거나 탭해 시작
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - paragraph [ref=e14]: How it works
+        - heading "Read, Write, Lead the World" [level=2] [ref=e15]:
+          - text: Read, Write, Lead
+          - text: the World
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: "01"
+          - heading "Read the World" [level=3] [ref=e19]
+          - paragraph [ref=e20]: Empathy
+          - paragraph [ref=e21]: 제3세계 이야기 속 기후, 역사, 문화를 통합적으로 탐구하고 공감의 시선으로 세계를 읽습니다
+        - generic [ref=e22]:
+          - generic [ref=e23]: "02"
+          - heading "Write the World" [level=3] [ref=e24]
+          - paragraph [ref=e25]: Sincerity
+          - paragraph [ref=e26]: 문화적 감수성을 담아 나만의 언어와 그림으로 이야기를 재창작합니다
+        - generic [ref=e27]:
+          - generic [ref=e28]: "03"
+          - heading "Lead the World" [level=3] [ref=e29]
+          - paragraph [ref=e30]: Sharing
+          - paragraph [ref=e31]: 국경을 넘어 다양한 문화권과 작품을 공유하고, 세계 시민으로 성장합니다
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - paragraph [ref=e34]: Activities
+        - heading "네 가지 독서 활동으로 여권을 완성하세요" [level=2] [ref=e35]:
+          - text: 네 가지 독서 활동으로
+          - text: 여권을 완성하세요
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Step 1
+          - heading "Story Read" [level=3] [ref=e39]
+          - paragraph [ref=e40]: 그림책을 읽고 감정 스티커와 한줄 감상을 남깁니다
+        - generic [ref=e41]:
+          - paragraph [ref=e42]: Step 2
+          - heading "Hidden Stories" [level=3] [ref=e43]
+          - paragraph [ref=e44]: 책 속에 숨겨진 문화와 역사 콘텐츠를 탐험합니다
+        - generic [ref=e45]:
+          - paragraph [ref=e46]: Step 3
+          - heading "Talk with Character" [level=3] [ref=e47]
+          - paragraph [ref=e48]: 등장인물과 AI 대화를 통해 이야기를 깊이 이해합니다
+        - generic [ref=e49]:
+          - paragraph [ref=e50]: Step 4
+          - heading "My Story" [level=3] [ref=e51]
+          - paragraph [ref=e52]: 나만의 이야기를 창작하고 그림책으로 완성합니다
+      - generic [ref=e53]:
+        - img [ref=e55]
+        - paragraph [ref=e57]: 활동마다 도장을 모으고, 4개를 완성하면 여권 페이지가 채워집니다
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - paragraph [ref=e61]: Global Partnership
+        - heading "Seeds of Empowerment" [level=2] [ref=e62]:
+          - text: Seeds of
+          - text: Empowerment
+        - paragraph [ref=e63]: Stanford University와 연계하여 학생들의 창작물을 글로벌 플랫폼에 공유합니다. 베트남, 모로코 등 국외 교육기관과의 교류를 통해 실질적인 소통을 경험합니다.
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - paragraph [ref=e66]: 10+
+          - paragraph [ref=e67]: 참여 국가
+        - generic [ref=e68]:
+          - paragraph [ref=e69]: 1,001
+          - paragraph [ref=e70]: 등록 도서
+        - generic [ref=e71]:
+          - paragraph [ref=e72]: Stanford
+          - paragraph [ref=e73]: 협력 기관
+        - generic [ref=e74]:
+          - paragraph [ref=e75]: 1001 Stories
+          - paragraph [ref=e76]: 공유 플랫폼
+    - generic [ref=e78]:
+      - heading "이야기로 세계를 연결하세요" [level=2] [ref=e79]
+      - paragraph [ref=e80]: 지금 바로 디지털 독서 여권을 시작하세요
+      - link "시작하기" [ref=e81] [cursor=pointer]:
+        - /url: /login
+        - text: 시작하기
+        - img [ref=e82]
+    - contentinfo [ref=e84]:
+      - paragraph [ref=e85]: World Docent © 2026 · Seeds of Empowerment · Leading with Reading
+  - button "Open Next.js Dev Tools" [ref=e91] [cursor=pointer]:
+    - img [ref=e92]
+  - alert [ref=e95]

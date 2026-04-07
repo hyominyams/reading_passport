@@ -1,19 +1,19 @@
 import type { Metadata } from 'next';
-import { Jua, Gowun_Dodum } from 'next/font/google';
+import { Space_Grotesk, Noto_Sans_KR } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthProvider';
 import './globals.css';
 
-const jua = Jua({
-  variable: '--font-jua',
+const spaceGrotesk = Space_Grotesk({
+  variable: '--font-space-grotesk',
   subsets: ['latin'],
-  weight: '400',
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
-const gowunDodum = Gowun_Dodum({
-  variable: '--font-gowun-dodum',
+const notoSansKR = Noto_Sans_KR({
+  variable: '--font-noto-sans-kr',
   subsets: ['latin'],
-  weight: '400',
+  weight: ['300', '400', '500', '700'],
   display: 'swap',
 });
 
@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`${jua.variable} ${gowunDodum.variable} h-full antialiased`}>
+    <html lang="ko" className={`${spaceGrotesk.variable} ${notoSansKR.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <AuthProvider>
           {children}

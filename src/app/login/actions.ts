@@ -1,13 +1,17 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/service';
 
 interface LoginResult {
   success: boolean;
   error?: string;
   redirectTo?: string;
   needsOnboarding?: boolean;
+}
+
+function buildStudentEmail(studentId: string): string {
+  return `student-${studentId}@student.worlddocent.local`;
 }
 
 export async function teacherLogin(
@@ -26,10 +30,7 @@ export async function teacherLogin(
   }
 
   // Check role using service client (bypasses RLS - session cookies not yet available in same request)
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = createServiceClient();
   const { data: profile } = await serviceClient
     .from('users')
     .select('role')
@@ -51,10 +52,7 @@ export async function studentLogin(
   studentCode: string
 ): Promise<LoginResult> {
   // Use service role to look up student code
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = createServiceClient();
 
   // Find the student by their 6-digit code
   const { data: student, error: lookupError } = await serviceClient
@@ -71,7 +69,7 @@ export async function studentLogin(
   // Since students don't have passwords, we use the service role to create a session
   const { data: authData, error: authError } = await serviceClient.auth.admin.generateLink({
     type: 'magiclink',
-    email: student.email || `${studentCode}@student.worlddocent.local`,
+    email: student.email || buildStudentEmail(student.id),
   });
 
   if (authError || !authData) {

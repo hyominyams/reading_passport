@@ -18,6 +18,8 @@ interface BookViewerModalProps {
   translatedPages?: string[];
   comments?: Comment[];
   canComment?: boolean;
+  commentLockMessage?: string;
+  onReadingComplete?: (totalPages: number) => void;
   commentText?: string;
   onCommentChange?: (text: string) => void;
   onSubmitComment?: () => void;
@@ -32,6 +34,8 @@ export default function BookViewerModal({
   translatedPages,
   comments = [],
   canComment = false,
+  commentLockMessage = '이 책을 끝까지 읽은 뒤 댓글을 남길 수 있어요.',
+  onReadingComplete,
   commentText = '',
   onCommentChange,
   onSubmitComment,
@@ -39,22 +43,8 @@ export default function BookViewerModal({
 }: BookViewerModalProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [showTranslation, setShowTranslation] = useState(false);
-  const hasReachedEndRef = useRef(false);
+  const hasReportedReadRef = useRef(false);
   const isLastPage = currentPage === pages.length - 1;
-
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentPage(0);
-      setShowTranslation(false);
-      hasReachedEndRef.current = false;
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isLastPage && !hasReachedEndRef.current) {
-      hasReachedEndRef.current = true;
-    }
-  }, [isLastPage]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -73,6 +63,21 @@ export default function BookViewerModal({
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, currentPage, pages.length, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !isLastPage || hasReportedReadRef.current) {
+      return;
+    }
+
+    onReadingComplete?.(pages.length);
+    hasReportedReadRef.current = true;
+  }, [isLastPage, isOpen, onReadingComplete, pages.length]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      hasReportedReadRef.current = false;
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -192,7 +197,7 @@ export default function BookViewerModal({
                 )}
 
                 {/* Comment input */}
-                {canComment && hasReachedEndRef.current && (
+                {canComment && isLastPage && (
                   <div className="border-t border-border pt-4">
                     <p className="text-xs font-heading text-muted mb-2">감상 남기기</p>
                     <div className="flex gap-2">
@@ -217,6 +222,15 @@ export default function BookViewerModal({
                         {submittingComment ? '...' : '등록'}
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {!canComment && isLastPage && (
+                  <div className="border-t border-border pt-4">
+                    <p className="text-xs font-heading text-muted mb-2">감상 남기기</p>
+                    <p className="text-sm text-muted">
+                      {commentLockMessage}
+                    </p>
                   </div>
                 )}
               </div>

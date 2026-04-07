@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -20,8 +20,10 @@ interface LocalMessage {
 
 export default function ChatPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const bookId = params.id as string;
+  const language = searchParams.get('lang') === 'en' ? 'en' : 'ko';
   const { user, loading: authLoading } = useAuth();
 
   // Phase: 'select' or 'chat'
@@ -50,7 +52,6 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const supabase = useMemo(() => createClient(), []);
 
   // Count conversation turns (user messages)
@@ -105,6 +106,7 @@ export default function ChatPage() {
         .eq('student_id', user.id)
         .eq('book_id', bookId)
         .eq('chat_type', 'character')
+        .eq('language', language)
         .order('created_at', { ascending: false });
 
       setChatLogs((logsData ?? []) as ChatLog[]);
@@ -126,7 +128,7 @@ export default function ChatPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, bookId, supabase]);
+  }, [user, bookId, language, supabase]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -144,7 +146,10 @@ export default function ChatPage() {
     // Send initial greeting from character
     const greeting: LocalMessage = {
       role: 'assistant',
-      content: `안녕! 나는 ${character.name}이야. 이 이야기에 대해 이야기해 볼래? 무엇이 궁금해?`,
+      content:
+        language === 'en'
+          ? `Hi! I'm ${character.name}. Do you want to talk about this story? What are you curious about?`
+          : `안녕! 나는 ${character.name}이야. 이 이야기에 대해 이야기해 볼래? 무엇이 궁금해?`,
     };
     setMessages([greeting]);
   };
@@ -163,17 +168,17 @@ export default function ChatPage() {
       const response = await fetch('/api/chat/character', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookId,
-          characterId: selectedCharacter.id,
-          messages: updatedMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          language: 'ko',
-          characterAnalysis: book.character_analysis,
-        }),
-      });
+          body: JSON.stringify({
+            bookId,
+            characterId: selectedCharacter.id,
+            messages: updatedMessages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            language,
+            characterAnalysis: book.character_analysis,
+          }),
+        });
 
       if (!response.ok) {
         throw new Error('Chat API request failed');
@@ -294,7 +299,7 @@ export default function ChatPage() {
           character_name: selectedCharacter.name,
           chat_type: 'character',
           messages: chatMessages,
-          language: 'ko',
+          language,
           flagged: false,
           ended_at: new Date().toISOString(),
         })
@@ -321,6 +326,7 @@ export default function ChatPage() {
           .eq('student_id', user.id)
           .eq('book_id', bookId)
           .eq('chat_type', 'character')
+          .eq('language', language)
           .order('created_at', { ascending: false });
 
         setChatLogs((logsData ?? []) as ChatLog[]);

@@ -1,34 +1,101 @@
 import { createClient } from '@/lib/supabase/server';
-import { createServiceClient } from '@/lib/supabase/service';
 import type { Book, Activity, Language } from '@/types/database';
 
+export interface MapBookProgress {
+  bookId: string;
+  stampCount: number;
+  completedTabsCount: number;
+  hasStarted: boolean;
+  isCompleted: boolean;
+  updatedAt: string;
+}
+
+export interface MapBooksData {
+  booksByCountry: Record<string, Book[]>;
+  bookProgressById: Record<string, MapBookProgress>;
+}
+
+function emptyMapBooksData(): MapBooksData {
+  return {
+    booksByCountry: {},
+    bookProgressById: {},
+  };
+}
+
 export async function getBooksByCountry(): Promise<Record<string, Book[]>> {
-  const supabase = createServiceClient();
+  const { booksByCountry } = await getMapBooksData();
+  return booksByCountry;
+}
+
+export async function getMapBooksData(): Promise<MapBooksData> {
+  const supabase = await createClient();
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    if (authError) {
+      console.error('Error resolving current user for map:', authError);
+    }
+    return emptyMapBooksData();
+  }
 
   const { data, error } = await supabase
     .from('books')
     .select('*')
-    .eq('approved', true)
     .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching books:', error);
-    return {};
+    return emptyMapBooksData();
   }
 
+  const books = (data ?? []) as Book[];
   const grouped: Record<string, Book[]> = {};
-  for (const book of (data ?? []) as Book[]) {
+  for (const book of books) {
     if (!grouped[book.country_id]) {
       grouped[book.country_id] = [];
     }
     grouped[book.country_id].push(book);
   }
 
-  return grouped;
+  const bookIds = books.map((book) => book.id);
+  const bookProgressById: Record<string, MapBookProgress> = {};
+
+  if (bookIds.length > 0) {
+    const { data: activities, error: activityError } = await supabase
+      .from('activities')
+      .select('book_id, completed_tabs, stamps_earned, created_at')
+      .eq('student_id', authData.user.id)
+      .in('book_id', bookIds);
+
+    if (activityError) {
+      console.error('Error fetching map activities:', activityError);
+    } else {
+      for (const activity of (activities ?? []) as Pick<
+        Activity,
+        'book_id' | 'completed_tabs' | 'stamps_earned' | 'created_at'
+      >[]) {
+        const stamps = activity.stamps_earned ?? [];
+        const completedTabs = activity.completed_tabs ?? [];
+        bookProgressById[activity.book_id] = {
+          bookId: activity.book_id,
+          stampCount: stamps.length,
+          completedTabsCount: completedTabs.length,
+          hasStarted: stamps.length > 0 || completedTabs.length > 0,
+          isCompleted: stamps.length >= 4,
+          updatedAt: activity.created_at,
+        };
+      }
+    }
+  }
+
+  return {
+    booksByCountry: grouped,
+    bookProgressById,
+  };
 }
 
 export async function getBookById(bookId: string): Promise<Book | null> {
-  const supabase = createServiceClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('books')

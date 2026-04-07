@@ -3,7 +3,16 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import PdfViewer from '@/components/book/PdfViewer';
+import dynamic from 'next/dynamic';
+
+const PdfViewer = dynamic(() => import('./PdfViewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center" style={{ minHeight: '500px' }}>
+      <div className="w-8 h-8 border-3 border-muted-light border-t-primary rounded-full animate-spin" />
+    </div>
+  ),
+});
 import EmotionPicker from '@/components/book/EmotionPicker';
 import StampAnimation from '@/components/book/StampAnimation';
 import { useAuth } from '@/hooks/useAuth';

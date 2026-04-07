@@ -10,6 +10,10 @@ interface LibraryBookCardProps {
   isLiked: boolean;
   onItemClick: (item: LibraryStoryItem) => void;
   onLike: (storyId: string) => void;
+  bookTitle?: string | null;
+  bookCoverUrl?: string | null;
+  storyTitle?: string | null;
+  studentName?: string | null;
 }
 
 export default function LibraryBookCard({
@@ -18,10 +22,19 @@ export default function LibraryBookCard({
   isLiked,
   onItemClick,
   onLike,
+  bookTitle,
+  bookCoverUrl,
+  storyTitle,
+  studentName,
 }: LibraryBookCardProps) {
-  const coverImage = item.story.scene_images?.[0] || null;
-  const title = item.story.final_text?.[0]?.slice(0, 30) || '이야기';
-  const authorName = item.story.author?.nickname || '작성자';
+  const coverImage = item.story.scene_images?.[0] || bookCoverUrl || item.book?.cover_url || null;
+  const title =
+    storyTitle?.trim() ||
+    item.story.final_text?.[0]?.slice(0, 30) ||
+    '이야기';
+  const authorName = studentName?.trim() || item.story.author?.nickname || '작성자';
+  const originalBookTitle =
+    bookTitle?.trim() || item.book?.title?.trim() || null;
 
   return (
     <motion.div
@@ -40,7 +53,7 @@ export default function LibraryBookCard({
             <div className="aspect-[3/4]">
               <img
                 src={coverImage}
-                alt="Story cover"
+                alt={originalBookTitle ? `${originalBookTitle} 표지` : 'Story cover'}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
             </div>
@@ -55,6 +68,11 @@ export default function LibraryBookCard({
 
         {/* Info */}
         <div className="p-3">
+          {originalBookTitle && (
+            <p className="text-[11px] text-muted line-clamp-1 mb-1">
+              원작: {originalBookTitle}
+            </p>
+          )}
           <p className="text-sm font-heading text-foreground line-clamp-1 mb-1">
             {title}
           </p>

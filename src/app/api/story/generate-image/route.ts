@@ -1,41 +1,62 @@
 import { NextRequest } from 'next/server';
-import openai from '@/lib/ai/openai';
+import { generateGeminiImage } from '@/lib/ai/gemini';
+import { storeGeneratedImage } from '@/lib/storage/generated-images';
+import type { CharacterRef } from '@/types/database';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, character_refs } = await request.json();
+    const body = (await request.json()) as {
+      prompt?: string;
+      character_refs?: CharacterRef[];
+    };
+    const prompt = body.prompt?.trim();
+
+    if (!prompt) {
+      return Response.json({ error: 'Prompt is required' }, { status: 400 });
+    }
 
     // Build the full prompt with character refs if available
     let fullPrompt = prompt;
-    if (character_refs && character_refs.length > 0) {
-      const refDescs = character_refs
-        .map((ref: { name: string; imageUrl: string }) => `${ref.name}`)
+    const referenceCharacters = (body.character_refs ?? []).filter(
+      (ref) => ref.imageUrl
+    );
+
+    if (referenceCharacters.length > 0) {
+      const refDescs = referenceCharacters
+        .map((ref) => ref.name)
         .join(', ');
-      fullPrompt = `${prompt}\nConsistently depict these characters: ${refDescs}`;
+      fullPrompt = `${prompt}\nUse the attached character reference images to keep ${refDescs} visually consistent across the illustration.`;
     }
 
-    // Use GPT Image model for image generation
-    const response = await openai.images.generate({
-      model: 'gpt-image-1',
+    const generatedImage = await generateGeminiImage({
       prompt: `Children's book illustration: ${fullPrompt}. Style: warm, friendly, appropriate for elementary school students.`,
-      n: 1,
-      size: '1024x1024',
+      referenceImages: referenceCharacters.map((ref) => ({
+        name: ref.name,
+        imageUrl: ref.imageUrl,
+      })),
+      aspectRatio: referenceCharacters.length > 0 ? '4:3' : '1:1',
+      imageSize: '1K',
     });
 
-    const imageUrl = response.data?.[0]?.url;
+    const imageUrl = await storeGeneratedImage({
+      base64Data: generatedImage.data,
+      mimeType: generatedImage.mimeType,
+      folder: referenceCharacters.length > 0 ? 'scene-images' : 'character-images',
+    });
 
-    if (!imageUrl) {
-      return Response.json(
-        { error: 'No image generated' },
-        { status: 500 }
-      );
-    }
-
-    return Response.json({ image_url: imageUrl });
+    return Response.json({
+      image_url: imageUrl,
+      model: generatedImage.model,
+    });
   } catch (error) {
     console.error('Image generation error:', error);
     return Response.json(
-      { error: 'Failed to generate image' },
+      {
+        error:
+          error instanceof Error ? error.message : 'Failed to generate image',
+      },
       { status: 500 }
     );
   }
