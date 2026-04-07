@@ -132,13 +132,10 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <motion.div
+              <div
                 key={feature.title}
-                className="bg-card rounded-2xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow text-center"
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.15 }}
+                className="bg-card rounded-2xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow text-center animate-fade-in-up"
+                style={{ animationDelay: `${index * 0.15}s`, animationFillMode: 'both' }}
               >
                 <div className={`w-16 h-16 rounded-2xl ${feature.color} flex items-center justify-center text-3xl mx-auto mb-4`}>
                   {feature.icon}
@@ -149,7 +146,7 @@ export default function HomePage() {
                 <p className="text-sm text-muted leading-relaxed">
                   {feature.description}
                 </p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
