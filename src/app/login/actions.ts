@@ -25,8 +25,12 @@ export async function teacherLogin(
     return { success: false, error: '이메일 또는 비밀번호가 올바르지 않습니다.' };
   }
 
-  // Check that this user is a teacher or admin
-  const { data: profile } = await supabase
+  // Check role using service client (bypasses RLS - session cookies not yet available in same request)
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const { data: profile } = await serviceClient
     .from('users')
     .select('role')
     .eq('id', data.user.id)
