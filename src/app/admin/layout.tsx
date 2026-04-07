@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
@@ -11,16 +11,22 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading, user, profile } = useAuth();
   const router = useRouter();
+  const [waitCount, setWaitCount] = useState(0);
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    if (loading) return;
+    if (user && !profile && waitCount < 5) {
+      const timer = setTimeout(() => setWaitCount((c) => c + 1), 600);
+      return () => clearTimeout(timer);
+    }
+    if (!user || (!isAdmin && profile)) {
       router.push('/map');
     }
-  }, [loading, isAdmin, router]);
+  }, [loading, user, profile, isAdmin, router, waitCount]);
 
-  if (loading) {
+  if (loading || (user && !profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner message="로딩 중..." />

@@ -33,14 +33,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    // Try fetching profile with retries (RLS may not be ready immediately after login)
+    let attempts = 0;
+    while (attempts < 3) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (data) {
-      setProfile(data as User);
+      if (data) {
+        setProfile(data as User);
+        return;
+      }
+      // If RLS blocks the read, wait briefly and retry
+      if (error && attempts < 2) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      attempts++;
     }
   }, [supabase]);
 

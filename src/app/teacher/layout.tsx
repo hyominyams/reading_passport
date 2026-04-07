@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
@@ -11,16 +11,24 @@ export default function TeacherLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isTeacher, loading, profile } = useAuth();
+  const { isTeacher, loading, profile, user } = useAuth();
   const router = useRouter();
+  const [waitCount, setWaitCount] = useState(0);
 
+  // Wait for profile to load before redirecting
   useEffect(() => {
-    if (!loading && !isTeacher) {
+    if (loading) return;
+    // If user is logged in but profile not yet loaded, wait a bit
+    if (user && !profile && waitCount < 5) {
+      const timer = setTimeout(() => setWaitCount((c) => c + 1), 600);
+      return () => clearTimeout(timer);
+    }
+    if (!user || (!isTeacher && profile)) {
       router.push('/map');
     }
-  }, [loading, isTeacher, router]);
+  }, [loading, user, profile, isTeacher, router, waitCount]);
 
-  if (loading) {
+  if (loading || (user && !profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner message="로딩 중..." />
