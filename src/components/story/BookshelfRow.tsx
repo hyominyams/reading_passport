@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import LibraryBookCard from './LibraryBookCard';
+import BookShelf from './BookShelf';
 import type { LibraryBookShelf, LibraryStoryItem } from './LibraryGrid';
 
 interface BookshelfRowProps {
@@ -55,37 +55,34 @@ export default function BookshelfRow({
   const shelfPreviewItems = shelves.slice(0, 8);
 
   return (
-    <div className="mb-4">
-      {/* Shelf bar - clickable */}
-      <button
-        onClick={onToggle}
-        className="w-full group"
-      >
+    <div className="mb-2">
+      {/* Country header - clickable */}
+      <button onClick={onToggle} className="w-full group">
         <div className="relative">
           {/* Book spines peeking above shelf (when collapsed) */}
           {!isExpanded && shelves.length > 0 && (
-            <div className="flex gap-1.5 px-6 pb-0 justify-start overflow-hidden h-8">
+            <div className="flex gap-1.5 px-6 pb-0 justify-start overflow-hidden h-10">
               {shelfPreviewItems.map((shelf, i) => {
                 const colors = [
-                  'bg-secondary/60', 'bg-primary/50', 'bg-accent/50',
-                  'bg-secondary-dark/40', 'bg-primary/40', 'bg-accent/40',
-                  'bg-secondary/50', 'bg-primary/60',
+                  'bg-[#8B6914]', 'bg-[#2D5016]', 'bg-[#8B0000]',
+                  'bg-[#1E3A5F]', 'bg-[#B8860B]', 'bg-[#D2691E]',
+                  'bg-[#8B6914]/80', 'bg-[#2D5016]/80',
                 ];
                 return (
                   <div
                     key={shelf.bookId}
                     className={`w-5 rounded-t-sm ${colors[i % colors.length]} shadow-sm`}
-                    style={{ height: `${20 + (i % 3) * 4}px`, marginTop: 'auto' }}
+                    style={{ height: `${24 + (i % 3) * 6}px`, marginTop: 'auto' }}
                   />
                 );
               })}
             </div>
           )}
 
-          {/* Shelf surface */}
-          <div className="bg-gradient-to-r from-[#4f5b73] via-[#64748b] to-[#4f5b73] rounded-lg px-6 py-3 flex items-center justify-between shadow-md">
+          {/* Shelf header bar */}
+          <div className="shelf-plank rounded-lg px-6 py-3 flex items-center justify-between shadow-md">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{countryFlag}</span>
+              <span className="text-2xl drop-shadow-sm">{countryFlag}</span>
               <span className="font-heading text-white text-base drop-shadow-sm">
                 {countryName}
               </span>
@@ -109,11 +106,11 @@ export default function BookshelfRow({
           </div>
 
           {/* Shelf shadow underneath */}
-          <div className="h-2 bg-gradient-to-b from-[#3b4559]/30 to-transparent rounded-b-lg mx-2" />
+          <div className="h-2 bg-gradient-to-b from-black/15 to-transparent mx-2" />
         </div>
       </button>
 
-      {/* Expanded books grid */}
+      {/* Expanded bookshelves */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -130,57 +127,14 @@ export default function BookshelfRow({
                 </p>
               ) : (
                 shelves.map((shelf, shelfIndex) => (
-                  <div
+                  <BookShelf
                     key={shelf.bookId}
-                    className="overflow-hidden rounded-2xl border border-border/70 bg-white shadow-sm"
-                  >
-                    <div className="flex items-center gap-3 border-b border-border/60 bg-card/70 px-4 py-3">
-                      <div
-                        className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-secondary/15 via-primary/10 to-accent/15"
-                        style={
-                          shelf.bookCoverUrl
-                            ? {
-                                backgroundImage: `url(${shelf.bookCoverUrl})`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                              }
-                            : undefined
-                        }
-                      >
-                        {!shelf.bookCoverUrl && (
-                          <span className="text-lg opacity-60">📘</span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted">
-                          원작 책
-                        </p>
-                        <h4 className="truncate font-heading text-sm text-foreground">
-                          {shelf.bookTitle || `원작 책 ${shelfIndex + 1}`}
-                        </h4>
-                        <p className="text-xs text-muted">
-                          {shelf.items.length}편의 학생 작품
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                        {shelf.items.map((item, index) => (
-                          <LibraryBookCard
-                            key={item.id}
-                            item={item}
-                            index={index}
-                            isLiked={likedStories.has(item.story_id)}
-                            onItemClick={onItemClick}
-                            onLike={onLike}
-                            bookTitle={shelf.bookTitle}
-                            bookCoverUrl={shelf.bookCoverUrl}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                    shelf={shelf}
+                    shelfIndex={shelfIndex}
+                    onItemClick={onItemClick}
+                    onLike={onLike}
+                    likedStories={likedStories}
+                  />
                 ))
               )}
             </div>

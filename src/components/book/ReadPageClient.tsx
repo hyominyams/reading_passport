@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 
-const PdfViewer = dynamic(() => import('./PdfViewer'), {
+const PictureBookViewer = dynamic(() => import('./PictureBookViewer'), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center" style={{ minHeight: '500px' }}>
-      <div className="w-8 h-8 border-3 border-muted-light border-t-primary rounded-full animate-spin" />
+    <div className="mx-auto flex w-full max-w-5xl items-center justify-center rounded-[28px] border border-[#d9c7ae] bg-[linear-gradient(180deg,#fbf6ec_0%,#efe1ca_100%)] p-4 shadow-[0_28px_90px_rgba(94,63,34,0.16)]" style={{ minHeight: '500px' }}>
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-3 border-[#d9c7ae] border-t-[#8c5d35] rounded-full animate-spin" />
+        <p className="text-xs text-[#8f7759]">책을 펼치는 중...</p>
+      </div>
     </div>
   ),
 });
@@ -152,7 +155,7 @@ export default function ReadPageClient({
             exit={{ opacity: 0, y: -20 }}
             className="w-full"
           >
-            <PdfViewer pdfUrl={pdfUrl} onLastPage={handleLastPage} />
+            <PictureBookViewer pdfUrl={pdfUrl} onLastPage={handleLastPage} />
           </motion.div>
         )}
 

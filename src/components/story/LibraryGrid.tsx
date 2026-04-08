@@ -117,12 +117,16 @@ export default function LibraryGrid({
   if (shelves.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-32 h-24 mb-6 relative">
+        <div className="w-48 mb-6 relative">
           {/* Empty bookshelf illustration */}
-          <div className="absolute bottom-0 w-full h-3 bg-gradient-to-r from-[#4f5b73] via-[#64748b] to-[#4f5b73] rounded shadow-md" />
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-4xl opacity-40">
-            📚
+          <div className="flex gap-2 justify-center pb-0 h-12">
+            <div className="w-4 rounded-t-sm bg-muted/20" style={{ height: 28, marginTop: 'auto' }} />
+            <div className="w-4 rounded-t-sm bg-muted/15" style={{ height: 36, marginTop: 'auto' }} />
+            <div className="w-4 rounded-t-sm bg-muted/20" style={{ height: 30, marginTop: 'auto' }} />
           </div>
+          <div className="h-[6px] shelf-plank-edge rounded-t-sm" />
+          <div className="h-[14px] shelf-plank rounded-b-sm" />
+          <div className="h-2 bg-gradient-to-b from-black/10 to-transparent mx-2" />
         </div>
         <h3 className="text-lg font-heading text-foreground mb-2">
           아직 이야기가 없어요
@@ -138,7 +142,7 @@ export default function LibraryGrid({
   const effectiveExpanded = shelves.length === 1 ? shelves[0].countryId : expandedCountry;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-5">
       {shelves.map((shelf) => (
         <BookshelfRow
           key={shelf.countryId}

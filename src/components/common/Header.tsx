@@ -56,7 +56,7 @@ export default function Header() {
 
   const displayName = profile ? buildAutoNickname(profile) : '';
   const avatarEmoji = getAvatarEmoji(profile?.avatar);
-  const initial = profile?.nickname?.charAt(0) ?? profile?.email?.charAt(0) ?? '?';
+  const initial = displayName.charAt(0) || profile?.email?.charAt(0) || '?';
 
   const handleSignOut = async () => {
     if (signingOut) {

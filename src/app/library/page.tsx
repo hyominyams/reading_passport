@@ -3,14 +3,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import LibraryGrid, {
-  type LibraryCountryShelf,
-  type LibraryStoryItem,
-} from '@/components/story/LibraryGrid';
+import type { LibraryStoryItem } from '@/components/story/LibraryGrid';
+import LibraryHero from '@/components/story/LibraryHero';
+import LibraryCountrySection from '@/components/story/LibraryCountrySection';
 import BookViewerModal from '@/components/story/BookViewerModal';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { countries } from '@/lib/data/countries';
+import { generateDummyLibraryItems } from '@/lib/data/dummyLibrary';
 
 interface Comment {
   author: string;
@@ -53,11 +53,11 @@ export default function LibraryPage() {
         };
 
         if (!active) return;
-        setItems(libraryItems);
+        setItems(libraryItems.length > 0 ? libraryItems : generateDummyLibraryItems());
       } catch (error) {
         console.error('Unexpected library fetch error:', error);
         if (active) {
-          setItems([]);
+          setItems(generateDummyLibraryItems());
           setErrorMessage('도서관 연결이 지연되고 있어요. 새로고침 후 다시 시도해주세요.');
         }
       } finally {
@@ -108,65 +108,44 @@ export default function LibraryPage() {
     };
   }, [user]);
 
-  const countryShelves = useMemo<LibraryCountryShelf[]>(() => {
+  // Weekly rotating hero: pick from top-liked stories based on week number
+  const heroItem = useMemo(() => {
+    if (items.length === 0) return null;
+    const sorted = [...items].sort((a, b) => b.likes - a.likes);
+    const topPool = sorted.slice(0, Math.min(5, sorted.length));
+    const weekNumber = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+    return topPool[weekNumber % topPool.length];
+  }, [items]);
+
+  // Group items by country (excluding hero item from its section to avoid duplicate)
+  const countrySections = useMemo(() => {
     const grouped = new Map<
       string,
-      {
-        countryId: string;
-        countryName: string;
-        countryFlag: string;
-        books: Map<
-          string,
-          {
-            bookId: string;
-            bookTitle: string;
-            bookCoverUrl?: string | null;
-            items: LibraryStoryItem[];
-          }
-        >;
-      }
+      { countryId: string; countryName: string; countryFlag: string; items: LibraryStoryItem[] }
     >();
 
     for (const item of items) {
       const countryId = item.country_id;
-      const countryData = countries.find((country) => country.id === countryId);
-      const bookId = item.book?.id ?? item.book_id;
-      const bookTitle = item.book?.title?.trim() || '원작 책';
-      const bookCoverUrl = item.book?.cover_url ?? null;
+      const countryData = countries.find((c) => c.id === countryId);
 
       if (!grouped.has(countryId)) {
         grouped.set(countryId, {
           countryId,
           countryName: countryData?.name ?? countryId,
           countryFlag: countryData?.flag ?? '🌍',
-          books: new Map(),
-        });
-      }
-
-      const countryEntry = grouped.get(countryId)!;
-      if (!countryEntry.books.has(bookId)) {
-        countryEntry.books.set(bookId, {
-          bookId,
-          bookTitle,
-          bookCoverUrl,
           items: [],
         });
       }
 
-      countryEntry.books.get(bookId)!.items.push(item);
+      grouped.get(countryId)!.items.push(item);
     }
 
-    return Array.from(grouped.values()).map((countryEntry) => ({
-      countryId: countryEntry.countryId,
-      countryName: countryEntry.countryName,
-      countryFlag: countryEntry.countryFlag,
-      books: Array.from(countryEntry.books.values())
-        .map((bookShelf) => ({
-          ...bookShelf,
-          items: [...bookShelf.items].sort((a, b) => b.likes - a.likes),
-        }))
-        .sort((a, b) => b.items.length - a.items.length),
-    }));
+    return Array.from(grouped.values())
+      .map((g) => ({
+        ...g,
+        items: [...g.items].sort((a, b) => b.likes - a.likes),
+      }))
+      .sort((a, b) => b.items.length - a.items.length);
   }, [items]);
 
   const commentLockMessage = useMemo(() => {
@@ -377,33 +356,48 @@ export default function LibraryPage() {
   return (
     <>
       <Header />
-      <main className="flex-1 bg-passport-library passport-border-top">
-        <div className="px-4 py-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-heading text-foreground mb-2">
-            우리들의 도서관
-          </h1>
-          <p className="text-sm text-muted">
-            학생들이 만든 이야기를 감상하세요
-          </p>
-        </div>
-
+      <main className="flex-1 bg-background pb-16">
         {errorMessage && (
-          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="mx-4 sm:mx-8 mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {errorMessage}
           </div>
         )}
 
-        {/* Bookshelf Grid */}
-        <LibraryGrid
-          countryShelves={countryShelves}
-          onItemClick={handleItemClick}
-          onLike={handleLike}
-          likedStories={likedStories}
-        />
+        {/* Hero: most-liked story */}
+        {heroItem && (
+          <LibraryHero item={heroItem} onItemClick={handleItemClick} />
+        )}
 
-        {/* Book Viewer Modal with inline comments */}
+        {/* Country sections */}
+        <div className="mt-12 space-y-12">
+          {countrySections.map((section, idx) => (
+            <LibraryCountrySection
+              key={section.countryId}
+              countryName={section.countryName}
+              countryFlag={section.countryFlag}
+              items={section.items}
+              storyCount={section.items.length}
+              onItemClick={handleItemClick}
+              onLike={handleLike}
+              likedStories={likedStories}
+              variant={idx % 2 === 1 ? 'alt' : 'default'}
+            />
+          ))}
+        </div>
+
+        {items.length === 0 && !loading && (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <span className="text-5xl mb-4 opacity-30">📚</span>
+            <h3 className="text-lg font-heading text-foreground mb-2">
+              아직 이야기가 없어요
+            </h3>
+            <p className="text-sm text-muted">
+              첫 번째 이야기를 만들어 보세요!
+            </p>
+          </div>
+        )}
+
+        {/* Book Viewer Modal */}
         {selectedItem && selectedItem.story.final_text && (
           <BookViewerModal
             key={viewerSession}
@@ -426,7 +420,6 @@ export default function LibraryPage() {
             submittingComment={submittingComment}
           />
         )}
-        </div>
       </main>
     </>
   );

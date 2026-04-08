@@ -185,6 +185,34 @@ body {
   border-radius: 2px;
 }
 
+/* ─── Bookshelf utilities ─── */
+
+.shelf-plank {
+  background:
+    /* subtle wood grain */
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 6px,
+      rgba(255,255,255,0.04) 6px,
+      rgba(255,255,255,0.04) 7px
+    ),
+    linear-gradient(180deg, #b8956a 0%, #a07850 40%, #7a5c30 100%);
+}
+
+.shelf-plank-edge {
+  background: linear-gradient(180deg, #c9a96e 0%, #a08060 100%);
+}
+
+.book-spine-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* Hide scrollbar for horizontal scroll sections */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 .storybook-page > div {
   display: flex;
 }

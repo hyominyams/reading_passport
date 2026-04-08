@@ -3,6 +3,16 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
+
+const PdfCoverThumbnail = dynamic(() => import('./PdfCoverThumbnail'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#fffdf8] to-[#f6eee0]">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#d9c7ae] border-t-[#8c5d35]" />
+    </div>
+  ),
+});
 
 interface BookCoverImageProps {
   title: string;
@@ -56,40 +66,11 @@ export default function BookCoverImage({
 
   if (showPdfPlaceholder) {
     return (
-      <div className="relative h-full w-full overflow-hidden rounded-[inherit] border border-slate-200 bg-[linear-gradient(160deg,#fffdf8_0%,#f6eee0_52%,#ead9bc_100%)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.88),transparent_48%)]" />
-        <div className="absolute right-2 top-2 rounded-full bg-white/85 px-2 py-0.5 text-[9px] font-semibold tracking-[0.18em] text-slate-600 shadow-sm">
-          PDF
-        </div>
-        <div className="relative flex h-full flex-col justify-between p-3">
-          <div className="text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-            World Stories
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-slate-700">
-              <svg className={iconClassName} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H6.375A1.125 1.125 0 005.25 3.375v17.25a1.125 1.125 0 001.125 1.125h11.25a1.125 1.125 0 001.125-1.125V10.5a9 9 0 00-9-9z" />
-              </svg>
-              <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-600">
-                Book File
-              </span>
-            </div>
-            <p
-              className="text-xs font-semibold leading-snug text-slate-900"
-              style={{
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: 4,
-                overflow: 'hidden',
-              }}
-            >
-              {title}
-            </p>
-            <p className="text-[10px] leading-snug text-slate-600">
-              PDF 표지를 이미지로 변환하지 못할 때 문서형 표지로 표시합니다.
-            </p>
-          </div>
-        </div>
+      <div className="relative h-full w-full overflow-hidden rounded-[inherit]">
+        <PdfCoverThumbnail
+          pdfUrl={normalizedCoverUrl!}
+          className="h-full w-full [&_canvas]:!h-full [&_canvas]:object-cover"
+        />
       </div>
     );
   }
