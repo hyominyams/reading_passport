@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check:db": "npx tsx scripts/check-db-health.ts",
+    "check:books": "npx tsx scripts/check-books.ts",
     "repair:students": "node scripts/repair-student-auth.mjs",
     "repair:hidden-content": "node scripts/repair-hidden-content-class-ids.mjs",
     "repair:legacy": "npm run repair:students && npm run repair:hidden-content"

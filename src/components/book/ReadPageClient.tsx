@@ -153,16 +153,6 @@ export default function ReadPageClient({
             className="w-full"
           >
             <PdfViewer pdfUrl={pdfUrl} onLastPage={handleLastPage} />
-
-            {/* Manual skip to emotion (for testing or if PDF is short) */}
-            <div className="mt-6 text-center">
-              <button
-                onClick={() => setPhase('emotion')}
-                className="text-sm text-muted hover:text-primary transition-colors underline"
-              >
-                읽기를 완료했어요 &#8594;
-              </button>
-            </div>
           </motion.div>
         )}
 
