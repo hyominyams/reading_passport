@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CountryCard from '@/components/book/CountryCard';
 import BookCard from '@/components/book/BookCard';
 import LanguageModal from '@/components/book/LanguageModal';
+import WorldMapSection from '@/components/book/WorldMapSection';
 import { countries } from '@/lib/data/countries';
 import type { MapBookProgress } from '@/lib/queries/books';
 import type { Book, Language } from '@/types/database';
@@ -186,6 +187,13 @@ export default function MapPageClient({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* World map with flight routes */}
+      <WorldMapSection
+        countryProgress={countryProgress}
+        onCountryClick={handleCountryClick}
+        selectedCountry={selectedCountry}
+      />
 
       {/* Language selection modal */}
       <LanguageModal

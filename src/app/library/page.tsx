@@ -18,24 +18,6 @@ interface Comment {
   date: string;
 }
 
-function withTimeout<T>(factory: () => Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms}ms`));
-    }, ms);
-
-    factory()
-      .then((value) => {
-        window.clearTimeout(timeoutId);
-        resolve(value);
-      })
-      .catch((error) => {
-        window.clearTimeout(timeoutId);
-        reject(error);
-      });
-  });
-}
-
 export default function LibraryPage() {
   const { user, loading: authLoading } = useAuth();
   const [items, setItems] = useState<LibraryStoryItem[]>([]);
@@ -54,64 +36,24 @@ export default function LibraryPage() {
 
     const fetchLibrary = async () => {
       try {
-        const supabase = createClient();
         setErrorMessage(null);
 
-        const { data, error } = await withTimeout(
-          async () =>
-            supabase
-              .from('library')
-              .select('*, book:books(id, title, cover_url), story:stories(*, author:users!stories_student_id_fkey(nickname))')
-              .order('likes', { ascending: false }),
-          8000,
-          'library fetch'
-        );
-
+        const res = await fetch('/api/library');
         if (!active) return;
 
-        if (error) {
-          console.error('Error fetching library:', error);
+        if (!res.ok) {
+          console.error('Error fetching library:', res.statusText);
           setItems([]);
           setErrorMessage('도서관 데이터를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
           return;
         }
 
-        const libraryItems = (data ?? []) as LibraryStoryItem[];
-        const storyIds = libraryItems.map((item) => item.story_id);
+        const { items: libraryItems } = (await res.json()) as {
+          items: LibraryStoryItem[];
+        };
 
-        let likeCounts = new Map<string, number>();
-        if (storyIds.length > 0) {
-          const { data: likeRows, error: likeError } = await withTimeout(
-            async () =>
-              supabase
-                .from('story_likes')
-                .select('story_id')
-                .in('story_id', storyIds),
-            8000,
-            'story likes fetch'
-          );
-
-          if (!active) return;
-
-          if (likeError) {
-            console.error('Error fetching likes:', likeError);
-          } else {
-            likeCounts = (likeRows ?? []).reduce((acc, row: { story_id: string }) => {
-              acc.set(row.story_id, (acc.get(row.story_id) ?? 0) + 1);
-              return acc;
-            }, new Map<string, number>());
-          }
-        }
-
-        const visibleItems = libraryItems
-          .filter((item) => item.story && item.story.visibility !== 'private')
-          .map((item) => ({
-            ...item,
-            likes: likeCounts.get(item.story_id) ?? item.likes,
-          }))
-          .sort((a, b) => b.likes - a.likes);
-
-        setItems(visibleItems);
+        if (!active) return;
+        setItems(libraryItems);
       } catch (error) {
         console.error('Unexpected library fetch error:', error);
         if (active) {

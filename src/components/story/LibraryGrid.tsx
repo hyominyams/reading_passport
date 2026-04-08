@@ -119,7 +119,7 @@ export default function LibraryGrid({
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-32 h-24 mb-6 relative">
           {/* Empty bookshelf illustration */}
-          <div className="absolute bottom-0 w-full h-3 bg-gradient-to-r from-[#8B7355] via-[#A08760] to-[#8B7355] rounded shadow-md" />
+          <div className="absolute bottom-0 w-full h-3 bg-gradient-to-r from-[#4f5b73] via-[#64748b] to-[#4f5b73] rounded shadow-md" />
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-4xl opacity-40">
             📚
           </div>

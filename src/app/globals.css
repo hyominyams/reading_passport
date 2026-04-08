@@ -123,37 +123,37 @@ body {
   background-size: 100% 100%, 100% 100%, 18px 18px, auto, auto, auto;
 }
 
-/* Library page: warm cream/parchment passport paper */
+/* Library page: cool blue-gray passport paper (matches map) */
 .bg-passport-library {
-  background-color: #f7f3ed;
+  background-color: #eef2f7;
   background-image:
-    /* Faint rosette-like watermarks */
-    radial-gradient(ellipse at 75% 20%, rgba(180, 140, 80, 0.04) 0%, transparent 45%),
-    radial-gradient(ellipse at 20% 80%, rgba(180, 140, 80, 0.03) 0%, transparent 40%),
-    /* Fine dot grid */
-    radial-gradient(circle, rgba(180, 160, 120, 0.16) 0.8px, transparent 0.8px),
+    /* Faint compass-like radial watermark */
+    radial-gradient(ellipse at 75% 20%, rgba(99, 102, 241, 0.04) 0%, transparent 45%),
+    radial-gradient(ellipse at 20% 80%, rgba(99, 102, 241, 0.03) 0%, transparent 40%),
+    /* Fine dot grid (passport security paper) */
+    radial-gradient(circle, rgba(148, 163, 184, 0.18) 0.8px, transparent 0.8px),
     /* Crosshatch lines */
     repeating-linear-gradient(
       45deg,
       transparent,
       transparent 24px,
-      rgba(180, 160, 120, 0.05) 24px,
-      rgba(180, 160, 120, 0.05) 25px
+      rgba(148, 163, 184, 0.06) 24px,
+      rgba(148, 163, 184, 0.06) 25px
     ),
     repeating-linear-gradient(
       -45deg,
       transparent,
       transparent 24px,
-      rgba(180, 160, 120, 0.05) 24px,
-      rgba(180, 160, 120, 0.05) 25px
+      rgba(148, 163, 184, 0.06) 24px,
+      rgba(148, 163, 184, 0.06) 25px
     ),
     /* Horizontal guilloche-like fine lines */
     repeating-linear-gradient(
       0deg,
       transparent,
       transparent 7px,
-      rgba(180, 160, 120, 0.02) 7px,
-      rgba(180, 160, 120, 0.02) 8px
+      rgba(148, 163, 184, 0.025) 7px,
+      rgba(148, 163, 184, 0.025) 8px
     );
   background-size: 100% 100%, 100% 100%, 18px 18px, auto, auto, auto;
 }

@@ -45,7 +45,7 @@ export default function LibraryBookCard({
       <button
         onClick={() => onItemClick(item)}
         className="w-full text-left bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-all group"
-        style={{ boxShadow: '-3px 0 6px -3px rgba(141,110,76,0.15)' }}
+        style={{ boxShadow: '-3px 0 6px -3px rgba(99,102,141,0.15)' }}
       >
         {/* Cover image with 3D book perspective */}
         <div className="relative overflow-hidden" style={{ perspective: '800px' }}>

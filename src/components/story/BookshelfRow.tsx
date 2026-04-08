@@ -82,8 +82,8 @@ export default function BookshelfRow({
             </div>
           )}
 
-          {/* Wooden shelf surface */}
-          <div className="bg-gradient-to-r from-[#8B7355] via-[#A08760] to-[#8B7355] rounded-lg px-6 py-3 flex items-center justify-between shadow-md">
+          {/* Shelf surface */}
+          <div className="bg-gradient-to-r from-[#4f5b73] via-[#64748b] to-[#4f5b73] rounded-lg px-6 py-3 flex items-center justify-between shadow-md">
             <div className="flex items-center gap-3">
               <span className="text-2xl">{countryFlag}</span>
               <span className="font-heading text-white text-base drop-shadow-sm">
@@ -109,7 +109,7 @@ export default function BookshelfRow({
           </div>
 
           {/* Shelf shadow underneath */}
-          <div className="h-2 bg-gradient-to-b from-[#6B5B3E]/30 to-transparent rounded-b-lg mx-2" />
+          <div className="h-2 bg-gradient-to-b from-[#3b4559]/30 to-transparent rounded-b-lg mx-2" />
         </div>
       </button>
 
