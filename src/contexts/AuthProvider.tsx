@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { User, UserRole } from '@/types/database';
+import { buildAutoNickname, hasNickname } from '@/lib/profile';
 
 interface AuthContextType {
   user: SupabaseUser | null;
@@ -32,6 +33,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const ensureNickname = useCallback(async (loadedProfile: User) => {
+    if (hasNickname(loadedProfile.nickname)) {
+      return loadedProfile;
+    }
+
+    const fallbackNickname = buildAutoNickname(loadedProfile);
+    const { data: updatedProfile, error } = await supabase
+      .from('users')
+      .update({ nickname: fallbackNickname })
+      .eq('id', loadedProfile.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Failed to persist auto nickname:', error);
+      return { ...loadedProfile, nickname: fallbackNickname } as User;
+    }
+
+    return (updatedProfile as User | null) ?? { ...loadedProfile, nickname: fallbackNickname };
+  }, [supabase]);
+
   const fetchProfile = useCallback(async (userId: string) => {
     // Try fetching profile with retries (RLS may not be ready immediately after login)
     let attempts = 0;
@@ -43,7 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (data) {
-        setProfile(data as User);
+        const hydratedProfile = await ensureNickname(data as User);
+        setProfile(hydratedProfile);
         return;
       }
       // If RLS blocks the read, wait briefly and retry
@@ -54,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setProfile(null);
-  }, [supabase]);
+  }, [ensureNickname, supabase]);
 
   const refreshProfile = useCallback(async () => {
     if (user) {
@@ -63,10 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfile]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-  }, [supabase]);
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
+      router.replace('/login');
+      router.refresh();
+    }
+  }, [router, supabase]);
 
   useEffect(() => {
     let isMounted = true;

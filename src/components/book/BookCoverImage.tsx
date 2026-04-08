@@ -1,7 +1,9 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import { getPdfJs } from '@/lib/pdf-client';
 
 interface BookCoverImageProps {
   title: string;
@@ -17,7 +19,7 @@ function isPdfUrl(url?: string | null): boolean {
     return false;
   }
 
-  return url.split('?')[0].toLowerCase().endsWith('.pdf');
+  return url.trim().split('?')[0].toLowerCase().endsWith('.pdf');
 }
 
 function isImageUrl(url?: string | null): boolean {
@@ -32,13 +34,14 @@ export default function BookCoverImage({
   fallbackClassName = 'flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200',
   iconClassName = 'h-6 w-6 text-slate-400',
 }: BookCoverImageProps) {
+  const normalizedCoverUrl = coverUrl?.trim() || null;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [hasImageError, setHasImageError] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [pdfThumbnailUrl, setPdfThumbnailUrl] = useState<string | null>(null);
   const [hasPdfError, setHasPdfError] = useState(false);
-  const showImage = isImageUrl(coverUrl) && !hasImageError;
-  const showPdf = isPdfUrl(coverUrl) && !hasPdfError;
+  const showImage = isImageUrl(normalizedCoverUrl) && !hasImageError;
+  const showPdf = isPdfUrl(normalizedCoverUrl) && !hasPdfError;
 
   useEffect(() => {
     const node = containerRef.current;
@@ -66,36 +69,25 @@ export default function BookCoverImage({
   }, []);
 
   useEffect(() => {
+    setHasImageError(false);
     setPdfThumbnailUrl(null);
     setHasPdfError(false);
-  }, [coverUrl]);
+  }, [normalizedCoverUrl]);
 
   useEffect(() => {
-    if (!showPdf || !coverUrl || containerWidth <= 0) {
+    if (!showPdf || !normalizedCoverUrl || containerWidth <= 0) {
       return;
     }
 
     let cancelled = false;
-    let loadingTask: { destroy?: () => void; promise?: Promise<unknown> } | null = null;
+    let loadingTask: ReturnType<ReturnType<typeof getPdfJs>['getDocument']> | null = null;
 
     const renderPdfThumbnail = async () => {
       try {
-        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`;
+        const pdfjs = getPdfJs();
 
-        loadingTask = pdfjs.getDocument(coverUrl);
-        const pdf = await loadingTask.promise as {
-          getPage: (pageNumber: number) => Promise<{
-            getViewport: (options: { scale: number }) => { width: number; height: number };
-            render: (params: {
-              canvasContext: CanvasRenderingContext2D;
-              viewport: { width: number; height: number };
-            }) => { promise: Promise<void> };
-            cleanup: () => void;
-          }>;
-          cleanup: () => void;
-          destroy: () => Promise<void>;
-        };
+        loadingTask = pdfjs.getDocument(normalizedCoverUrl);
+        const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 1 });
         const scale = containerWidth / viewport.width;
@@ -117,6 +109,7 @@ export default function BookCoverImage({
         context.imageSmoothingEnabled = true;
 
         await page.render({
+          canvas: null,
           canvasContext: context,
           viewport: scaledViewport,
         }).promise;
@@ -142,17 +135,18 @@ export default function BookCoverImage({
       cancelled = true;
       loadingTask?.destroy?.();
     };
-  }, [containerWidth, coverUrl, showPdf]);
+  }, [containerWidth, normalizedCoverUrl, showPdf]);
 
   if (showImage) {
     return (
       <div ref={containerRef} className="relative h-full w-full">
-        <Image
-          src={coverUrl!}
+        <img
+          src={normalizedCoverUrl!}
           alt={title}
-          fill
           sizes={sizes}
-          className={imageClassName}
+          className={`absolute inset-0 h-full w-full ${imageClassName}`}
+          loading="lazy"
+          decoding="async"
           onError={() => setHasImageError(true)}
         />
       </div>
@@ -163,13 +157,13 @@ export default function BookCoverImage({
     return (
       <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-white">
         {pdfThumbnailUrl ? (
-          <Image
+          <img
             src={pdfThumbnailUrl}
             alt={`${title} 표지`}
-            fill
-            unoptimized
             sizes={sizes}
-            className={imageClassName}
+            className={`absolute inset-0 h-full w-full ${imageClassName}`}
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className={fallbackClassName}>

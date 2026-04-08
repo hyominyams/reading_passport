@@ -18,7 +18,7 @@ export async function GET() {
 
   const storyIds = (data ?? []).map((item: { story_id: string }) => item.story_id);
 
-  let likeCounts: Record<string, number> = {};
+  const likeCounts: Record<string, number> = {};
   if (storyIds.length > 0) {
     const { data: likeRows, error: likeError } = await supabase
       .from('story_likes')

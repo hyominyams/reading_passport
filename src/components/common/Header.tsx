@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { buildAutoNickname, getAvatarEmoji } from '@/lib/profile';
 
 const navIcons: Record<string, React.ReactNode> = {
   '/map': (
@@ -31,11 +33,17 @@ const navIcons: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   ),
+  '/mypage': (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.964 0a9 9 0 10-11.964 0m11.964 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
 };
 
 export default function Header() {
   const { profile, role, isAuthenticated, signOut } = useAuth();
   const pathname = usePathname();
+  const [signingOut, setSigningOut] = useState(false);
 
   const navLinks = [
     { href: '/map', label: '세계지도' },
@@ -43,9 +51,27 @@ export default function Header() {
     ...(role === 'student' ? [{ href: '/passport', label: '여권' }] : []),
     ...((role === 'teacher' || role === 'admin') ? [{ href: '/teacher', label: '교사 관리' }] : []),
     ...(role === 'admin' ? [{ href: '/admin', label: '관리자' }] : []),
+    { href: '/mypage', label: '마이페이지' },
   ];
 
+  const displayName = profile ? buildAutoNickname(profile) : '';
+  const avatarEmoji = getAvatarEmoji(profile?.avatar);
   const initial = profile?.nickname?.charAt(0) ?? profile?.email?.charAt(0) ?? '?';
+
+  const handleSignOut = async () => {
+    if (signingOut) {
+      return;
+    }
+
+    setSigningOut(true);
+
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Failed to sign out:', error);
+      setSigningOut(false);
+    }
+  };
 
   return (
     <header className="bg-white/80 backdrop-blur-md border-b border-border/60 sticky top-0 z-50">
@@ -83,16 +109,20 @@ export default function Header() {
 
               <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border/60">
                 <div className="w-7 h-7 rounded-full bg-foreground/[0.08] text-foreground flex items-center justify-center text-xs font-medium">
-                  {initial}
+                  {avatarEmoji ? <span className="text-sm">{avatarEmoji}</span> : initial}
                 </div>
                 <span className="text-sm text-foreground hidden sm:inline">
-                  {profile?.nickname ?? profile?.email ?? ''}
+                  {displayName}
                 </span>
                 <button
-                  onClick={signOut}
-                  className="text-xs text-muted hover:text-foreground transition-colors"
+                  type="button"
+                  onClick={() => {
+                    void handleSignOut();
+                  }}
+                  disabled={signingOut}
+                  className="text-xs text-muted hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:text-muted/50"
                 >
-                  로그아웃
+                  {signingOut ? '로그아웃 중...' : '로그아웃'}
                 </button>
               </div>
             </nav>

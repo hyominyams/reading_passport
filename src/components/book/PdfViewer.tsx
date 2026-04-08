@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { Document, Page } from 'react-pdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { getPdfJs } from '@/lib/pdf-client';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+getPdfJs();
 
 interface PdfViewerProps {
   pdfUrl: string;

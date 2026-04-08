@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { buildAutoNickname, hasNickname } from '@/lib/profile';
 
 interface LoginResult {
   success: boolean;
@@ -31,15 +32,31 @@ export async function teacherLogin(
 
   // Check role using service client (bypasses RLS - session cookies not yet available in same request)
   const serviceClient = createServiceClient();
-  const { data: profile } = await serviceClient
+  const { data: profileData } = await serviceClient
     .from('users')
-    .select('role')
+    .select('role, nickname')
     .eq('id', data.user.id)
     .single();
+
+  const profile = profileData as { role: 'admin' | 'teacher' | 'student'; nickname: string | null } | null;
 
   if (!profile || (profile.role !== 'teacher' && profile.role !== 'admin')) {
     await supabase.auth.signOut();
     return { success: false, error: '교사 계정이 아닙니다. 학생 로그인을 이용해주세요.' };
+  }
+
+  if (!hasNickname(profile.nickname)) {
+    const fallbackNickname = buildAutoNickname({
+      id: data.user.id,
+      role: profile.role,
+      email: data.user.email,
+      nickname: profile.nickname,
+    });
+
+    await serviceClient
+      .from('users')
+      .update({ nickname: fallbackNickname })
+      .eq('id', data.user.id);
   }
 
   return {
@@ -57,7 +74,7 @@ export async function studentLogin(
   // Find the student by their 6-digit code
   const { data: student, error: lookupError } = await serviceClient
     .from('users')
-    .select('id, email, nickname')
+    .select('id, email, nickname, student_code')
     .eq('student_code', studentCode)
     .single();
 
@@ -91,11 +108,24 @@ export async function studentLogin(
     }
   }
 
-  const needsOnboarding = !student.nickname;
+  if (!hasNickname(student.nickname)) {
+    const fallbackNickname = buildAutoNickname({
+      id: student.id,
+      role: 'student',
+      email: student.email,
+      nickname: student.nickname,
+      student_code: student.student_code ?? studentCode,
+    });
+
+    await serviceClient
+      .from('users')
+      .update({ nickname: fallbackNickname })
+      .eq('id', student.id);
+  }
 
   return {
     success: true,
-    redirectTo: needsOnboarding ? '/onboarding' : '/map',
-    needsOnboarding,
+    redirectTo: '/map',
+    needsOnboarding: false,
   };
 }

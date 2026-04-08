@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { updateSession } from '@/lib/supabase/middleware';
 
-const protectedRoutes = ['/map', '/book', '/library', '/teacher', '/admin', '/onboarding', '/passport'];
+const protectedRoutes = ['/map', '/book', '/library', '/teacher', '/admin', '/onboarding', '/passport', '/mypage'];
 const teacherRoutes = ['/teacher'];
 const adminRoutes = ['/admin'];
 
