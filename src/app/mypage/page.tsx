@@ -19,7 +19,7 @@ const requiredStamps: StampType[] = ['read', 'hidden', 'character', 'mystory'];
 type StudentActivityRow = {
   created_at: string;
   stamps_earned: StampType[] | null;
-  book: { title: string | null } | null;
+  book: { title: string | null }[] | null;
 };
 
 type TeacherStudentRow = Pick<User, 'id' | 'nickname' | 'student_code' | 'created_at'>;
@@ -96,7 +96,7 @@ export default function MyPage() {
           const [activitiesResult, storiesResult] = await Promise.all([
             supabase
               .from('activities')
-              .select('created_at, stamps_earned, book:books(title)')
+              .select('created_at, stamps_earned, book:book_id(title)')
               .eq('student_id', user.id)
               .order('created_at', { ascending: false }),
             supabase
@@ -126,7 +126,7 @@ export default function MyPage() {
               completedBooks,
               totalStamps,
               storyCount: storiesResult.count ?? 0,
-              latestBookTitle: latestActivity?.book?.title ?? null,
+              latestBookTitle: latestActivity?.book?.[0]?.title ?? null,
               latestActivityAt: latestActivity?.created_at ?? null,
             },
           });
@@ -300,15 +300,16 @@ export default function MyPage() {
         updates.avatar = selectedAvatar;
       } else {
         const trimmedGrade = grade.trim();
-        const parsedGrade = trimmedGrade ? Number(trimmedGrade) : null;
+        let parsedGrade: number | null = null;
 
-        if (
-          trimmedGrade &&
-          (!Number.isInteger(parsedGrade) || parsedGrade < 1 || parsedGrade > 12)
-        ) {
-          setSaveError('학년은 1부터 12 사이 숫자로 입력해주세요.');
-          setSaving(false);
-          return;
+        if (trimmedGrade) {
+          parsedGrade = Number(trimmedGrade);
+
+          if (!Number.isInteger(parsedGrade) || parsedGrade < 1 || parsedGrade > 12) {
+            setSaveError('학년은 1부터 12 사이 숫자로 입력해주세요.');
+            setSaving(false);
+            return;
+          }
         }
 
         updates.school = school.trim() || null;
@@ -361,7 +362,7 @@ export default function MyPage() {
               <div className="rounded-3xl border border-border bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                   <div className="flex items-start gap-4">
-                    <div className="flex h-18 w-18 shrink-0 items-center justify-center rounded-3xl bg-foreground/[0.06] text-3xl">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-foreground/[0.06] text-3xl">
                       {avatarEmoji ?? displayName.charAt(0)}
                     </div>
                     <div>
