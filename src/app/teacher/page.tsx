@@ -80,7 +80,7 @@ export default function TeacherPage() {
       if (cancelled) return;
 
       const activities = (activitiesData ?? []) as (Activity & { book?: Book })[];
-      const flaggedStudentIds = new Set((flaggedChats ?? []).map((c) => c.student_id));
+      const flaggedStudentIds = new Set((flaggedChats ?? []).map((c: { student_id: string }) => c.student_id));
 
       // Map most recent activity per student.
       const studentActivityMap = new Map<string, Activity & { book?: Book }>();

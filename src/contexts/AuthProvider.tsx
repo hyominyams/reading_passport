@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { User as SupabaseUser, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import type { User, UserRole } from '@/types/database';
 import { buildAutoNickname, hasNickname } from '@/lib/profile';
 
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void getInitialSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         if (!isMounted) return;
 
         try {

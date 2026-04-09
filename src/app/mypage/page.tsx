@@ -184,7 +184,7 @@ export default function MyPage() {
         }
 
         const activeStudentCount = new Set(
-          (activitiesResult.data ?? []).map((activity) => activity.student_id)
+          (activitiesResult.data ?? []).map((activity: { student_id: string }) => activity.student_id)
         ).size;
 
         setStats({

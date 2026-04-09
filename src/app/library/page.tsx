@@ -215,7 +215,7 @@ export default function LibraryPage() {
       .select('story_id')
       .in('story_id', items.map((item) => item.story_id));
 
-    const counts = (likeRows ?? []).reduce((acc, row: { story_id: string }) => {
+    const counts = (likeRows ?? []).reduce((acc: Map<string, number>, row: { story_id: string }) => {
       acc.set(row.story_id, (acc.get(row.story_id) ?? 0) + 1);
       return acc;
     }, new Map<string, number>());

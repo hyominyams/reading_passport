@@ -38,7 +38,7 @@ export default function GalleryGrid() {
         return;
       }
 
-      const studentIds = studentData.map((s) => s.id);
+      const studentIds = studentData.map((s: { id: string }) => s.id);
 
       const { data } = await supabase
         .from('stories')
