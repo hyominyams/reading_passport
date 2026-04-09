@@ -45,7 +45,7 @@ Output ONLY the English image prompt, nothing else.`,
       },
     ],
     {
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       temperature: 0.7,
       maxTokens: 300,
     }
@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
       pageText: string;
     }> = [];
 
-    // Cover: generate only if description exists and no uploaded cover
-    if (story.cover_design?.description && !story.cover_design?.image_url) {
+    // Cover: generate only if description exists and no uploaded/generated cover
+    if (story.cover_design?.description && !story.cover_design?.image_url && !story.cover_image_url) {
       imageTasks.push({
         type: 'cover',
         index: -1,
@@ -103,13 +103,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Pages: generate for each scene_description where no uploaded_image exists
+    // Pages: generate for each scene_description where no uploaded_image
+    // AND no previously generated scene_image exists (avoids duplicates on retry)
     const sceneDescriptions = story.scene_descriptions ?? [];
     const uploadedImages = story.uploaded_images ?? [];
+    const existingSceneImages = story.scene_images ?? [];
     const finalText = story.final_text ?? [];
 
     for (let i = 0; i < sceneDescriptions.length; i++) {
-      if (sceneDescriptions[i] && !uploadedImages[i]) {
+      if (sceneDescriptions[i] && !uploadedImages[i] && !existingSceneImages[i]) {
         imageTasks.push({
           type: 'page',
           index: i,

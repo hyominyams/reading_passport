@@ -204,19 +204,26 @@ export default function QuestionsPageContent({
     setDirtyAfterValidation(false);
 
     try {
-      // Final save
-      await saveQuestions(questions);
+      // Save and validate in parallel (save is fire-and-forget)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-      // AI validation
-      const res = await fetch('/api/story/validate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questions,
-          book_title: book.title,
-          country_id: book.country_id,
+      const [, res] = await Promise.all([
+        saveQuestions(questions),
+        fetch('/api/story/validate-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            questions,
+            book_title: book.title,
+            country_id: book.country_id,
+          }),
+          signal: controller.signal,
         }),
-      });
+      ]);
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error('Validation request failed');
       const result = await res.json() as ValidationResult;
       setValidation(result);
 

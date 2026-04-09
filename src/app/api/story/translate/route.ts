@@ -29,7 +29,7 @@ Rules:
           { role: 'user', content: page },
         ],
         {
-          model: 'gpt-4o-mini',
+          model: 'gpt-5-mini',
           temperature: 0.3,
           maxTokens: 500,
         }

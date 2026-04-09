@@ -142,6 +142,10 @@ function makeId(): string {
   return `dummy-${counter.toString().padStart(4, '0')}`;
 }
 
+export function isDummyId(id: string): boolean {
+  return id.startsWith('dummy-');
+}
+
 export function generateDummyLibraryItems(): LibraryStoryItem[] {
   counter = 0;
   const items: LibraryStoryItem[] = [];
@@ -157,6 +161,10 @@ export function generateDummyLibraryItems(): LibraryStoryItem[] {
       const libId = makeId();
       const pageSet = buildPages(s.title, items.length);
       const coverUrl = countryCoverList[items.length % countryCoverList.length];
+
+      const sceneImgs = pageSet.map(
+        (_, pi) => countryCoverList[(items.length + pi) % countryCoverList.length]
+      );
 
       items.push({
         id: libId,
@@ -176,7 +184,7 @@ export function generateDummyLibraryItems(): LibraryStoryItem[] {
           book_id: bookId,
           country_id: group.countryId,
           language: 'ko',
-          story_type: 'retelling',
+          story_type: 'continue',
           custom_input: null,
           chat_log: {},
           all_student_messages: null,
@@ -184,7 +192,7 @@ export function generateDummyLibraryItems(): LibraryStoryItem[] {
           ai_draft: null,
           final_text: pageSet,
           character_refs: null,
-          scene_images: [coverUrl],
+          scene_images: sceneImgs,
           translation_text: null,
           pdf_url_original: null,
           pdf_url_translated: null,

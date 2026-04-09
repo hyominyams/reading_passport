@@ -188,7 +188,7 @@ ${studentInput}
           : '이야기 재료를 바탕으로 6장면 초안을 작성해 주세요.' },
       ],
       {
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         temperature: 0.8,
         maxTokens: 3500,
       }

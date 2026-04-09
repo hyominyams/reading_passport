@@ -41,7 +41,7 @@ ${student_freewrite}
         { role: 'system', content: systemPrompt },
         { role: 'user', content: '피드백을 주세요.' },
       ],
-      { model: 'gpt-4o-mini', temperature: 0.7, maxTokens: 200 }
+      { model: 'gpt-5-mini', temperature: 0.7, maxTokens: 200 }
     );
 
     return Response.json({ feedback: result.trim() });

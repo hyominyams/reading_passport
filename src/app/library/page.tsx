@@ -10,7 +10,7 @@ import BookViewerModal from '@/components/story/BookViewerModal';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { countries } from '@/lib/data/countries';
-import { generateDummyLibraryItems } from '@/lib/data/dummyLibrary';
+import { generateDummyLibraryItems, isDummyId } from '@/lib/data/dummyLibrary';
 
 interface Comment {
   author: string;
@@ -19,7 +19,7 @@ interface Comment {
 }
 
 export default function LibraryPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [items, setItems] = useState<LibraryStoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -175,9 +175,27 @@ export default function LibraryPage() {
 
   const handleLike = async (storyId: string) => {
     if (!user) return;
-    const supabase = createClient();
 
     const isLiked = likedStories.has(storyId);
+
+    // Dummy data: local-only toggle without DB
+    if (isDummyId(storyId)) {
+      setLikedStories((prev) => {
+        const next = new Set(prev);
+        if (isLiked) next.delete(storyId); else next.add(storyId);
+        return next;
+      });
+      setItems((prev) =>
+        prev.map((item) =>
+          item.story_id === storyId
+            ? { ...item, likes: item.likes + (isLiked ? -1 : 1) }
+            : item
+        )
+      );
+      return;
+    }
+
+    const supabase = createClient();
 
     if (isLiked) {
       const { error } = await supabase
@@ -231,6 +249,10 @@ export default function LibraryPage() {
   };
 
   const fetchComments = async (storyId: string) => {
+    if (isDummyId(storyId)) {
+      setComments([]);
+      return;
+    }
     const supabase = createClient();
     const { data } = await supabase
       .from('story_comments')
@@ -258,17 +280,30 @@ export default function LibraryPage() {
     setSubmittingComment(true);
 
     try {
-      const supabase = createClient();
-      await supabase
-        .from('story_comments')
-        .insert({
-          story_id: selectedItem.story_id,
-          user_id: user.id,
-          content: commentText.trim(),
-        });
+      if (isDummyId(selectedItem.story_id)) {
+        // Local-only comment for dummy data
+        setComments((prev) => [
+          ...prev,
+          {
+            author: profile?.nickname ?? '사용자',
+            text: commentText.trim(),
+            date: new Date().toLocaleDateString('ko-KR'),
+          },
+        ]);
+        setCommentText('');
+      } else {
+        const supabase = createClient();
+        await supabase
+          .from('story_comments')
+          .insert({
+            story_id: selectedItem.story_id,
+            user_id: user.id,
+            content: commentText.trim(),
+          });
 
-      setCommentText('');
-      await fetchComments(selectedItem.story_id);
+        setCommentText('');
+        await fetchComments(selectedItem.story_id);
+      }
     } catch (err) {
       console.error('Error submitting comment:', err);
     }
@@ -284,6 +319,18 @@ export default function LibraryPage() {
     setSelectedReadCompleted(false);
 
     await fetchComments(item.story_id);
+
+    if (isDummyId(item.story_id)) {
+      // Skip DB operations for dummy data; increment views locally
+      setItems((prev) =>
+        prev.map((libraryItem) =>
+          libraryItem.id === item.id
+            ? { ...libraryItem, views: libraryItem.views + 1 }
+            : libraryItem
+        )
+      );
+      return;
+    }
 
     const supabase = createClient();
     if (user) {
@@ -318,6 +365,11 @@ export default function LibraryPage() {
 
   const handleReadingComplete = async (totalPages: number) => {
     if (!user || !selectedItem) return;
+
+    if (isDummyId(selectedItem.story_id)) {
+      setSelectedReadCompleted(true);
+      return;
+    }
 
     const supabase = createClient();
     const { error } = await supabase

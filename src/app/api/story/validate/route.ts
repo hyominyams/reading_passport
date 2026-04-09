@@ -145,7 +145,7 @@ function normalizeValidationResult(payload: unknown): ValidationResult {
 
 async function generateValidationResult(allStudentMessages: string): Promise<ValidationResult> {
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-nano',
     messages: [
       { role: 'system', content: buildSystemPrompt() },
       { role: 'user', content: allStudentMessages },

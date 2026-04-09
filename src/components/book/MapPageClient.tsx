@@ -7,6 +7,7 @@ import CountryCard from '@/components/book/CountryCard';
 import BookCard from '@/components/book/BookCard';
 import LanguageModal from '@/components/book/LanguageModal';
 import WorldMapSection from '@/components/book/WorldMapSection';
+import ContinueBanner from '@/components/book/ContinueBanner';
 import { countries } from '@/lib/data/countries';
 import type { MapBookProgress } from '@/lib/queries/books';
 import type { Book, Language } from '@/types/database';
@@ -201,6 +202,12 @@ export default function MapPageClient({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSelect={handleLanguageSelect}
+      />
+
+      {/* Continue where you left off banner */}
+      <ContinueBanner
+        booksByCountry={booksByCountry}
+        bookProgressById={bookProgressById}
       />
     </>
   );

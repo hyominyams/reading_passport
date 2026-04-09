@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import ActivityCard from '@/components/book/ActivityCard';
 import type { Book, Activity, StampType } from '@/types/database';
 
@@ -30,7 +29,7 @@ export default function ActivityPageClient({
 
   const stampsEarned: StampType[] = (initialActivity?.stamps_earned as StampType[]) ?? [];
 
-  const cards: CardConfig[] = [
+  const mainCards: CardConfig[] = [
     {
       icon: '📖',
       title: 'Story Read',
@@ -54,6 +53,14 @@ export default function ActivityPageClient({
     },
   ];
 
+  const myStoryCard: CardConfig = {
+    icon: '✏️',
+    title: 'My Story',
+    stampLabel: '도장 4',
+    stampType: 'mystory',
+    route: `/book/${book.id}/mystory?lang=${language}`,
+  };
+
   const allThreeCompleted =
     stampsEarned.includes('read') &&
     stampsEarned.includes('hidden') &&
@@ -71,7 +78,7 @@ export default function ActivityPageClient({
 
       {/* 3 Activity cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 w-full max-w-3xl">
-        {cards.map((card, index) => (
+        {mainCards.map((card, index) => (
           <ActivityCard
             key={card.stampType}
             icon={card.icon}
@@ -88,41 +95,22 @@ export default function ActivityPageClient({
         ))}
       </div>
 
-      {/* My Story button - appears only when all 3 stamps earned */}
-      <AnimatePresence>
-        {allThreeCompleted && (
-          <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-            className="w-full max-w-md"
-          >
-            <motion.button
-              onClick={() =>
-                router.push(`/book/${book.id}/mystory?lang=${language}`)
-              }
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              animate={{
-                boxShadow: [
-                  '0 0 0 0 rgba(245,158,11,0.3)',
-                  '0 0 0 12px rgba(245,158,11,0)',
-                ],
-              }}
-              transition={{
-                boxShadow: { duration: 1.5, repeat: Infinity },
-              }}
-              className="w-full py-5 rounded-2xl font-bold text-white
-                         bg-gradient-to-r from-secondary to-stamp-gold
-                         shadow-lg text-lg flex items-center justify-center gap-3"
-            >
-              <span className="text-2xl">&#9997;&#65039;</span>
-              <span>My Story (도장 4)</span>
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 4th card: My Story — always visible, locked until 1-3 completed */}
+      <div className="w-full max-w-xs">
+        <ActivityCard
+          icon={myStoryCard.icon}
+          title={myStoryCard.title}
+          stampLabel={myStoryCard.stampLabel}
+          stampType={myStoryCard.stampType}
+          isCompleted={stampsEarned.includes('mystory')}
+          isLocked={!allThreeCompleted}
+          isHovered={hoveredIndex === 3}
+          onClick={() => router.push(myStoryCard.route)}
+          onHoverStart={() => setHoveredIndex(3)}
+          onHoverEnd={() => setHoveredIndex(null)}
+          index={3}
+        />
+      </div>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import type { Campaign, CampaignAssetMeta, CampaignContentType, SubmissionStatus } from '@/types/database';
+import { isSampleCampaignId, getSampleCampaign, getSampleSubmissions } from '@/lib/data/dummyCampaign';
 import CampaignStatusBadge from './CampaignStatusBadge';
 import SubmissionCard from './SubmissionCard';
 import SubmissionViewerModal from './SubmissionViewerModal';
@@ -44,6 +45,14 @@ export default function CampaignDetailPage({ campaignId }: { campaignId: string 
   const isOwner = campaign?.created_by === user?.id || role === 'admin';
 
   const fetchData = useCallback(async () => {
+    // Use local dummy data for sample campaigns
+    if (isSampleCampaignId(campaignId)) {
+      setCampaign(getSampleCampaign(campaignId) ?? null);
+      setSubmissions(getSampleSubmissions(campaignId));
+      setLoading(false);
+      return;
+    }
+
     try {
       const [campaignRes, submissionsRes] = await Promise.all([
         fetch(`/api/campaign/${campaignId}`),
@@ -70,6 +79,19 @@ export default function CampaignDetailPage({ campaignId }: { campaignId: string 
   }, [fetchData]);
 
   const handleLike = async (submissionId: string) => {
+    // Local-only toggle for sample campaigns
+    if (isSampleCampaignId(campaignId)) {
+      const toggle = (s: EnrichedSubmission) =>
+        s.id === submissionId
+          ? { ...s, liked_by_me: !s.liked_by_me, like_count: s.like_count + (s.liked_by_me ? -1 : 1) }
+          : s;
+      setSubmissions((prev) => prev.map(toggle));
+      if (selectedSubmission?.id === submissionId) {
+        setSelectedSubmission((prev) => (prev ? toggle(prev) : null));
+      }
+      return;
+    }
+
     const res = await fetch(
       `/api/campaign/${campaignId}/submissions/${submissionId}/like`,
       { method: 'POST' }

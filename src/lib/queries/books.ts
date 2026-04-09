@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import type { Book, Activity, Language } from '@/types/database';
+import type { Book, Activity, Language, StampType } from '@/types/database';
 
 export interface MapBookProgress {
   bookId: string;
@@ -8,6 +8,8 @@ export interface MapBookProgress {
   hasStarted: boolean;
   isCompleted: boolean;
   updatedAt: string;
+  stampsEarned: StampType[];
+  language: Language | null;
 }
 
 export interface MapBooksData {
@@ -63,7 +65,7 @@ export async function getMapBooksData(): Promise<MapBooksData> {
   if (bookIds.length > 0) {
     const { data: activities, error: activityError } = await supabase
       .from('activities')
-      .select('book_id, completed_tabs, stamps_earned, created_at')
+      .select('book_id, completed_tabs, stamps_earned, language, created_at')
       .eq('student_id', authData.user.id)
       .in('book_id', bookIds);
 
@@ -72,7 +74,7 @@ export async function getMapBooksData(): Promise<MapBooksData> {
     } else {
       for (const activity of (activities ?? []) as Pick<
         Activity,
-        'book_id' | 'completed_tabs' | 'stamps_earned' | 'created_at'
+        'book_id' | 'completed_tabs' | 'stamps_earned' | 'language' | 'created_at'
       >[]) {
         const stamps = activity.stamps_earned ?? [];
         const completedTabs = activity.completed_tabs ?? [];
@@ -83,6 +85,8 @@ export async function getMapBooksData(): Promise<MapBooksData> {
           hasStarted: stamps.length > 0 || completedTabs.length > 0,
           isCompleted: stamps.length >= 4,
           updatedAt: activity.created_at,
+          stampsEarned: stamps,
+          language: activity.language ?? null,
         };
       }
     }

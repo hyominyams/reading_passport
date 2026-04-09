@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
         { role: 'user', content: `다음 그림책 텍스트를 분석해주세요:\n\n${sourceText}` },
       ],
       {
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-nano',
         temperature: 0.3,
         maxTokens: 2048,
       }

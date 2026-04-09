@@ -25,6 +25,7 @@ export default function FinishPageContent() {
   const [translating, setTranslating] = useState(false);
   const [translatedPages, setTranslatedPages] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editedTexts, setEditedTexts] = useState<string[]>([]);
 
@@ -85,6 +86,7 @@ export default function FinishPageContent() {
   const handleComplete = async () => {
     if (!storyId || !user || !story) return;
     setSaving(true);
+    setSaveError(null);
 
     try {
       const supabase = createClient();
@@ -100,7 +102,7 @@ export default function FinishPageContent() {
         .from('library')
         .select('id')
         .eq('story_id', storyId)
-        .single();
+        .maybeSingle();
 
       if (!existingLib) {
         await supabase.from('library').insert({
@@ -132,12 +134,23 @@ export default function FinishPageContent() {
           .from('activities')
           .update({ completed_tabs: completedTabs, stamps_earned: stampsEarned })
           .eq('id', activity.id);
+      } else {
+        // Create activity if it doesn't exist yet
+        await supabase.from('activities').insert({
+          student_id: user.id,
+          book_id: bookId,
+          country_id: story.country_id,
+          language: story.language,
+          completed_tabs: ['mystory'],
+          stamps_earned: ['mystory'],
+        });
       }
 
       setCompleted(true);
       setShowConfetti(true);
     } catch (err) {
       console.error('Complete error:', err);
+      setSaveError('저장 중 오류가 발생했어요. 다시 시도해 주세요.');
     }
     setSaving(false);
   };
@@ -380,6 +393,12 @@ export default function FinishPageContent() {
               <h3 className="font-semibold text-gray-800 mb-3">공개 설정</h3>
               <VisibilitySelector value={visibility} onChange={setVisibility} />
             </div>
+
+            {saveError && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                <p className="text-sm text-red-600">{saveError}</p>
+              </div>
+            )}
 
             <div className="mt-8 flex justify-center">
               <motion.button

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
@@ -54,6 +55,7 @@ function formatDate(value?: string | null) {
 }
 
 export default function MyPage() {
+  const router = useRouter();
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const [nickname, setNickname] = useState('');
   const [school, setSchool] = useState('');
@@ -339,12 +341,41 @@ export default function MyPage() {
     }
   };
 
-  if (authLoading || !profilePreview || !profile) {
+  // Still loading auth state
+  if (authLoading) {
     return (
       <>
         <Header />
         <main className="flex-1 flex items-center justify-center bg-muted-light/40">
           <LoadingSpinner message="마이페이지를 불러오는 중..." />
+        </main>
+      </>
+    );
+  }
+
+  // Not authenticated — redirect to login
+  if (!user) {
+    router.replace('/login');
+    return null;
+  }
+
+  // Authenticated but profile not loaded — show error with retry
+  if (!profile || !profilePreview) {
+    return (
+      <>
+        <Header />
+        <main className="flex-1 flex items-center justify-center bg-muted-light/40">
+          <div className="text-center space-y-4">
+            <p className="text-sm text-muted">프로필 정보를 불러올 수 없습니다.</p>
+            <button
+              type="button"
+              onClick={() => void refreshProfile()}
+              className="rounded-xl bg-foreground px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-foreground/90"
+            >
+              다시 시도
+            </button>
+            <p className="text-xs text-muted">문제가 계속되면 선생님에게 문의하세요.</p>
+          </div>
         </main>
       </>
     );

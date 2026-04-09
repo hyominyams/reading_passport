@@ -227,7 +227,7 @@ async function generateCharacterReply(
   systemPrompt: string
 ): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages.map((message) => ({
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
 
     if (!isValidCharacterReply(finalReply, language)) {
       const repairResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         messages: [
           {
             role: 'system',

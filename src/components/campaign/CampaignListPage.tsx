@@ -6,6 +6,7 @@ import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import type { Campaign, CampaignContentType } from '@/types/database';
+import { SAMPLE_CAMPAIGNS } from '@/lib/data/dummyCampaign';
 import CampaignCard from './CampaignCard';
 import CampaignHero from './CampaignHero';
 
@@ -19,82 +20,6 @@ const filterOptions: { key: FilterKey; label: string }[] = [
   { key: 'culture_intro', label: '문화 소개' },
   { key: 'worksheet', label: '활동지' },
   { key: 'other', label: '기타' },
-];
-
-// Preview-only sample data (remove after DB migration is applied)
-const SAMPLE_CAMPAIGNS: Campaign[] = [
-  {
-    id: 'sample-1',
-    title: '우리 반 세계시장 포스터전',
-    description:
-      '각 나라 그림책을 읽고 지역 시장, 음식, 직업 문화를 포스터와 카드뉴스로 재해석한 결과물을 모아 전시합니다. 자유롭게 디자인하되, 나라의 문화가 잘 드러나도록 해 주세요.',
-    cover_image_url: null,
-    allowed_content_types: ['poster', 'card_news'],
-    tags: ['전시', '포스터', '문화비교'],
-    status: 'active',
-    deadline: '2026-04-30T23:59:59Z',
-    max_files_per_submission: 3,
-    max_file_size_mb: 5,
-    created_by: 'teacher-1',
-    class_id: null,
-    scope: 'class',
-    created_at: '2026-04-01T00:00:00Z',
-    updated_at: '2026-04-01T00:00:00Z',
-  },
-  {
-    id: 'sample-2',
-    title: '등장인물 인터뷰집 배포팩',
-    description:
-      '학생들이 만든 등장인물 인터뷰 질문지와 응답 기록을 교실 배포용 PDF로 묶어 공유하는 자료 아카이브입니다. 인터뷰 형식으로 작성해 주세요.',
-    cover_image_url: null,
-    allowed_content_types: ['worksheet', 'other'],
-    tags: ['질문지', '배포자료', '토론'],
-    status: 'active',
-    deadline: '2026-05-15T23:59:59Z',
-    max_files_per_submission: 5,
-    max_file_size_mb: 10,
-    created_by: 'teacher-1',
-    class_id: null,
-    scope: 'class',
-    created_at: '2026-04-03T00:00:00Z',
-    updated_at: '2026-04-03T00:00:00Z',
-  },
-  {
-    id: 'sample-3',
-    title: '숨은 이야기 탐험 키트',
-    description:
-      'Hidden Stories 활동을 수업 바깥으로 확장해 지도, 조사 카드, 사진 기록지를 함께 묶은 탐험형 자료 꾸러미입니다.',
-    cover_image_url: null,
-    allowed_content_types: ['culture_intro', 'impression'],
-    tags: ['탐험', '프로젝트', '조사'],
-    status: 'active',
-    deadline: null,
-    max_files_per_submission: 3,
-    max_file_size_mb: 5,
-    created_by: 'teacher-1',
-    class_id: null,
-    scope: 'class',
-    created_at: '2026-04-05T00:00:00Z',
-    updated_at: '2026-04-05T00:00:00Z',
-  },
-  {
-    id: 'sample-4',
-    title: '나라별 음식 문화 감상문 챌린지',
-    description:
-      '그림책에 등장하는 음식 문화를 읽고 감상문을 써 보세요. 가장 인상 깊었던 음식과 그 이유를 자유롭게 표현해 주세요.',
-    cover_image_url: null,
-    allowed_content_types: ['impression'],
-    tags: ['감상문', '음식', '챌린지'],
-    status: 'active',
-    deadline: '2026-04-20T23:59:59Z',
-    max_files_per_submission: 2,
-    max_file_size_mb: 5,
-    created_by: 'teacher-1',
-    class_id: null,
-    scope: 'class',
-    created_at: '2026-04-07T00:00:00Z',
-    updated_at: '2026-04-07T00:00:00Z',
-  },
 ];
 
 export default function CampaignListPage() {

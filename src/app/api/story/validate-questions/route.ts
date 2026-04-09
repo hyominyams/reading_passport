@@ -78,7 +78,7 @@ ${inferenceQs.map((q: string, i: number) => `${i}. ${q}`).join('\n')}`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      { model: 'gpt-4o-mini', temperature: 0.2, maxTokens: 500 }
+      { model: 'gpt-5-nano', temperature: 0.2, maxTokens: 500, jsonMode: true }
     );
 
     // Parse JSON response

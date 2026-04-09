@@ -147,13 +147,19 @@ export default function BookViewerModal({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -30 }}
               >
-                {sceneImages[currentPage] && (
+                {sceneImages.length > 0 && (
                   <div className="aspect-[16/9]">
-                    <img
-                      src={sceneImages[currentPage]}
-                      alt={`장면 ${currentPage + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    {sceneImages[currentPage] ? (
+                      <img
+                        src={sceneImages[currentPage]}
+                        alt={`장면 ${currentPage + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-secondary/10 via-primary/5 to-accent/10 flex items-center justify-center">
+                        <span className="text-4xl opacity-20">📖</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="p-6">

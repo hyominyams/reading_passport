@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         { role: 'user', content: `다음 대화를 검토해주세요:\n\n${conversationText}` },
       ],
       {
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-nano',
         temperature: 0.1,
         maxTokens: 256,
       }

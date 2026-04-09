@@ -297,7 +297,7 @@ function buildValidationSystemPrompt() {
 async function runCharacterCase(openai, sample) {
   const systemPrompt = buildCharacterSystemPrompt(sample);
   const initialResponse = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     messages: [{ role: 'system', content: systemPrompt }, ...sample.messages],
     temperature: 0.7,
     max_tokens: 220,
@@ -317,7 +317,7 @@ async function runCharacterCase(openai, sample) {
     countQuestionMarks(reply) !== 1
   ) {
     const repairResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       messages: [
         {
           role: 'system',
@@ -375,7 +375,7 @@ async function runGaugeCase(openai, sample) {
   const systemPrompt = buildGaugeSystemPrompt(sample);
   const focus = detectGaugeFocus(sample.messages);
   const initialResponse = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     messages: [{ role: 'system', content: systemPrompt }, ...sample.messages],
     temperature: 0.4,
     max_tokens: 220,
@@ -398,7 +398,7 @@ async function runGaugeCase(openai, sample) {
     !matchesGaugeFocus(question, focus)
   ) {
     const repairResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       messages: [
         {
           role: 'system',
@@ -464,7 +464,7 @@ async function runGaugeCase(openai, sample) {
 
 async function runValidationCase(openai, sample) {
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-nano',
     messages: [
       { role: 'system', content: buildValidationSystemPrompt() },
       { role: 'user', content: sample.text },
