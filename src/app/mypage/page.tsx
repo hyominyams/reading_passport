@@ -14,7 +14,7 @@ import {
 } from '@/lib/profile';
 import type { StampType, User } from '@/types/database';
 
-const requiredStamps: StampType[] = ['read', 'hidden', 'character', 'mystory'];
+const requiredStamps: StampType[] = ['read', 'hidden', 'questions', 'mystory'];
 
 type StudentActivityRow = {
   created_at: string;
@@ -239,12 +239,14 @@ export default function MyPage() {
         { href: '/map', label: '책 고르기' },
         { href: '/passport', label: '여권 보기' },
         { href: '/library', label: '서재 보기' },
+        { href: '/campaign', label: '캠페인 보기' },
       ];
     }
 
     return [
       { href: '/teacher', label: '교사 대시보드' },
       { href: '/library', label: '학생 작품 보기' },
+      { href: '/campaign', label: '캠페인 보기' },
       ...(profile.role === 'admin' ? [{ href: '/admin', label: '관리자 페이지' }] : []),
     ];
   }, [profile]);

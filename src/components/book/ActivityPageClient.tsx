@@ -1,17 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import ActivityCard from '@/components/book/ActivityCard';
-import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { useAuth } from '@/hooks/useAuth';
-import { createClient } from '@/lib/supabase/client';
 import type { Book, Activity, StampType } from '@/types/database';
 
 interface ActivityPageClientProps {
   book: Book;
   language: string;
+  initialActivity: Activity | null;
 }
 
 interface CardConfig {
@@ -25,46 +23,12 @@ interface CardConfig {
 export default function ActivityPageClient({
   book,
   language,
+  initialActivity,
 }: ActivityPageClientProps) {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-  const [activity, setActivity] = useState<Activity | null>(null);
-  const [loadingActivity, setLoadingActivity] = useState(true);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    async function fetchActivity() {
-      if (!user) {
-        setLoadingActivity(false);
-        return;
-      }
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('student_id', user.id)
-        .eq('book_id', book.id)
-        .single();
-
-      if (data) {
-        setActivity(data as Activity);
-      }
-      setLoadingActivity(false);
-    }
-
-    if (!authLoading) {
-      fetchActivity();
-    }
-  }, [user, authLoading, book.id]);
-
-  const stampsEarned: StampType[] = (activity?.stamps_earned as StampType[]) ?? [];
-
-  // Extract character name from character_analysis if available
-  const charAnalysis = book.character_analysis as Record<string, unknown> | null;
-  const characterName =
-    (charAnalysis?.name as string) ??
-    (charAnalysis?.character_name as string) ??
-    '등장인물';
+  const stampsEarned: StampType[] = (initialActivity?.stamps_earned as StampType[]) ?? [];
 
   const cards: CardConfig[] = [
     {
@@ -82,26 +46,18 @@ export default function ActivityPageClient({
       route: `/book/${book.id}/explore?lang=${language}`,
     },
     {
-      icon: '💬',
-      title: `Talk with ${characterName}`,
+      icon: '❓',
+      title: '질문 만들기',
       stampLabel: '도장 3',
-      stampType: 'character',
-      route: `/book/${book.id}/chat?lang=${language}`,
+      stampType: 'questions',
+      route: `/book/${book.id}/questions?lang=${language}`,
     },
   ];
 
   const allThreeCompleted =
     stampsEarned.includes('read') &&
     stampsEarned.includes('hidden') &&
-    stampsEarned.includes('character');
-
-  if (authLoading || loadingActivity) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <LoadingSpinner size="lg" message="활동 정보를 불러오는 중..." />
-      </div>
-    );
-  }
+    stampsEarned.includes('questions');
 
   return (
     <div className="flex flex-col items-center gap-8">
@@ -124,7 +80,6 @@ export default function ActivityPageClient({
             stampType={card.stampType}
             isCompleted={stampsEarned.includes(card.stampType)}
             isHovered={hoveredIndex === index}
-            anyHovered={hoveredIndex !== null}
             onClick={() => router.push(card.route)}
             onHoverStart={() => setHoveredIndex(index)}
             onHoverEnd={() => setHoveredIndex(null)}

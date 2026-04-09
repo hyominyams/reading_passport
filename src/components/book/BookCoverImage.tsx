@@ -3,16 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState } from 'react';
-import dynamic from 'next/dynamic';
-
-const PdfCoverThumbnail = dynamic(() => import('./PdfCoverThumbnail'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#fffdf8] to-[#f6eee0]">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#d9c7ae] border-t-[#8c5d35]" />
-    </div>
-  ),
-});
+import PdfCoverThumbnail from './PdfCoverThumbnail';
 
 interface BookCoverImageProps {
   title: string;
@@ -69,6 +60,7 @@ export default function BookCoverImage({
       <div className="relative h-full w-full overflow-hidden rounded-[inherit]">
         <PdfCoverThumbnail
           pdfUrl={normalizedCoverUrl!}
+          title={title}
           className="h-full w-full [&_canvas]:!h-full [&_canvas]:object-cover"
         />
       </div>

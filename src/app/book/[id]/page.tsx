@@ -1,5 +1,6 @@
 import Header from '@/components/common/Header';
-import { getBookById } from '@/lib/queries/books';
+import { getBookById, getStudentActivity } from '@/lib/queries/books';
+import { createClient } from '@/lib/supabase/server';
 import BookIntroClient from '@/components/book/BookIntroClient';
 
 export default async function BookPage({
@@ -13,7 +14,13 @@ export default async function BookPage({
   const { lang } = await searchParams;
   const language = lang === 'en' ? 'en' : 'ko';
 
-  const book = await getBookById(id);
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const [book, activity] = await Promise.all([
+    getBookById(id),
+    user ? getStudentActivity(user.id, id) : Promise.resolve(null),
+  ]);
 
   if (!book) {
     return (
@@ -35,7 +42,7 @@ export default async function BookPage({
     <>
       <Header />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <BookIntroClient book={book} language={language} />
+        <BookIntroClient book={book} language={language} initialActivity={activity} />
       </main>
     </>
   );

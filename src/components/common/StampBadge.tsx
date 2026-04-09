@@ -12,14 +12,14 @@ interface StampBadgeProps {
 const stampLabels: Record<StampType, string> = {
   read: '읽기',
   hidden: '탐험',
-  character: '캐릭터',
+  questions: '질문만들기',
   mystory: '내 이야기',
 };
 
 const stampIcons: Record<StampType, string> = {
   read: '📖',
   hidden: '🔍',
-  character: '💬',
+  questions: '❓',
   mystory: '✍️',
 };
 

@@ -1,430 +1,617 @@
 'use client';
 
-import '@/lib/pdf-worker-setup';
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Document, Page } from 'react-pdf';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import { getPdfJs, createLoadParams } from '@/lib/pdfjs-loader';
+import type { PdfDocument } from '@/lib/pdfjs-loader';
+import { getCachedDocument, setCachedDocument } from '@/lib/pdf-document-cache';
+
+/* ─── Types ─── */
 
 interface PictureBookViewerProps {
   pdfUrl: string;
   onLastPage: () => void;
+  /** Callback reporting the maximum page number the reader has visited */
+  onMaxPageChange?: (maxPage: number, totalPages: number) => void;
 }
 
-function getSpreadPages(
-  spreadIndex: number,
-  numPages: number,
-  isMobile: boolean
-): { left: number | null; right: number | null } {
-  if (isMobile) {
-    const pageNum = spreadIndex + 1;
-    return { left: null, right: pageNum <= numPages ? pageNum : null };
-  }
-  if (spreadIndex === 0) {
-    return { left: null, right: 1 };
-  }
-  const leftPage = spreadIndex * 2;
-  const rightPage = spreadIndex * 2 + 1;
-  return {
-    left: leftPage <= numPages ? leftPage : null,
-    right: rightPage <= numPages ? rightPage : null,
-  };
+/* ─── Mobile detection (SSR-safe) ─── */
+
+const MQ = '(max-width: 639px)';
+function subscribeMedia(cb: () => void) {
+  const mql = window.matchMedia(MQ);
+  mql.addEventListener('change', cb);
+  return () => mql.removeEventListener('change', cb);
+}
+function getIsMobile() {
+  return window.matchMedia(MQ).matches;
+}
+function getIsMobileServer() {
+  return false;
 }
 
-function getTotalSpreads(numPages: number, isMobile: boolean): number {
-  if (isMobile) return numPages;
-  if (numPages <= 1) return 1;
-  return 1 + Math.ceil((numPages - 1) / 2);
-}
+/* ─── Animation variants ─── */
 
-const pageVariants = {
+type Bezier = [number, number, number, number];
+const EASE: Bezier = [0.4, 0, 0.2, 1];
+
+const flipVariants = {
   enter: (dir: number) => ({
-    x: dir > 0 ? 200 : -200,
+    rotateY: dir > 0 ? 90 : -90,
+    opacity: 0.5,
+  }),
+  center: {
+    rotateY: 0,
+    opacity: 1,
+    transition: { duration: 0.5, ease: EASE },
+  },
+  exit: (dir: number) => ({
+    rotateY: dir < 0 ? 90 : -90,
+    opacity: 0.5,
+    transition: { duration: 0.5, ease: EASE },
+  }),
+};
+
+const slideVariants = {
+  enter: (dir: number) => ({
+    x: dir > 0 ? 300 : -300,
     opacity: 0,
   }),
   center: {
     x: 0,
     opacity: 1,
+    transition: { duration: 0.35, ease: EASE },
   },
   exit: (dir: number) => ({
-    x: dir > 0 ? -200 : 200,
+    x: dir < 0 ? 300 : -300,
     opacity: 0,
+    transition: { duration: 0.35, ease: EASE },
   }),
 };
+
+/* ─── Page Canvas Component ─── */
+
+function PageCanvas({
+  doc,
+  pageNum,
+  side,
+}: {
+  doc: PdfDocument;
+  pageNum: number;
+  side: 'left' | 'right' | 'single';
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function renderPage() {
+      setLoaded(false);
+
+      try {
+        const page = await doc.getPage(pageNum);
+        if (cancelled) return;
+
+        const canvas = canvasRef.current;
+        const container = containerRef.current;
+        if (!canvas || !container) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+
+        const baseViewport = page.getViewport({ scale: 1 });
+        // Fit within container preserving aspect ratio
+        const scaleW = containerW / baseViewport.width;
+        const scaleH = containerH / baseViewport.height;
+        const scale = Math.min(scaleW, scaleH) * dpr;
+        const viewport = page.getViewport({ scale });
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = `${viewport.width / dpr}px`;
+        canvas.style.height = `${viewport.height / dpr}px`;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx || cancelled) return;
+
+        await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+        if (!cancelled) setLoaded(true);
+      } catch (e) {
+        console.error(`Failed to render page ${pageNum}:`, e);
+      }
+    }
+
+    renderPage();
+    return () => {
+      cancelled = true;
+    };
+  }, [doc, pageNum]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative flex h-full w-full items-center justify-center bg-white"
+    >
+      {!loaded && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#faf6ef]">
+          <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-[#e8dcc8] border-t-[#8c5d35]" />
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        className={`transition-opacity duration-300 ${
+          loaded ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+      <span
+        className={`absolute bottom-2 text-[11px] text-[#b8a48c] select-none ${
+          side === 'left' ? 'left-3' : 'right-3'
+        }`}
+      >
+        {pageNum}
+      </span>
+    </div>
+  );
+}
+
+function BlankPage() {
+  return (
+    <div className="flex h-full items-center justify-center bg-[#faf6ef]">
+      <div className="h-16 w-16 rounded-full bg-[#f0e6d6] opacity-30" />
+    </div>
+  );
+}
+
+/* ─── Main Viewer ─── */
 
 export default function PictureBookViewer({
   pdfUrl,
   onLastPage,
+  onMaxPageChange,
 }: PictureBookViewerProps) {
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [currentSpread, setCurrentSpread] = useState(0);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [direction, setDirection] = useState(1);
-  const [pdfError, setPdfError] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useSyncExternalStore(
+    subscribeMedia,
+    getIsMobile,
+    getIsMobileServer,
+  );
 
-  const isMobile = containerWidth < 768;
-  const totalSpreads = numPages ? getTotalSpreads(numPages, isMobile) : 0;
-  const isLastSpread = totalSpreads > 0 && currentSpread === totalSpreads - 1;
-  const spread = numPages
-    ? getSpreadPages(currentSpread, numPages, isMobile)
-    : { left: null, right: null };
+  const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(null);
+  const [pageCount, setPageCount] = useState<number | null>(null);
+  const [pageAspect, setPageAspect] = useState<number>(4 / 3); // width/height
+  const [currentPage, setCurrentPage] = useState(1);
+  const [maxPageVisited, setMaxPageVisited] = useState(1);
+  const [direction, setDirection] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const touchStartX = useRef(0);
 
-  // Measure container width
+  /* ── Derived state ── */
+  const spreadOf = (pg: number) => (pg === 1 ? 0 : Math.ceil((pg - 1) / 2));
+  const currentSpread = spreadOf(currentPage);
+  const totalSpreadCount = pageCount
+    ? 1 + Math.ceil((pageCount - 1) / 2)
+    : 1;
+
+  const spreadLeft = currentSpread === 0 ? null : currentSpread * 2;
+  const spreadRight =
+    currentSpread === 0
+      ? 1
+      : currentSpread * 2 + 1 <= (pageCount ?? 0)
+        ? currentSpread * 2 + 1
+        : null;
+
+  const canGoNext =
+    pageCount !== null &&
+    (isMobile
+      ? currentPage < pageCount
+      : currentSpread < totalSpreadCount - 1);
+  const canGoPrev = isMobile ? currentPage > 1 : currentSpread > 0;
+
+  /* ── Track max page visited ── */
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) setContainerWidth(entry.contentRect.width);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') goNext();
-      else if (e.key === 'ArrowLeft') goPrev();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalSpreads, currentSpread]);
-
-  const goNext = useCallback(() => {
-    setCurrentSpread((prev) => {
-      if (prev < totalSpreads - 1) {
-        setDirection(1);
-        return prev + 1;
+    // On desktop, the right page of the spread is the furthest reached
+    const furthest = isMobile
+      ? currentPage
+      : Math.max(spreadLeft ?? 1, spreadRight ?? 1);
+    setMaxPageVisited((prev) => {
+      const next = Math.max(prev, furthest);
+      if (next !== prev && pageCount && onMaxPageChange) {
+        onMaxPageChange(next, pageCount);
       }
-      return prev;
+      return next;
     });
-  }, [totalSpreads]);
+  }, [currentPage, isMobile, spreadLeft, spreadRight, pageCount, onMaxPageChange]);
+
+  /* ── Load PDF document (with cache + range requests) ── */
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        // Check cache first — avoids re-downloading on back-navigation
+        const cached = getCachedDocument(pdfUrl);
+        if (cached) {
+          setPdfDoc(cached);
+          setPageCount(cached.numPages);
+          try {
+            const firstPage = await cached.getPage(1);
+            const vp = firstPage.getViewport({ scale: 1 });
+            if (!cancelled) setPageAspect(vp.width / vp.height);
+          } catch { /* use default aspect */ }
+          return;
+        }
+
+        const pdfjsLib = await getPdfJs();
+        const loadingTask = pdfjsLib.getDocument(createLoadParams(pdfUrl));
+        const doc = await loadingTask.promise;
+        if (cancelled) {
+          await doc.destroy();
+          return;
+        }
+        setCachedDocument(pdfUrl, doc);
+        setPdfDoc(doc);
+        setPageCount(doc.numPages);
+
+        // Read first page aspect ratio to size the viewer correctly
+        try {
+          const firstPage = await doc.getPage(1);
+          const vp = firstPage.getViewport({ scale: 1 });
+          if (!cancelled) setPageAspect(vp.width / vp.height);
+        } catch { /* use default aspect */ }
+      } catch (e) {
+        console.error('Failed to load PDF:', e);
+        if (!cancelled) setError('PDF를 불러올 수 없습니다');
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfUrl]);
+
+  /* ── Prefetch next pages (data parsing only) ── */
+  useEffect(() => {
+    if (!pdfDoc || pageCount === null) return;
+    const nextPages = isMobile
+      ? [currentPage + 1]
+      : [currentPage + 2, currentPage + 3];
+
+    for (const p of nextPages) {
+      if (p >= 1 && p <= pageCount) {
+        pdfDoc.getPage(p); // fire-and-forget; PDF.js caches page data internally
+      }
+    }
+  }, [pdfDoc, currentPage, pageCount, isMobile]);
+
+  /* ── Navigation ── */
+  const goNext = useCallback(() => {
+    if (!canGoNext || pageCount === null) return;
+    setDirection(1);
+    if (isMobile) {
+      setCurrentPage((p) => Math.min(p + 1, pageCount));
+    } else {
+      const nextSpread = currentSpread + 1;
+      setCurrentPage(nextSpread === 0 ? 1 : nextSpread * 2);
+    }
+  }, [canGoNext, pageCount, isMobile, currentSpread]);
 
   const goPrev = useCallback(() => {
-    setCurrentSpread((prev) => {
-      if (prev > 0) {
-        setDirection(-1);
-        return prev - 1;
-      }
-      return prev;
-    });
-  }, []);
-
-  // Calculate page width
-  const framePadding = isMobile ? 12 : 16;
-  const innerPadding = framePadding * 2;
-  const spineWidth = isMobile ? 0 : 2;
-  const availableWidth = Math.max(containerWidth - innerPadding - 24, 100);
-  const pageWidth = isMobile
-    ? availableWidth
-    : Math.floor((availableWidth - spineWidth) / 2);
-
-  // Page indicator text
-  const getPageIndicator = () => {
-    if (!numPages) return '';
+    if (!canGoPrev) return;
+    setDirection(-1);
     if (isMobile) {
-      return `${currentSpread + 1} / ${numPages}`;
+      setCurrentPage((p) => Math.max(p - 1, 1));
+    } else {
+      const prevSpread = currentSpread - 1;
+      setCurrentPage(prevSpread === 0 ? 1 : prevSpread * 2);
     }
-    if (spread.left && spread.right) {
-      return `${spread.left}-${spread.right} / ${numPages}`;
-    }
-    const page = spread.left || spread.right;
-    return page ? `${page} / ${numPages}` : '';
-  };
+  }, [canGoPrev, isMobile, currentSpread]);
 
-  if (pdfError) {
+  const goToSpread = useCallback(
+    (idx: number) => {
+      setDirection(idx > currentSpread ? 1 : -1);
+      setCurrentPage(idx === 0 ? 1 : idx * 2);
+    },
+    [currentSpread],
+  );
+
+  /* ── Keyboard ── */
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        goNext();
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goPrev();
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [goNext, goPrev]);
+
+  /* ── Touch swipe ── */
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      if (Math.abs(dx) > 50) {
+        if (dx < 0) goNext();
+        else goPrev();
+      }
+    },
+    [goNext, goPrev],
+  );
+
+  /* ── Loading / Error ── */
+  if (error) {
     return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <div className="flex flex-col items-center justify-center gap-4 rounded-[28px] border border-[#d9c7ae] bg-[linear-gradient(180deg,#fbf6ec_0%,#efe1ca_100%)] p-8 shadow-[0_28px_90px_rgba(94,63,34,0.16)]">
-          <span className="text-5xl">📖</span>
-          <p className="text-sm font-semibold text-[#7d6243]">
-            PDF를 불러올 수 없습니다
-          </p>
-          <a
-            href={pdfUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center rounded-full border border-[#d8c5a8] bg-white px-4 py-2 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-[#fffaf1]"
-          >
-            새 탭으로 열기
-          </a>
-        </div>
-        <div className="flex items-center justify-center">
-          <motion.button
-            type="button"
-            onClick={onLastPage}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="inline-flex items-center justify-center rounded-full bg-[#8c5d35] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#7b512d]"
-          >
-            읽기 완료
-          </motion.button>
+      <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-center gap-4 rounded-3xl border border-[#e8dcc8] bg-[#faf6ef] py-20">
+        <span className="text-4xl">📖</span>
+        <p className="text-sm font-medium text-[#7d6243]">{error}</p>
+        <a
+          href={pdfUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-full border border-[#d8c5a8] bg-white px-5 py-2 text-sm font-semibold text-[#7d6243] transition hover:bg-[#fffaf1]"
+        >
+          새 ��으로 열기
+        </a>
+      </div>
+    );
+  }
+
+  if (!pdfDoc || pageCount === null) {
+    return (
+      <div
+        className="mx-auto flex w-full max-w-5xl items-center justify-center rounded-3xl border border-[#e8dcc8] bg-[#faf6ef]"
+        style={{ minHeight: 480 }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#e8dcc8] border-t-[#8c5d35]" />
+          <p className="text-xs font-medium text-[#7d6243]">책을 여는 중...</p>
         </div>
       </div>
     );
   }
 
+  const animKey = isMobile ? currentPage : currentSpread;
+
+  // Desktop: two pages side-by-side → aspect = singlePageAspect * 2
+  // Mobile: single page → aspect = singlePageAspect
+  const spreadAspect = isMobile ? pageAspect : pageAspect * 2;
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-      {/* Book frame */}
-      <div
-        ref={containerRef}
-        className="overflow-hidden rounded-[28px] border border-[#d9c7ae] bg-[linear-gradient(180deg,#fbf6ec_0%,#efe1ca_100%)] p-3 shadow-[0_28px_90px_rgba(94,63,34,0.16)] sm:p-4"
-      >
-        <div className="overflow-hidden rounded-[22px] border border-[#e7d7c1] bg-white shadow-inner">
-          <Document
-            file={pdfUrl}
-            onLoadSuccess={({ numPages: n }) => setNumPages(n)}
-            onLoadError={() => setPdfError(true)}
-            loading={
-              <div className="flex min-h-[60vh] items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="h-8 w-8 animate-spin rounded-full border-3 border-[#d9c7ae] border-t-[#8c5d35]" />
-                  <p className="text-xs text-[#8f7759]">책을 펼치는 중...</p>
-                </div>
-              </div>
-            }
-          >
-            {numPages && containerWidth > 0 && (
-              <AnimatePresence mode="wait" custom={direction}>
-                <motion.div
-                  key={currentSpread}
-                  custom={direction}
-                  variants={pageVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-                  className="relative"
-                >
-                  {/* Desktop: two-page spread */}
-                  {!isMobile ? (
-                    <div className="flex min-h-[60vh]">
-                      {/* Left page area */}
-                      <div
-                        className="flex flex-1 cursor-pointer items-center justify-center bg-[#faf7f2]"
-                        onClick={goPrev}
-                        role="button"
-                        tabIndex={-1}
-                        aria-label="이전 페이지"
-                      >
-                        {spread.left ? (
-                          <div className="storybook-page">
-                            <Page
-                              pageNumber={spread.left}
-                              width={pageWidth}
-                              renderTextLayer={false}
-                              renderAnnotationLayer={false}
-                              loading={
-                                <div
-                                  className="animate-pulse bg-[#f0e8db]"
-                                  style={{
-                                    width: pageWidth,
-                                    height: pageWidth * 1.4,
-                                  }}
-                                />
-                              }
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            {currentSpread === 0 && (
-                              <div className="flex flex-col items-center gap-2 text-[#c4a882]">
-                                <svg
-                                  className="h-12 w-12"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-                                  />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+      {/* ── Book body ── */}
+      <div className="overflow-hidden rounded-[28px] border border-[#d9c7ae] bg-[radial-gradient(circle_at_top,#fffaf1_0%,#f4e6d1_42%,#e2c7a6_100%)] p-2.5 shadow-[0_34px_90px_rgba(94,63,34,0.2)] sm:rounded-[32px] sm:p-5">
+        <div
+          className="relative overflow-hidden rounded-[20px] border border-[#ddc7a8] bg-[#5d3b22] shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_20px_60px_rgba(50,28,10,0.28)] sm:rounded-[24px]"
+          style={{ perspective: 1800, aspectRatio: `${spreadAspect}` }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Spine shadow (desktop) */}
+          {!isMobile && (
+            <div
+              className="pointer-events-none absolute inset-y-0 left-1/2 z-20 w-8 -translate-x-1/2"
+              style={{
+                background:
+                  'linear-gradient(90deg, rgba(60,35,15,0.25) 0%, rgba(60,35,15,0.08) 30%, transparent 50%, rgba(60,35,15,0.08) 70%, rgba(60,35,15,0.25) 100%)',
+              }}
+            />
+          )}
 
-                      {/* Spine divider */}
-                      <div className="w-[2px] bg-gradient-to-b from-transparent via-[#d9c7ae] to-transparent" />
-
-                      {/* Right page area */}
-                      <div
-                        className="flex flex-1 cursor-pointer items-center justify-center bg-white"
-                        onClick={goNext}
-                        role="button"
-                        tabIndex={-1}
-                        aria-label="다음 페이지"
-                      >
-                        {spread.right ? (
-                          <div className="storybook-page">
-                            <Page
-                              pageNumber={spread.right}
-                              width={pageWidth}
-                              renderTextLayer={false}
-                              renderAnnotationLayer={false}
-                              loading={
-                                <div
-                                  className="animate-pulse bg-[#f0e8db]"
-                                  style={{
-                                    width: pageWidth,
-                                    height: pageWidth * 1.4,
-                                  }}
-                                />
-                              }
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            className="flex items-center justify-center"
-                            style={{
-                              width: pageWidth,
-                              minHeight: pageWidth * 1.2,
-                            }}
-                          />
-                        )}
-                      </div>
-                    </div>
+          {/* Pages area */}
+          <AnimatePresence mode="wait" custom={direction}>
+            {isMobile ? (
+              <motion.div
+                key={animKey}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="h-full w-full"
+              >
+                <PageCanvas
+                  doc={pdfDoc}
+                  pageNum={currentPage}
+                  side="single"
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key={animKey}
+                custom={direction}
+                variants={flipVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                style={{ transformStyle: 'preserve-3d' }}
+                className="grid h-full grid-cols-2"
+              >
+                <div className="overflow-hidden border-r border-[#e2d5c2]/30">
+                  {spreadLeft ? (
+                    <PageCanvas
+                      doc={pdfDoc}
+                      pageNum={spreadLeft}
+                      side="left"
+                    />
                   ) : (
-                    /* Mobile: single page */
-                    <div
-                      className="flex min-h-[50vh] items-center justify-center"
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const clickX = e.clientX - rect.left;
-                        if (clickX > rect.width / 2) goNext();
-                        else goPrev();
-                      }}
-                      role="button"
-                      tabIndex={-1}
-                    >
-                      {spread.right && (
-                        <div className="storybook-page">
-                          <Page
-                            pageNumber={spread.right}
-                            width={pageWidth}
-                            renderTextLayer={false}
-                            renderAnnotationLayer={false}
-                            loading={
-                              <div
-                                className="animate-pulse bg-[#f0e8db]"
-                                style={{
-                                  width: pageWidth,
-                                  height: pageWidth * 1.4,
-                                }}
-                              />
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
+                    <BlankPage />
                   )}
-                </motion.div>
-              </AnimatePresence>
+                </div>
+                <div className="overflow-hidden">
+                  {spreadRight ? (
+                    <PageCanvas
+                      doc={pdfDoc}
+                      pageNum={spreadRight}
+                      side="right"
+                    />
+                  ) : (
+                    <BlankPage />
+                  )}
+                </div>
+              </motion.div>
             )}
-          </Document>
+          </AnimatePresence>
+
+          {/* Tap zones */}
+          <button
+            type="button"
+            aria-label="이전 페이지"
+            onClick={goPrev}
+            disabled={!canGoPrev}
+            className="absolute inset-y-0 left-0 z-30 w-1/4 cursor-w-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0 sm:w-[15%]"
+          >
+            <div className="flex h-full items-center justify-start pl-3">
+              <div className="rounded-full bg-black/20 p-2 backdrop-blur-sm">
+                <ChevronLeft />
+              </div>
+            </div>
+          </button>
+          <button
+            type="button"
+            aria-label="다음 페이지"
+            onClick={goNext}
+            disabled={!canGoNext}
+            className="absolute inset-y-0 right-0 z-30 w-1/4 cursor-e-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0 sm:w-[15%]"
+          >
+            <div className="flex h-full items-center justify-end pr-3">
+              <div className="rounded-full bg-black/20 p-2 backdrop-blur-sm">
+                <ChevronRight />
+              </div>
+            </div>
+          </button>
         </div>
       </div>
 
-      {/* Bottom controls */}
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#eadcca] bg-white/90 px-5 py-4 shadow-sm">
-        {/* Navigation row */}
-        <div className="flex w-full items-center justify-between">
+      {/* ── Controls ── */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#eadcca] bg-white/90 px-4 py-3 shadow-sm sm:px-5 sm:py-4">
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={goPrev}
-            disabled={currentSpread === 0}
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-[#7d6243] transition hover:bg-[#f5ede0] disabled:opacity-30"
+            disabled={!canGoPrev}
+            className="flex items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-3 py-1.5 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0 sm:px-4 sm:py-2"
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            이전
+            <ChevronLeft />
+            <span className="hidden sm:inline">이전</span>
           </button>
 
-          <span className="text-sm font-semibold text-[#7d6243]">
-            {getPageIndicator()}
-          </span>
+          {isMobile ? (
+            <span className="text-sm font-medium text-[#7d6243]">
+              {currentPage} / {pageCount}
+            </span>
+          ) : (
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+              {Array.from({ length: totalSpreadCount }, (_, i) => (
+                <button
+                  type="button"
+                  key={i}
+                  aria-label={`${i === 0 ? '표지' : `${i * 2}-${i * 2 + 1}쪽`}`}
+                  onClick={() => goToSpread(i)}
+                  className={`h-2 shrink-0 rounded-full transition-all ${
+                    i === currentSpread
+                      ? 'w-6 bg-[#8c5d35]'
+                      : 'w-2 bg-[#d9c7ae] hover:bg-[#c4ae92]'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
 
           <button
             type="button"
             onClick={goNext}
-            disabled={isLastSpread}
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-[#7d6243] transition hover:bg-[#f5ede0] disabled:opacity-30"
+            disabled={!canGoNext}
+            className="flex items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-3 py-1.5 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0 sm:px-4 sm:py-2"
           >
-            다음
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+            <span className="hidden sm:inline">다음</span>
+            <ChevronRight />
           </button>
         </div>
 
-        {/* Page dots (show for small page counts) */}
-        {totalSpreads > 0 && totalSpreads <= 20 && (
-          <div className="flex gap-1.5">
-            {Array.from({ length: totalSpreads }, (_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => {
-                  setDirection(i > currentSpread ? 1 : -1);
-                  setCurrentSpread(i);
-                }}
-                className={`h-2 w-2 rounded-full transition-all ${
-                  currentSpread === i
-                    ? 'scale-125 bg-[#8c5d35]'
-                    : 'bg-[#d9c7ae] hover:bg-[#c4a882]'
-                }`}
-                aria-label={`스프레드 ${i + 1}`}
-              />
-            ))}
-          </div>
-        )}
+        <p className="text-center text-xs text-[#b8a48c]">
+          {isMobile
+            ? `${currentPage}쪽 / 전체 ${pageCount}쪽`
+            : currentSpread === 0
+              ? `표지 — 전체 ${pageCount}쪽`
+              : `${spreadLeft ?? ''}${spreadLeft && spreadRight ? ' - ' : ''}${spreadRight ?? ''}쪽 / ${pageCount}쪽`}
+          <span className="mx-2 text-[#d9c7ae]">·</span>
+          {isMobile
+            ? '스와이프로 넘기세요'
+            : '화살표 키 또는 스와이프로 넘기세요'}
+        </p>
 
-        {/* Reading complete button */}
-        <motion.button
-          type="button"
-          onClick={onLastPage}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className={`inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-semibold shadow-sm transition ${
-            isLastSpread
-              ? 'bg-[#8c5d35] text-white hover:bg-[#7b512d]'
-              : 'bg-[#e8ddd0] text-[#a08768] cursor-default'
-          }`}
-          disabled={!isLastSpread}
-        >
-          {isLastSpread ? '읽기 완료' : '끝까지 읽어주세요'}
-        </motion.button>
+        {pageCount && maxPageVisited >= pageCount ? (
+          <motion.button
+            type="button"
+            onClick={onLastPage}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center justify-center self-center rounded-full bg-[#8c5d35] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#7b512d]"
+          >
+            읽기 완료
+          </motion.button>
+        ) : (
+          <p className="self-center text-xs text-[#b8a48c]">
+            마지막 페이지까지 읽으면 완료 버튼이 나타나요
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+/* ── Icons ── */
+
+function ChevronLeft() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 19l-7-7 7-7"
+      />
+    </svg>
+  );
+}
+
+function ChevronRight() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 5l7 7-7 7"
+      />
+    </svg>
   );
 }

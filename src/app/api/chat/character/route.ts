@@ -317,10 +317,19 @@ export async function POST(request: NextRequest) {
       finalReply = fallbackCharacterReply(language);
     }
 
+    // Stream the validated response word-by-word for natural typing UX
     const encoder = new TextEncoder();
+    const words = finalReply.split(/(?<=\s)/); // Split but keep whitespace attached
+
     const readable = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: finalReply })}\n\n`));
+      async start(controller) {
+        for (const word of words) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ content: word })}\n\n`)
+          );
+          // Small delay between words for natural feel
+          await new Promise((resolve) => setTimeout(resolve, 30 + Math.random() * 40));
+        }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       },

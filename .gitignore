@@ -36,9 +36,14 @@ yarn-error.log*
 # claude
 .claude/
 
+# pdfjs build artifacts (copied by scripts/copy-pdfjs.mjs)
+/public/pdfjs/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+output/
+supabase/.temp/

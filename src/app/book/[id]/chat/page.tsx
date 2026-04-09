@@ -117,11 +117,11 @@ export default function ChatPage() {
         .select('*')
         .eq('student_id', user.id)
         .eq('book_id', bookId)
-        .single();
+        .maybeSingle();
 
       if (activityData) {
         const act = activityData as Activity;
-        setCharacterStampEarned(act.stamps_earned.includes('character'));
+        setCharacterStampEarned((act.stamps_earned as string[]).includes('character'));
       }
     } catch (err) {
       console.error('Error fetching chat data:', err);
@@ -222,8 +222,9 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, assistantMessage]);
       setStreamingContent('');
 
-      // Award stamp on completing any conversation (at least 1 user turn)
-      if (!characterStampEarned) {
+      // Award stamp after minimum 3 conversation turns
+      const newUserTurnCount = updatedMessages.filter((m) => m.role === 'user').length;
+      if (!characterStampEarned && newUserTurnCount >= 3) {
         await awardCharacterStamp();
       }
     } catch (err) {
@@ -251,40 +252,53 @@ export default function ChatPage() {
         .select('*')
         .eq('student_id', user.id)
         .eq('book_id', bookId)
-        .single();
+        .maybeSingle();
 
       if (existing) {
         const act = existing as Activity;
-        if (act.stamps_earned.includes('character')) return;
+        if ((act.stamps_earned as string[]).includes('character')) return;
 
         const completedTabs = [...act.completed_tabs, 'character'];
-        const stampsEarned = [...act.stamps_earned, 'character'];
+        const stampsEarned = [...(act.stamps_earned as string[]), 'character'];
 
         await supabase
           .from('activities')
           .update({ completed_tabs: completedTabs, stamps_earned: stampsEarned })
           .eq('id', act.id);
-
-        setCharacterStampEarned(true);
-        setShowStampAnimation(true);
-        setTimeout(() => setShowStampAnimation(false), 3000);
+      } else {
+        // Create activity record if it doesn't exist yet
+        await supabase.from('activities').insert({
+          student_id: user.id,
+          book_id: bookId,
+          country_id: book?.country_id ?? '',
+          language,
+          completed_tabs: ['character'],
+          stamps_earned: ['character'],
+        });
       }
+
+      setCharacterStampEarned(true);
+      setShowStampAnimation(true);
+      setTimeout(() => setShowStampAnimation(false), 3000);
     } catch (err) {
       console.error('Error awarding stamp:', err);
     }
   };
 
-  // Save current session and go back to character select
-  const handleNewChat = async () => {
-    if (!user || !selectedCharacter || messages.length <= 1) {
-      setPhase('select');
-      setMessages([]);
-      setSelectedCharacter(null);
-      return;
-    }
+  // Ref to track if session was already saved (avoid double-saves)
+  const sessionSavedRef = useRef(false);
+
+  // Core save logic - extracted for reuse
+  const saveChatSession = useCallback(async (
+    msgs: LocalMessage[],
+    character: CharacterData,
+    opts: { refreshLogs?: boolean } = {}
+  ) => {
+    if (!user || msgs.length <= 1 || sessionSavedRef.current) return;
+    sessionSavedRef.current = true;
 
     try {
-      const chatMessages: ChatMessage[] = messages.map((m) => ({
+      const chatMessages: ChatMessage[] = msgs.map((m) => ({
         role: m.role,
         content: m.content,
         timestamp: new Date().toISOString(),
@@ -295,8 +309,8 @@ export default function ChatPage() {
         .insert({
           student_id: user.id,
           book_id: bookId,
-          character_id: selectedCharacter.id,
-          character_name: selectedCharacter.name,
+          character_id: character.id,
+          character_name: character.name,
           chat_type: 'character',
           messages: chatMessages,
           language,
@@ -319,25 +333,68 @@ export default function ChatPage() {
           // Fire and forget
         });
 
-        // Refresh chat logs
-        const { data: logsData } = await supabase
-          .from('chat_logs')
-          .select('*')
-          .eq('student_id', user.id)
-          .eq('book_id', bookId)
-          .eq('chat_type', 'character')
-          .eq('language', language)
-          .order('created_at', { ascending: false });
+        if (opts.refreshLogs) {
+          const { data: logsData } = await supabase
+            .from('chat_logs')
+            .select('*')
+            .eq('student_id', user.id)
+            .eq('book_id', bookId)
+            .eq('chat_type', 'character')
+            .eq('language', language)
+            .order('created_at', { ascending: false });
 
-        setChatLogs((logsData ?? []) as ChatLog[]);
+          setChatLogs((logsData ?? []) as ChatLog[]);
+        }
       }
     } catch (err) {
       console.error('Error saving chat session:', err);
+      sessionSavedRef.current = false; // Allow retry on error
     }
+  }, [user, bookId, language, supabase]);
+
+  // Auto-save on page unload (back navigation, tab close, etc.)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (phase === 'chat' && selectedCharacter && messages.length > 1 && !sessionSavedRef.current) {
+        // Use sendBeacon for reliable save on page unload
+        const chatMessages = messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          timestamp: new Date().toISOString(),
+        }));
+        const payload = JSON.stringify({
+          student_id: user?.id,
+          book_id: bookId,
+          character_id: selectedCharacter.id,
+          character_name: selectedCharacter.name,
+          chat_type: 'character',
+          messages: chatMessages,
+          language,
+        });
+        navigator.sendBeacon('/api/chat/save', payload);
+        sessionSavedRef.current = true;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [phase, selectedCharacter, messages, user, bookId, language]);
+
+  // Save current session and go back to character select
+  const handleNewChat = async () => {
+    if (!user || !selectedCharacter || messages.length <= 1) {
+      setPhase('select');
+      setMessages([]);
+      setSelectedCharacter(null);
+      return;
+    }
+
+    await saveChatSession(messages, selectedCharacter, { refreshLogs: true });
 
     setPhase('select');
     setMessages([]);
     setSelectedCharacter(null);
+    sessionSavedRef.current = false; // Reset for next session
   };
 
   // View a previous chat log (read-only)
@@ -595,10 +652,14 @@ export default function ChatPage() {
           )}
 
           {/* Stamp hint */}
-          {!characterStampEarned && userTurnCount === 0 && (
+          {!characterStampEarned && (
             <div className="text-center py-2">
               <p className="text-xs text-muted">
-                💬 대화를 시작하면 스탬프를 받을 수 있어요!
+                {userTurnCount === 0
+                  ? '💬 대화를 시작하면 스탬프를 받을 수 있어요!'
+                  : userTurnCount < 3
+                    ? `💬 스탬프까지 ${3 - userTurnCount}번 더 대화해 보세요!`
+                    : ''}
               </p>
             </div>
           )}

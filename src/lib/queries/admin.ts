@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { generateAndStoreBookCover } from '@/lib/books/generate-cover';
 import type { User, Book, ApprovalRequest, HiddenContent, Story, LibraryItem, Language } from '@/types/database';
 
 function computeLanguagesAvailable(
@@ -130,6 +131,7 @@ export async function createBook(data: {
   pdf_url_en?: string | null;
   character_analysis?: Record<string, unknown>;
   created_by: string;
+  base_url?: string;
 }): Promise<{ success: boolean; bookId?: string; error?: string }> {
   const supabase = await createClient();
 
@@ -155,6 +157,30 @@ export async function createBook(data: {
     return { success: false, error: error.message };
   }
 
+  if (result?.id) {
+    try {
+      const generatedCoverUrl = await generateAndStoreBookCover({
+        bookId: result.id,
+        pdfUrlKo: data.pdf_url_ko ?? null,
+        pdfUrlEn: data.pdf_url_en ?? null,
+        baseUrl: data.base_url,
+      });
+
+      if (generatedCoverUrl) {
+        const { error: coverUpdateError } = await supabase
+          .from('books')
+          .update({ cover_url: generatedCoverUrl })
+          .eq('id', result.id);
+
+        if (coverUpdateError) {
+          console.error('Error updating generated cover:', coverUpdateError);
+        }
+      }
+    } catch (coverError) {
+      console.error('Failed to generate cover after book creation:', coverError);
+    }
+  }
+
   return { success: true, bookId: result?.id };
 }
 
@@ -168,13 +194,14 @@ export async function updateBook(
     pdf_url_en: string | null;
     approved: boolean;
     character_analysis: Record<string, unknown>;
+    base_url: string;
   }>
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
 
   const { data: currentBook, error: fetchError } = await supabase
     .from('books')
-    .select('pdf_url_ko, pdf_url_en')
+    .select('cover_url, pdf_url_ko, pdf_url_en')
     .eq('id', bookId)
     .single();
 
@@ -186,11 +213,12 @@ export async function updateBook(
   const nextPdfUrlKo = data.pdf_url_ko !== undefined ? data.pdf_url_ko : currentBook.pdf_url_ko;
   const nextPdfUrlEn = data.pdf_url_en !== undefined ? data.pdf_url_en : currentBook.pdf_url_en;
   const nextLanguages = computeLanguagesAvailable(nextPdfUrlKo, nextPdfUrlEn);
+  const { base_url, ...bookUpdateData } = data;
 
   const { error } = await supabase
     .from('books')
     .update({
-      ...data,
+      ...bookUpdateData,
       pdf_url_ko: nextPdfUrlKo,
       pdf_url_en: nextPdfUrlEn,
       languages_available: nextLanguages,
@@ -200,6 +228,39 @@ export async function updateBook(
   if (error) {
     console.error('Error updating book:', error);
     return { success: false, error: error.message };
+  }
+
+  const pdfUrlChanged =
+    nextPdfUrlKo !== currentBook.pdf_url_ko || nextPdfUrlEn !== currentBook.pdf_url_en;
+
+  const shouldRegenerateCover =
+    pdfUrlChanged ||
+    !currentBook.cover_url ||
+    currentBook.cover_url === nextPdfUrlKo ||
+    currentBook.cover_url === nextPdfUrlEn;
+
+  if (shouldRegenerateCover) {
+    try {
+      const generatedCoverUrl = await generateAndStoreBookCover({
+        bookId,
+        pdfUrlKo: nextPdfUrlKo,
+        pdfUrlEn: nextPdfUrlEn,
+        baseUrl: base_url,
+      });
+
+      if (generatedCoverUrl && generatedCoverUrl !== currentBook.cover_url) {
+        const { error: coverUpdateError } = await supabase
+          .from('books')
+          .update({ cover_url: generatedCoverUrl })
+          .eq('id', bookId);
+
+        if (coverUpdateError) {
+          console.error('Error updating generated cover:', coverUpdateError);
+        }
+      }
+    } catch (coverError) {
+      console.error('Failed to regenerate cover after book update:', coverError);
+    }
   }
 
   return { success: true };

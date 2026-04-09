@@ -1,66 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import StampBadge from '@/components/common/StampBadge';
-import LoadingSpinner from '@/components/common/LoadingSpinner';
 import BookCoverImage from '@/components/book/BookCoverImage';
-import { useAuth } from '@/hooks/useAuth';
-import { createClient } from '@/lib/supabase/client';
 import { countries } from '@/lib/data/countries';
 import type { Book, Activity, StampType } from '@/types/database';
 
 interface BookIntroClientProps {
   book: Book;
   language: string;
+  initialActivity: Activity | null;
 }
 
-const stampTypes: StampType[] = ['read', 'hidden', 'character', 'mystory'];
+const stampTypes: StampType[] = ['read', 'hidden', 'questions', 'mystory'];
 
-export default function BookIntroClient({ book, language }: BookIntroClientProps) {
+export default function BookIntroClient({ book, language, initialActivity }: BookIntroClientProps) {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-  const [activity, setActivity] = useState<Activity | null>(null);
-  const [loadingActivity, setLoadingActivity] = useState(true);
-
   const country = countries.find((c) => c.id === book.country_id);
-
-  useEffect(() => {
-    async function fetchActivity() {
-      if (!user) {
-        setLoadingActivity(false);
-        return;
-      }
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('student_id', user.id)
-        .eq('book_id', book.id)
-        .single();
-
-      if (data) {
-        setActivity(data as Activity);
-      }
-      setLoadingActivity(false);
-    }
-
-    if (!authLoading) {
-      fetchActivity();
-    }
-  }, [user, authLoading, book.id]);
-
-  const stampsEarned = activity?.stamps_earned ?? [];
+  const stampsEarned = initialActivity?.stamps_earned ?? [];
   const stampCount = stampsEarned.length;
-
-  if (authLoading || loadingActivity) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <LoadingSpinner size="lg" message="도서 정보를 불러오는 중..." />
-      </div>
-    );
-  }
 
   return (
     <motion.div

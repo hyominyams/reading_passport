@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { pickPreferredPdfUrl } from '@/lib/pdf-analysis';
 import { getAllBooks, createBook, updateBook, deleteBook } from '@/lib/queries/admin';
 
 export async function GET() {
@@ -44,15 +45,18 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { country_id, title, cover_url, pdf_url_ko, pdf_url_en, character_analysis } = body;
+  const normalizedCoverUrl = cover_url?.trim() || null;
+  const preferredPdfUrl = pickPreferredPdfUrl(pdf_url_ko, pdf_url_en);
+  const resolvedCoverUrl = normalizedCoverUrl || preferredPdfUrl;
 
-  if (!country_id || !title || !cover_url) {
-    return NextResponse.json({ error: '필수 항목을 입력해주세요' }, { status: 400 });
+  if (!country_id || !title || !resolvedCoverUrl) {
+    return NextResponse.json({ error: '국가, 제목, PDF 또는 표지 URL을 입력해주세요' }, { status: 400 });
   }
 
   const result = await createBook({
     country_id,
     title,
-    cover_url,
+    cover_url: resolvedCoverUrl,
     pdf_url_ko: pdf_url_ko || null,
     pdf_url_en: pdf_url_en || null,
     character_analysis:
@@ -60,6 +64,7 @@ export async function POST(request: NextRequest) {
         ? character_analysis
         : undefined,
     created_by: user.id,
+    base_url: request.nextUrl.origin,
   });
 
   if (!result.success) {
@@ -88,11 +93,21 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { id, ...updateData } = body;
+  const { id, cover_url, pdf_url_ko, pdf_url_en, ...restUpdateData } = body;
 
   if (!id) {
     return NextResponse.json({ error: '도서 ID가 필요합니다' }, { status: 400 });
   }
+
+  const normalizedCoverUrl = typeof cover_url === 'string' ? cover_url.trim() : cover_url;
+  const preferredPdfUrl = pickPreferredPdfUrl(pdf_url_ko, pdf_url_en);
+  const updateData = {
+    ...restUpdateData,
+    ...(cover_url !== undefined ? { cover_url: normalizedCoverUrl || preferredPdfUrl || '' } : {}),
+    ...(pdf_url_ko !== undefined ? { pdf_url_ko: pdf_url_ko || null } : {}),
+    ...(pdf_url_en !== undefined ? { pdf_url_en: pdf_url_en || null } : {}),
+    base_url: request.nextUrl.origin,
+  };
 
   const result = await updateBook(id, updateData);
 

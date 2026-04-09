@@ -11,7 +11,7 @@ export default function ScenesPage() {
       <Header />
       <Suspense
         fallback={
-          <main className="flex-1 flex items-center justify-center">
+          <main className="flex-1 flex items-center justify-center min-h-[60vh]">
             <LoadingSpinner message="로딩 중..." />
           </main>
         }

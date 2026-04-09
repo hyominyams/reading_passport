@@ -59,7 +59,7 @@ export default function ReadPageClient({
           .select('*')
           .eq('student_id', user.id)
           .eq('book_id', book.id)
-          .single();
+          .maybeSingle();
 
         if (existing) {
           const activity = existing as Activity;
@@ -155,7 +155,11 @@ export default function ReadPageClient({
             exit={{ opacity: 0, y: -20 }}
             className="w-full"
           >
-            <PictureBookViewer pdfUrl={pdfUrl} onLastPage={handleLastPage} />
+            <PictureBookViewer
+              key={pdfUrl}
+              pdfUrl={pdfUrl}
+              onLastPage={handleLastPage}
+            />
           </motion.div>
         )}
 

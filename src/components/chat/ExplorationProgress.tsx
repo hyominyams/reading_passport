@@ -61,7 +61,7 @@ export default function ExplorationProgress({
           </motion.button>
         ) : (
           <p className="text-xs text-muted text-center">
-            콘텐츠의 70% 이상을 확인하면 스탬프를 받을 수 있어요
+            모든 콘텐츠를 충분히 읽으면 스탬프를 받을 수 있어요
           </p>
         )}
       </AnimatePresence>

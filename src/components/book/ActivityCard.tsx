@@ -10,7 +10,6 @@ interface ActivityCardProps {
   stampType: StampType;
   isCompleted: boolean;
   isHovered: boolean;
-  anyHovered: boolean;
   onClick: () => void;
   onHoverStart: () => void;
   onHoverEnd: () => void;
@@ -23,13 +22,12 @@ export default function ActivityCard({
   stampLabel,
   isCompleted,
   isHovered,
-  anyHovered,
   onClick,
   onHoverStart,
   onHoverEnd,
   index,
 }: ActivityCardProps) {
-  const shouldDesaturate = anyHovered && !isHovered;
+  const isInactive = !isHovered;
 
   return (
     <motion.button
@@ -46,12 +44,15 @@ export default function ActivityCard({
         p-6 sm:p-8 rounded-2xl border-2 w-full
         transition-all duration-300
         ${isCompleted
-          ? 'border-stamp-gold bg-stamp-gold/5'
+          ? isHovered
+            ? 'border-stamp-gold bg-stamp-gold/10 shadow-lg'
+            : 'border-border bg-slate-100'
           : isHovered
             ? 'border-primary bg-primary/5 shadow-lg'
-            : 'border-border bg-card'
+            : 'border-border bg-slate-100'
         }
-        ${shouldDesaturate ? 'opacity-40 grayscale' : 'opacity-100'}
+        ${isInactive ? 'grayscale text-slate-500' : 'text-foreground'}
+        ${isInactive ? 'opacity-65' : 'opacity-100'}
       `}
     >
       {/* Completed stamp overlay */}
@@ -67,7 +68,7 @@ export default function ActivityCard({
       <span className="text-4xl sm:text-5xl">{icon}</span>
 
       {/* Title */}
-      <h3 className="text-base sm:text-lg font-bold text-foreground text-center">
+      <h3 className="text-base sm:text-lg font-bold text-center">
         {title}
       </h3>
 
@@ -76,8 +77,12 @@ export default function ActivityCard({
         className={`
           text-xs px-3 py-1 rounded-full font-medium
           ${isCompleted
-            ? 'bg-stamp-gold/20 text-secondary-dark'
-            : 'bg-muted-light text-muted'
+            ? isHovered
+              ? 'bg-stamp-gold/20 text-secondary-dark'
+              : 'bg-slate-200 text-slate-500'
+            : isHovered
+              ? 'bg-muted-light text-muted'
+              : 'bg-slate-200 text-slate-500'
           }
         `}
       >

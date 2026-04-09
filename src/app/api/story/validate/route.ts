@@ -164,13 +164,26 @@ async function generateValidationResult(allStudentMessages: string): Promise<Val
 
 export async function POST(request: NextRequest) {
   try {
-    const { all_student_messages } = await request.json();
+    const { all_student_messages, guide_answers, student_freewrite } = await request.json();
 
-    if (typeof all_student_messages !== 'string' || !all_student_messages.trim()) {
+    // Support both old format (all_student_messages) and new format (guide_answers + student_freewrite)
+    let inputText = '';
+    if (guide_answers || student_freewrite) {
+      const parts: string[] = [];
+      if (guide_answers?.content) parts.push(`내용: ${guide_answers.content}`);
+      if (guide_answers?.character) parts.push(`인물: ${guide_answers.character}`);
+      if (guide_answers?.world) parts.push(`세계: ${guide_answers.world}`);
+      if (student_freewrite) parts.push(`이야기: ${student_freewrite}`);
+      inputText = parts.join('\n');
+    } else if (typeof all_student_messages === 'string') {
+      inputText = all_student_messages;
+    }
+
+    if (!inputText.trim()) {
       return Response.json({ error: '필수 파라미터가 누락되었습니다.' }, { status: 400 });
     }
 
-    const validation = await generateValidationResult(all_student_messages);
+    const validation = await generateValidationResult(inputText);
     return Response.json(validation);
   } catch (error) {
     console.error('Validation error:', error);

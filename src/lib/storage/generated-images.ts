@@ -45,19 +45,18 @@ async function ensureBucket() {
   return supabase;
 }
 
-export async function storeGeneratedImage(options: {
-  base64Data: string;
+async function uploadImageBuffer(options: {
+  fileBuffer: Buffer;
   mimeType: string;
   folder: string;
 }) {
   const supabase = await ensureBucket();
   const extension = getFileExtension(options.mimeType);
   const filePath = `${options.folder}/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${extension}`;
-  const fileBuffer = Buffer.from(options.base64Data, 'base64');
 
   const { error: uploadError } = await supabase.storage
     .from(GENERATED_IMAGES_BUCKET)
-    .upload(filePath, fileBuffer, {
+    .upload(filePath, options.fileBuffer, {
       contentType: options.mimeType,
       upsert: false,
       cacheControl: '3600',
@@ -72,4 +71,26 @@ export async function storeGeneratedImage(options: {
     .getPublicUrl(filePath);
 
   return data.publicUrl;
+}
+
+export async function storeGeneratedImage(options: {
+  base64Data: string;
+  mimeType: string;
+  folder: string;
+}) {
+  const fileBuffer = Buffer.from(options.base64Data, 'base64');
+
+  return uploadImageBuffer({
+    fileBuffer,
+    mimeType: options.mimeType,
+    folder: options.folder,
+  });
+}
+
+export async function storeGeneratedImageBuffer(options: {
+  fileBuffer: Buffer;
+  mimeType: string;
+  folder: string;
+}) {
+  return uploadImageBuffer(options);
 }

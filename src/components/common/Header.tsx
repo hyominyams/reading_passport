@@ -17,6 +17,11 @@ const navIcons: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
     </svg>
   ),
+  '/campaign': (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 0m5.84 0a6 6 0 10-5.84 0m5.84 0l1.41 1.41m-7.25-1.41l-1.41 1.41M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M7.757 16.243l-2.121 2.121m0-12.728l2.121 2.121m8.486 8.486l2.121 2.121" />
+    </svg>
+  ),
   '/passport': (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
@@ -48,6 +53,7 @@ export default function Header() {
   const navLinks = [
     { href: '/map', label: '세계지도' },
     { href: '/library', label: '도서관' },
+    { href: '/campaign', label: '캠페인' },
     ...(role === 'student' ? [{ href: '/passport', label: '여권' }] : []),
     ...((role === 'teacher' || role === 'admin') ? [{ href: '/teacher', label: '교사 관리' }] : []),
     ...(role === 'admin' ? [{ href: '/admin', label: '관리자' }] : []),

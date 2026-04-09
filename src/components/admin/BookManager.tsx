@@ -61,8 +61,14 @@ export default function BookManager() {
     e.preventDefault();
     setError('');
 
-    if (!formData.country_id.trim() || !formData.title.trim() || !formData.cover_url.trim()) {
-      setError('국가 ID, 제목, 표지 URL은 필수입니다');
+    if (
+      !formData.country_id.trim() ||
+      !formData.title.trim() ||
+      (!formData.cover_url.trim() &&
+        !formData.pdf_url_ko.trim() &&
+        !formData.pdf_url_en.trim())
+    ) {
+      setError('국가 ID, 제목, PDF URL 또는 표지 URL은 필수입니다');
       return;
     }
 
@@ -324,14 +330,17 @@ export default function BookManager() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-muted mb-1">표지 이미지 URL</label>
+                <label className="block text-sm font-medium text-muted mb-1">표지 이미지 URL (선택)</label>
                 <input
                   type="url"
                   value={formData.cover_url}
                   onChange={(e) => setFormData({ ...formData, cover_url: e.target.value })}
-                  placeholder="https://..."
+                  placeholder="없으면 PDF 첫 페이지로 자동 생성"
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
+                <p className="mt-1 text-xs text-muted">
+                  PDF URL이 있으면 저장 시 첫 페이지 이미지를 표지로 자동 생성합니다. 이 값은 생성 실패 시 폴백으로 사용됩니다.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">PDF URL (한국어)</label>

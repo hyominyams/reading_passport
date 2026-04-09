@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
-import type { Story, LibraryItem, Visibility, StoryType, Language, CharacterRef } from '@/types/database';
+import type {
+  Story, LibraryItem, Visibility, StoryType, Language, CharacterRef,
+  GuideAnswers, AiDraftPage, CoverDesign, IllustrationStyle, ProductionStatus,
+  CharacterDesign, CountryFact,
+} from '@/types/database';
 
 export async function createStory(data: {
   student_id: string;
@@ -8,9 +12,8 @@ export async function createStory(data: {
   language: Language;
   story_type: StoryType;
   custom_input?: string | null;
-  chat_log?: Record<string, unknown>;
-  all_student_messages?: string | null;
-  gauge_final?: number;
+  guide_answers?: GuideAnswers | null;
+  current_step?: number;
 }): Promise<{ success: boolean; storyId?: string; error?: string }> {
   const supabase = await createClient();
 
@@ -23,9 +26,11 @@ export async function createStory(data: {
       language: data.language,
       story_type: data.story_type,
       custom_input: data.custom_input ?? null,
-      chat_log: data.chat_log ?? {},
-      all_student_messages: data.all_student_messages ?? null,
-      gauge_final: data.gauge_final ?? 0,
+      guide_answers: data.guide_answers ?? null,
+      current_step: data.current_step ?? 1,
+      chat_log: {},
+      all_student_messages: null,
+      gauge_final: 0,
       visibility: 'public' as Visibility,
     })
     .select('id')
@@ -39,20 +44,79 @@ export async function createStory(data: {
   return { success: true, storyId: result?.id };
 }
 
+export async function getOrCreateStoryForBook(
+  studentId: string,
+  bookId: string,
+  countryId: string,
+  language: Language
+): Promise<{ story: Story | null; isNew: boolean; error?: string }> {
+  const existing = await getStudentStoryForBook(studentId, bookId);
+  if (existing) {
+    return { story: existing, isNew: false };
+  }
+
+  const result = await createStory({
+    student_id: studentId,
+    book_id: bookId,
+    country_id: countryId,
+    language,
+    story_type: 'continue',
+    current_step: 1,
+  });
+
+  if (!result.success || !result.storyId) {
+    return { story: null, isNew: true, error: result.error };
+  }
+
+  const story = await getStory(result.storyId);
+  return { story, isNew: true };
+}
+
+export async function getCountryFacts(countryId: string): Promise<CountryFact[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('country_facts')
+    .select('*')
+    .eq('country_id', countryId)
+    .order('order', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching country facts:', error);
+    return [];
+  }
+
+  return (data ?? []) as CountryFact[];
+}
+
 export async function updateStory(
   storyId: string,
   data: Partial<{
-    chat_log: Record<string, unknown>;
-    all_student_messages: string | null;
-    gauge_final: number;
-    ai_draft: string[] | null;
+    current_step: number;
+    story_type: StoryType;
+    custom_input: string | null;
+    guide_answers: GuideAnswers | null;
+    student_freewrite: string | null;
+    ai_draft: AiDraftPage[] | null;
     final_text: string[] | null;
-    character_refs: CharacterRef[] | null;
+    uploaded_images: string[] | null;
+    scene_descriptions: string[] | null;
     scene_images: string[] | null;
+    illustration_style: IllustrationStyle | null;
+    cover_design: CoverDesign | null;
+    cover_image_url: string | null;
+    production_status: ProductionStatus;
+    production_progress: number;
     translation_text: string[] | null;
     pdf_url_original: string | null;
     pdf_url_translated: string | null;
     visibility: Visibility;
+    // Legacy
+    chat_log: Record<string, unknown>;
+    all_student_messages: string | null;
+    gauge_final: number;
+    character_refs: CharacterRef[] | null;
+    character_designs: CharacterDesign[] | null;
   }>
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();

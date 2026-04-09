@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import { teacherLogin, studentLogin } from './actions';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
@@ -57,12 +56,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
-      <motion.div
-        className="w-full max-w-sm"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
+      <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-10">
           <div className="w-10 h-10 rounded-xl bg-foreground flex items-center justify-center mx-auto mb-4">
@@ -79,6 +73,7 @@ export default function LoginPage() {
           {/* Tabs */}
           <div className="flex border-b border-border">
             <button
+              type="button"
               onClick={() => { setActiveTab('student'); setError(null); }}
               className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
                 activeTab === 'student'
@@ -89,6 +84,7 @@ export default function LoginPage() {
               학생
             </button>
             <button
+              type="button"
               onClick={() => { setActiveTab('teacher'); setError(null); }}
               className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
                 activeTab === 'teacher'
@@ -102,122 +98,93 @@ export default function LoginPage() {
 
           <div className="p-6">
             {/* Error */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4 p-3 bg-error/5 border border-error/15 rounded-lg text-sm text-error"
-                >
-                  {error}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {error && (
+              <div className="mb-4 rounded-lg border border-error/15 bg-error/5 p-3 text-sm text-error">
+                {error}
+              </div>
+            )}
 
-            <AnimatePresence mode="wait">
-              {/* Student */}
-              {activeTab === 'student' && (
-                <motion.form
-                  key="student"
-                  onSubmit={handleStudentSubmit}
-                  className="space-y-5"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <div>
-                    <label htmlFor="student-code" className="block text-sm font-medium text-foreground mb-2">
-                      학생 코드
-                    </label>
-                    <input
-                      id="student-code"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      value={studentCode}
-                      onChange={(e) => handleCodeInput(e.target.value)}
-                      placeholder="000000"
-                      className="w-full px-4 py-3 text-center text-2xl tracking-[0.5em] font-heading border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30 placeholder:text-border placeholder:tracking-[0.5em]"
-                      disabled={isPending}
-                    />
-                    <p className="mt-2 text-xs text-muted">
-                      선생님이 알려준 6자리 숫자 코드를 입력하세요
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isPending || studentCode.length !== 6}
-                    className="w-full py-3 bg-foreground text-white rounded-xl font-medium text-sm hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isPending ? <LoadingSpinner size="sm" /> : '시작하기'}
-                  </button>
-                </motion.form>
-              )}
-
-              {/* Teacher */}
-              {activeTab === 'teacher' && (
-                <motion.form
-                  key="teacher"
-                  onSubmit={handleTeacherSubmit}
-                  className="space-y-4"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
-                      이메일
-                    </label>
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="teacher@school.ac.kr"
-                      className="w-full px-4 py-2.5 border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30 text-sm"
-                      disabled={isPending}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
-                      비밀번호
-                    </label>
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="비밀번호를 입력하세요"
-                      className="w-full px-4 py-2.5 border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30 text-sm"
-                      disabled={isPending}
-                      required
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
+            {activeTab === 'student' ? (
+              <form onSubmit={handleStudentSubmit} className="space-y-5">
+                <div>
+                  <label htmlFor="student-code" className="block text-sm font-medium text-foreground mb-2">
+                    학생 코드
+                  </label>
+                  <input
+                    id="student-code"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={studentCode}
+                    onChange={(e) => handleCodeInput(e.target.value)}
+                    placeholder="000000"
+                    className="w-full px-4 py-3 text-center text-2xl tracking-[0.5em] font-heading border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30 placeholder:text-border placeholder:tracking-[0.5em]"
                     disabled={isPending}
-                    className="w-full py-3 bg-foreground text-white rounded-xl font-medium text-sm hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isPending ? <LoadingSpinner size="sm" /> : '로그인'}
-                  </button>
-                </motion.form>
-              )}
-            </AnimatePresence>
+                  />
+                  <p className="mt-2 text-xs text-muted">
+                    선생님이 알려준 6자리 숫자 코드를 입력하세요
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isPending || studentCode.length !== 6}
+                  className="w-full py-3 bg-foreground text-white rounded-xl font-medium text-sm hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isPending ? <LoadingSpinner size="sm" /> : '시작하기'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleTeacherSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
+                    이메일
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="teacher@school.ac.kr"
+                    className="w-full px-4 py-2.5 border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30 text-sm"
+                    disabled={isPending}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
+                    비밀번호
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="비밀번호를 입력하세요"
+                    className="w-full px-4 py-2.5 border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30 text-sm"
+                    disabled={isPending}
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="w-full py-3 bg-foreground text-white rounded-xl font-medium text-sm hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isPending ? <LoadingSpinner size="sm" /> : '로그인'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
 
         <p className="text-center text-xs text-muted mt-8">
           World Docent &copy; 2026
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }

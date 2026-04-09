@@ -46,7 +46,7 @@ export async function markExplorationComplete(
     .select('*')
     .eq('student_id', studentId)
     .eq('book_id', bookId)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     const completedTabs = (existing.completed_tabs as string[]).includes('hidden')

@@ -1,12 +1,47 @@
 export type UserRole = 'admin' | 'teacher' | 'student';
 export type ContentScope = 'global' | 'class';
 export type ContentType = 'video' | 'pdf' | 'image' | 'link';
-export type ChatType = 'character' | 'story_gauge';
+export type ChatType = 'character' | 'story_gauge' | 'questions';
+export type ProductionStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type IllustrationStyle = 'colored_pencil' | 'watercolor' | 'woodblock' | 'pastel';
+
+export interface GuideAnswers {
+  content: string;
+  character: string;
+  world: string;
+}
+
+export interface AiDraftPage {
+  draft: string;
+  advice: string;
+}
+
+export interface CoverDesign {
+  title: string;
+  author: string;
+  image_url?: string;
+  description?: string;
+}
+
+export interface CharacterDesign {
+  name: string;
+  appearance: string;
+  personality: string;
+  imageUrl: string | null;
+}
+
+export interface CountryFact {
+  id: string;
+  country_id: string;
+  fact_text: string;
+  fact_text_en: string | null;
+  order: number;
+}
 export type StoryType = 'continue' | 'new_protagonist' | 'extra_backstory' | 'change_ending' | 'custom';
 export type Visibility = 'public' | 'class' | 'private';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type Language = 'ko' | 'en';
-export type StampType = 'read' | 'hidden' | 'character' | 'mystory';
+export type StampType = 'read' | 'hidden' | 'questions' | 'mystory';
 
 export interface User {
   id: string;
@@ -107,13 +142,27 @@ export interface Story {
   language: Language;
   story_type: StoryType;
   custom_input: string | null;
+  // Legacy fields (kept for old stories)
   chat_log: Record<string, unknown>;
   all_student_messages: string | null;
   gauge_final: number;
-  ai_draft: string[] | null;
-  final_text: string[] | null;
   character_refs: CharacterRef[] | null;
+  // New 7-step fields
+  current_step: number;
+  guide_answers: GuideAnswers | null;
+  student_freewrite: string | null;
+  ai_draft: AiDraftPage[] | null;
+  final_text: string[] | null;
+  uploaded_images: string[] | null;
+  scene_descriptions: string[] | null;
   scene_images: string[] | null;
+  character_designs: CharacterDesign[] | null;
+  illustration_style: IllustrationStyle | null;
+  cover_design: CoverDesign | null;
+  cover_image_url: string | null;
+  production_status: ProductionStatus;
+  production_progress: number;
+  // Shared fields
   translation_text: string[] | null;
   pdf_url_original: string | null;
   pdf_url_translated: string | null;
@@ -157,4 +206,56 @@ export interface ApprovalRequest {
   status: ApprovalStatus;
   created_at: string;
   reviewed_at: string | null;
+}
+
+// ── Campaign System ──
+
+export type CampaignStatus = 'draft' | 'active' | 'closed';
+export type CampaignContentType = 'poster' | 'card_news' | 'impression' | 'culture_intro' | 'worksheet' | 'other';
+export type SubmissionStatus = 'submitted' | 'featured' | 'hidden';
+
+export interface CampaignAssetMeta {
+  id: string;
+  name: string;
+  type: 'image' | 'pdf';
+  size_bytes: number;
+  storage_path: string;
+  public_url: string;
+}
+
+export interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  cover_image_url: string | null;
+  allowed_content_types: CampaignContentType[];
+  tags: string[];
+  status: CampaignStatus;
+  deadline: string | null;
+  max_files_per_submission: number;
+  max_file_size_mb: number;
+  created_by: string;
+  class_id: string | null;
+  scope: ContentScope;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CampaignSubmission {
+  id: string;
+  campaign_id: string;
+  student_id: string;
+  content_type: CampaignContentType;
+  title: string;
+  description: string | null;
+  assets: CampaignAssetMeta[];
+  status: SubmissionStatus;
+  created_at: string;
+}
+
+export interface CampaignLike {
+  id: string;
+  submission_id: string;
+  user_id: string;
+  created_at: string;
 }

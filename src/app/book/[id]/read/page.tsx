@@ -35,6 +35,9 @@ export default async function ReadPage({
 
   return (
     <>
+      {/* Preload PDF.js so it's ready before client JS executes */}
+      <link rel="modulepreload" href="/pdfjs/pdf.min.mjs" />
+      <link rel="modulepreload" href="/pdfjs/pdf.worker.min.mjs" />
       <Header />
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ReadPageClient book={book} pdfUrl={pdfUrl} language={language} />

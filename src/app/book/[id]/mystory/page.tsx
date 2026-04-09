@@ -2,9 +2,20 @@ import { redirect } from 'next/navigation';
 import Header from '@/components/common/Header';
 import MyStoryPageContent from './MyStoryPageContent';
 import { createClient } from '@/lib/supabase/server';
-import type { Activity, Book } from '@/types/database';
+import type { Activity, Book, Story } from '@/types/database';
 
-const REQUIRED_STAMPS: Activity['stamps_earned'] = ['read', 'hidden', 'character'];
+const REQUIRED_STAMPS: Activity['stamps_earned'] = ['read', 'hidden', 'questions'];
+
+const STEP_ROUTES: Record<number, string> = {
+  2: 'write',
+  3: 'draft',
+  4: 'scenes',
+  5: 'characters',
+  6: 'style',
+  7: 'creating',
+  8: 'finish',
+};
+
 export default async function MyStoryPage({
   params,
   searchParams,
@@ -25,6 +36,7 @@ export default async function MyStoryPage({
     redirect(`/login?redirect=/book/${bookId}/mystory?lang=${language}`);
   }
 
+  /* ── Fetch book ── */
   const { data: bookData } = await supabase
     .from('books')
     .select('*')
@@ -43,12 +55,13 @@ export default async function MyStoryPage({
     );
   }
 
+  /* ── Check required stamps ── */
   const { data: activityData } = await supabase
     .from('activities')
     .select('stamps_earned')
     .eq('student_id', user.id)
     .eq('book_id', bookId)
-    .single();
+    .maybeSingle();
 
   const currentActivity = (activityData as Pick<Activity, 'stamps_earned'> | null) ?? null;
   const hasRequiredStamps = REQUIRED_STAMPS.every((stamp) =>
@@ -59,10 +72,69 @@ export default async function MyStoryPage({
     redirect(`/book/${bookId}/activity?lang=${language}`);
   }
 
+  /* ── Get or create story ── */
+  const { data: existingStory } = await supabase
+    .from('stories')
+    .select('*')
+    .eq('student_id', user.id)
+    .eq('book_id', bookId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let story = existingStory as Story | null;
+
+  if (!story) {
+    const { data: newStory, error: insertError } = await supabase
+      .from('stories')
+      .insert({
+        student_id: user.id,
+        book_id: bookId,
+        country_id: book.country_id,
+        language,
+        story_type: 'continue',
+        current_step: 1,
+        chat_log: {},
+        all_student_messages: null,
+        gauge_final: 0,
+        visibility: 'public',
+      })
+      .select('*')
+      .single();
+
+    if (insertError) {
+      return (
+        <>
+          <Header />
+          <main className="flex-1 flex items-center justify-center">
+            <p className="text-muted">이야기를 시작할 수 없습니다. 다시 시도해 주세요.</p>
+          </main>
+        </>
+      );
+    }
+
+    story = newStory as Story;
+  }
+
+  /* ── Redirect if past step 1 ── */
+  if (story.current_step > 1) {
+    const route = STEP_ROUTES[story.current_step];
+    if (route) {
+      redirect(`/book/${bookId}/mystory/${route}?storyId=${story.id}&lang=${language}`);
+    }
+  }
+
   return (
     <>
       <Header />
-      <MyStoryPageContent book={book} bookId={bookId} language={language} />
+      <MyStoryPageContent
+        book={book}
+        bookId={bookId}
+        language={language}
+        storyId={story.id}
+        initialStoryType={story.story_type}
+        initialGuideAnswers={story.guide_answers}
+      />
     </>
   );
 }

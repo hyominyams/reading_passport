@@ -63,8 +63,7 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
 
   const getTabStatus = (activity: ActivityWithBook, tab: string) => {
     if (activity.completed_tabs?.includes(tab)) return 'completed';
-    // Check if there are chat logs for character tab
-    if (tab === 'character' && activity.chatLogs && activity.chatLogs.length > 0) {
+    if (tab === 'questions' && activity.chatLogs?.some(cl => cl.chat_type === 'questions')) {
       return 'in_progress';
     }
     return 'not_started';
@@ -84,7 +83,7 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
   const tabConfig = [
     { key: 'read', icon: '\uD83D\uDCD6', label: 'Story Read' },
     { key: 'hidden', icon: '\uD83C\uDF0D', label: 'Hidden Stories' },
-    { key: 'character', icon: '\uD83D\uDCAC', label: '캐릭터 대화' },
+    { key: 'questions', icon: '\u2753', label: '질문 만들기' },
     { key: 'mystory', icon: '\u270F\uFE0F', label: 'My Story' },
   ];
 
@@ -148,34 +147,29 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
                         <span className="ml-auto text-sm">{statusLabel(status)}</span>
                       </div>
 
-                      {/* Show chat details if character tab */}
-                      {tab.key === 'character' && activity.chatLogs && activity.chatLogs.length > 0 && (
+                      {/* Show questions log */}
+                      {tab.key === 'questions' && activity.chatLogs && activity.chatLogs.length > 0 && (
                         <div className="ml-12 space-y-1 mb-2">
                           {activity.chatLogs
-                            .filter((cl) => cl.chat_type === 'character')
-                            .map((chatLog) => (
-                              <div
-                                key={chatLog.id}
-                                className="flex items-center gap-2 text-sm py-1"
-                              >
-                                <span className="text-muted">\u2514\u2500</span>
-                                <span className="text-muted">
-                                  {chatLog.character_name ?? '캐릭터'}와 대화
-                                </span>
-                                <span className="text-xs text-muted">
-                                  ({chatLog.messages?.length ?? 0}턴)
-                                </span>
-                                {chatLog.flagged && (
-                                  <span className="text-error text-xs">&#9888;&#65039;</span>
-                                )}
-                                <button
-                                  onClick={() => onViewChat(chatLog)}
-                                  className="ml-auto text-xs text-primary hover:text-primary-dark transition-colors"
+                            .filter((cl) => cl.chat_type === 'questions')
+                            .map((chatLog) => {
+                              const userMsgs = (chatLog.messages ?? []).filter(m => m.role === 'user');
+                              return (
+                                <div
+                                  key={chatLog.id}
+                                  className="flex items-center gap-2 text-sm py-1"
                                 >
-                                  [대화 보기]
-                                </button>
-                              </div>
-                            ))}
+                                  <span className="text-muted">{'\u2514\u2500'}</span>
+                                  <span className="text-muted">질문 {userMsgs.length}개 작성</span>
+                                  <button
+                                    onClick={() => onViewChat(chatLog)}
+                                    className="ml-auto text-xs text-primary hover:text-primary-dark transition-colors"
+                                  >
+                                    [질문 보기]
+                                  </button>
+                                </div>
+                              );
+                            })}
                         </div>
                       )}
                     </div>

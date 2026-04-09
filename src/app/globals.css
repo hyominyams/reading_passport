@@ -212,13 +212,3 @@ body {
 /* Hide scrollbar for horizontal scroll sections */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-
-.storybook-page > div {
-  display: flex;
-}
-
-.storybook-page canvas {
-  display: block;
-  height: auto !important;
-  max-width: 100%;
-}
