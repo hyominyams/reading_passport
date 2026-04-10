@@ -29,8 +29,7 @@ Rules:
           { role: 'user', content: page },
         ],
         {
-          model: 'gpt-5-mini',
-          temperature: 0.3,
+          model: 'gpt-5-nano',
           maxTokens: 500,
         }
       );

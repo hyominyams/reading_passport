@@ -131,9 +131,14 @@ export default async function MyStoryPage({
         book={book}
         bookId={bookId}
         language={language}
+        userId={user.id}
         storyId={story.id}
         initialStoryType={story.story_type}
-        initialGuideAnswers={story.guide_answers}
+        initialChatLog={
+          Array.isArray(story.chat_log) && story.chat_log.length > 0
+            ? (story.chat_log as { role: 'user' | 'assistant' | 'system'; content: string; timestamp: string }[])
+            : null
+        }
       />
     </>
   );

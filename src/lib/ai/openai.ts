@@ -6,6 +6,13 @@ const openai = new OpenAI({
 
 export default openai;
 
+function extractMessageContent(
+  message: OpenAI.Chat.Completions.ChatCompletionMessage | undefined,
+): string {
+  if (!message) return '';
+  return typeof message.content === 'string' ? message.content.trim() : '';
+}
+
 export async function chatCompletion(
   messages: OpenAI.ChatCompletionMessageParam[],
   options?: {
@@ -16,12 +23,21 @@ export async function chatCompletion(
   }
 ) {
   const response = await openai.chat.completions.create({
-    model: options?.model ?? 'gpt-5-mini',
+    model: options?.model ?? 'gpt-5-nano',
     messages,
-    temperature: options?.temperature ?? 0.7,
-    max_tokens: options?.maxTokens ?? 1024,
+    max_completion_tokens: options?.maxTokens ?? 1024,
     ...(options?.jsonMode && { response_format: { type: 'json_object' as const } }),
   });
 
-  return response.choices[0]?.message?.content ?? '';
+  const content = extractMessageContent(response.choices[0]?.message);
+
+  if (!content) {
+    console.error('OpenAI chat completion returned empty content.', {
+      model: options?.model ?? 'gpt-5-nano',
+      finishReason: response.choices[0]?.finish_reason,
+      usage: response.usage,
+    });
+  }
+
+  return content;
 }

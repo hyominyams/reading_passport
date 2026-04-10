@@ -45,8 +45,7 @@ Output ONLY the English image prompt, nothing else.`,
       },
     ],
     {
-      model: 'gpt-5-mini',
-      temperature: 0.7,
+      model: 'gpt-5-nano',
       maxTokens: 300,
     }
   );

@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
 - 기준에 맞지 않는 질문의 인덱스(0부터 시작)를 invalidIndices에 넣으세요.
 - invalidIndices가 비어있으면 해당 영역은 valid: true입니다.
 - 부적절한 질문이 있으면 해당 영역의 feedback에 "~한 질문을 다시 만들어 보세요" 형태로 짧은 조언을 주세요.
-- 적절하면 feedback은 빈 문자열로 두세요.
+- 적절한 질문이 있으면 해당 영역의 feedback에 해당 질문의 장점을 1-2문장으로 칭찬해 주세요. (예: "이야기의 핵심을 잘 파악했어! 등장인물의 변화를 묻는 질문이 특히 좋았어.")
+- feedback은 항상 채워야 합니다. 빈 문자열로 두지 마세요.
 - 초등학생 수준을 고려해서 너무 엄격하지 않게 판단하세요. 의도가 보이면 통과시켜 주세요.
 - 반말, 친근한 톤으로 피드백을 작성하세요.
 
@@ -78,7 +79,7 @@ ${inferenceQs.map((q: string, i: number) => `${i}. ${q}`).join('\n')}`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      { model: 'gpt-5-nano', temperature: 0.2, maxTokens: 500, jsonMode: true }
+      { model: 'gpt-5-nano', maxTokens: 800, jsonMode: true }
     );
 
     // Parse JSON response

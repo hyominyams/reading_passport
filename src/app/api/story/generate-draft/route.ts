@@ -189,7 +189,6 @@ ${studentInput}
       ],
       {
         model: 'gpt-5-mini',
-        temperature: 0.8,
         maxTokens: 3500,
       }
     );

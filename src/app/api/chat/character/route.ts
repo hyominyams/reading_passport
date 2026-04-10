@@ -227,7 +227,7 @@ async function generateCharacterReply(
   systemPrompt: string
 ): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: 'gpt-5-mini',
+    model: 'gpt-5-nano',
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages.map((message) => ({
@@ -235,8 +235,7 @@ async function generateCharacterReply(
         content: message.content,
       })),
     ],
-    temperature: 0.7,
-    max_tokens: 280,
+    max_completion_tokens: 280,
     response_format: { type: 'json_object' },
   });
 
@@ -296,15 +295,14 @@ export async function POST(request: NextRequest) {
 
     if (!isValidCharacterReply(finalReply, language)) {
       const repairResponse = await openai.chat.completions.create({
-        model: 'gpt-5-mini',
+        model: 'gpt-5-nano',
         messages: [
           {
             role: 'system',
             content: buildRepairPrompt(language, finalReply || fallbackCharacterReply(language)),
           },
         ],
-        temperature: 0.2,
-        max_tokens: 200,
+        max_completion_tokens: 200,
         response_format: { type: 'json_object' },
       });
 

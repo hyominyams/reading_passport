@@ -150,8 +150,7 @@ async function generateValidationResult(allStudentMessages: string): Promise<Val
       { role: 'system', content: buildSystemPrompt() },
       { role: 'user', content: allStudentMessages },
     ],
-    temperature: 0.1,
-    max_tokens: 220,
+    max_completion_tokens: 220,
     response_format: { type: 'json_object' },
   });
 

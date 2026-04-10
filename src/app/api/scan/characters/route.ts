@@ -123,7 +123,6 @@ export async function POST(request: NextRequest) {
       ],
       {
         model: 'gpt-5-nano',
-        temperature: 0.3,
         maxTokens: 2048,
       }
     );
