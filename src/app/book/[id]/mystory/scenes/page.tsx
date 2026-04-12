@@ -1,23 +1,17 @@
-'use client';
-
-import { Suspense } from 'react';
 import Header from '@/components/common/Header';
-import LoadingSpinner from '@/components/common/LoadingSpinner';
 import ScenesPageContent from './ScenesPageContent';
 
-export default function ScenesPage() {
+export default async function ScenesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ storyId?: string }>;
+}) {
+  const { storyId } = await searchParams;
+
   return (
     <>
       <Header />
-      <Suspense
-        fallback={
-          <main className="flex-1 flex items-center justify-center min-h-[60vh]">
-            <LoadingSpinner message="로딩 중..." />
-          </main>
-        }
-      >
-        <ScenesPageContent />
-      </Suspense>
+      <ScenesPageContent storyId={storyId ?? null} />
     </>
   );
 }

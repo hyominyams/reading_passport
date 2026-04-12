@@ -3,7 +3,23 @@ export type ContentScope = 'global' | 'class';
 export type ContentType = 'video' | 'pdf' | 'image' | 'link';
 export type ChatType = 'character' | 'story_gauge' | 'questions';
 export type ProductionStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type IllustrationStyle = 'colored_pencil' | 'watercolor' | 'woodblock' | 'pastel';
+export type IllustrationStyle =
+  | 'watercolor'
+  | 'rough_drawing'
+  | 'pastel'
+  | 'collage'
+  | 'woodblock'
+  | 'cartoon_comic'
+  | 'anime'
+  | 'caricature'
+  | 'three_d_clay'
+  | 'stop_motion'
+  | 'three_d_animation'
+  | 'three_d_chibi';
+export type CharacterGender = 'unspecified' | 'female' | 'male';
+export type PictureBookShape = 'landscape_4_3' | 'portrait_3_4' | 'square_1_1';
+export type StoryTranslationMap = Record<string, string[]>;
+export type StoryTranslatedPdfMap = Record<string, string>;
 
 export interface GuideAnswers {
   content: string;
@@ -21,13 +37,55 @@ export interface CoverDesign {
   author: string;
   image_url?: string;
   description?: string;
+  picture_book_shape?: PictureBookShape;
 }
 
 export interface CharacterDesign {
   name: string;
+  gender: CharacterGender;
   appearance: string;
   personality: string;
   imageUrl: string | null;
+}
+
+export interface BookCharacterProfile {
+  name: string;
+  role?: string;
+  age?: string;
+  personality?: string[];
+  speech_style?: string;
+  background?: string;
+  core_emotion?: string;
+  key_moments?: string;
+  profile_prompt?: string;
+}
+
+export interface BookSettingSummary {
+  time?: string;
+  place?: string;
+  social_context?: string;
+  atmosphere?: string;
+}
+
+export interface BookPlotStructure {
+  beginning?: string;
+  middle?: string;
+  climax?: string;
+  ending?: string;
+}
+
+export interface BookCharacterAnalysis {
+  story_summary: string;
+  detailed_story_summary: string;
+  setting: BookSettingSummary;
+  plot_structure: BookPlotStructure;
+  characters: BookCharacterProfile[];
+  key_events: string[];
+  plot_points: string[];
+  themes: string[];
+  important_objects: string[];
+  emotional_keywords: string[];
+  out_of_scope_topics: string[];
 }
 
 export interface CountryFact {
@@ -64,6 +122,7 @@ export interface Class {
   school: string;
   grade: number;
   class_name: string;
+  mystory_required_turns: number;
 }
 
 export interface Book {
@@ -74,7 +133,7 @@ export interface Book {
   pdf_url_ko: string | null;
   pdf_url_en: string | null;
   languages_available: Language[];
-  character_analysis: Record<string, unknown>;
+  character_analysis: BookCharacterAnalysis;
   created_by: string;
   scope: ContentScope;
   class_id: string | null;
@@ -164,8 +223,10 @@ export interface Story {
   production_progress: number;
   // Shared fields
   translation_text: string[] | null;
+  translated_texts: StoryTranslationMap | null;
   pdf_url_original: string | null;
   pdf_url_translated: string | null;
+  translated_pdf_urls: StoryTranslatedPdfMap | null;
   visibility: Visibility;
   created_at: string;
 }

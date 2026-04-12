@@ -94,7 +94,7 @@ export default function Header() {
           </Link>
 
           {isAuthenticated && (
-            <nav className="flex items-center gap-0.5 sm:gap-1">
+            <nav className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
                 return (

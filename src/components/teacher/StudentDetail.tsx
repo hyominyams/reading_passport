@@ -102,7 +102,6 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
         onClick={onBack}
         className="flex items-center gap-2 text-sm text-muted hover:text-foreground mb-4 transition-colors"
       >
-        <span>\u2190</span>
         <span>{student.nickname}의 활동 기록</span>
       </button>
 

@@ -1,13 +1,14 @@
 import { redirect } from 'next/navigation';
 import Header from '@/components/common/Header';
 import MyStoryPageContent from './MyStoryPageContent';
+import { getStudentClassSetting } from '@/lib/classroom';
 import { createClient } from '@/lib/supabase/server';
 import type { Activity, Book, Story } from '@/types/database';
 
 const REQUIRED_STAMPS: Activity['stamps_earned'] = ['read', 'hidden', 'questions'];
 
+// Step 2 (자유 작성) removed — 토리 chat handles brainstorming, jumps to step 3
 const STEP_ROUTES: Record<number, string> = {
-  2: 'write',
   3: 'draft',
   4: 'scenes',
   5: 'characters',
@@ -21,10 +22,10 @@ export default async function MyStoryPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string; storyId?: string }>;
 }) {
   const { id: bookId } = await params;
-  const { lang } = await searchParams;
+  const { lang, storyId: requestedStoryId } = await searchParams;
   const language = lang === 'en' ? 'en' : 'ko';
 
   const supabase = await createClient();
@@ -35,6 +36,12 @@ export default async function MyStoryPage({
   if (!user) {
     redirect(`/login?redirect=/book/${bookId}/mystory?lang=${language}`);
   }
+
+  const { data: userProfile } = await supabase
+    .from('users')
+    .select('teacher_id, class')
+    .eq('id', user.id)
+    .single();
 
   /* ── Fetch book ── */
   const { data: bookData } = await supabase
@@ -94,7 +101,7 @@ export default async function MyStoryPage({
         language,
         story_type: 'continue',
         current_step: 1,
-        chat_log: {},
+        chat_log: [],
         all_student_messages: null,
         gauge_final: 0,
         visibility: 'public',
@@ -117,12 +124,20 @@ export default async function MyStoryPage({
   }
 
   /* ── Redirect if past step 1 ── */
-  if (story.current_step > 1) {
+  const isRevisitingStepOne = requestedStoryId === story.id;
+
+  if (story.current_step > 1 && !isRevisitingStepOne) {
     const route = STEP_ROUTES[story.current_step];
     if (route) {
       redirect(`/book/${bookId}/mystory/${route}?storyId=${story.id}&lang=${language}`);
     }
   }
+
+  const classSetting = await getStudentClassSetting(supabase, {
+    teacher_id: userProfile?.teacher_id ?? null,
+    class: userProfile?.class ?? null,
+  });
+  const requiredTurns = classSetting?.mystory_required_turns ?? 5;
 
   return (
     <>
@@ -134,6 +149,9 @@ export default async function MyStoryPage({
         userId={user.id}
         storyId={story.id}
         initialStoryType={story.story_type}
+        initialCurrentStep={story.current_step}
+        requiredTurns={requiredTurns}
+        hasExistingDraft={Array.isArray(story.ai_draft) && story.ai_draft.length > 0}
         initialChatLog={
           Array.isArray(story.chat_log) && story.chat_log.length > 0
             ? (story.chat_log as { role: 'user' | 'assistant' | 'system'; content: string; timestamp: string }[])

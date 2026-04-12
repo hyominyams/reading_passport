@@ -24,13 +24,13 @@ export default function EditorCard({
       transition={{ delay: index * 0.1 }}
       className="grid grid-cols-2 gap-4"
     >
-      {/* AI Draft (left) */}
+      {/* Tori story (left) */}
       <div className="bg-muted-light rounded-xl p-5 border border-border">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
             <span className="text-xs font-bold text-primary">{index + 1}</span>
           </div>
-          <h4 className="text-sm font-bold text-primary">AI {label}</h4>
+          <h4 className="text-sm font-bold text-primary">토리가 써준 {label}</h4>
         </div>
         <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
           {aiDraft}
@@ -48,7 +48,7 @@ export default function EditorCard({
         <textarea
           value={studentText}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="AI 초안을 참고해서 나만의 이야기를 써 보세요..."
+          placeholder="토리가 써준 이야기를 읽어보고, 나만의 이야기로 바꿔 적어 보세요..."
           className="w-full h-32 text-sm leading-relaxed text-foreground bg-transparent resize-none focus:outline-none placeholder:text-muted/50"
         />
       </div>

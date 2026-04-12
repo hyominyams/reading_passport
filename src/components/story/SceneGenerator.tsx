@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import type { CharacterRef } from '@/types/database';
+import { getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
 
 interface SceneGeneratorProps {
   pages: string[];
@@ -41,19 +42,15 @@ export default function SceneGenerator({
     try {
       const matchedChars = detectCharactersInText(pages[currentPage]);
 
-      const artStyleMap: Record<string, string> = {
-        colored_pencil: 'colored pencil illustration',
-        watercolor: 'watercolor painting',
-        woodblock: 'woodblock print (판화)',
-        pastel: 'soft pastel illustration',
-      };
+      const styleOption = getIllustrationStyleOption(normalizeIllustrationStyle(artStyle));
 
       const response = await fetch('/api/story/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `${desc}. Art style: ${artStyleMap[artStyle] || artStyle}. Children's book scene illustration.`,
+          prompt: `${desc}. 선택 스타일: ${styleOption.label}. 스타일 키워드: ${styleOption.promptLabel}.`,
           character_refs: matchedChars,
+          style_key: normalizeIllustrationStyle(artStyle),
         }),
       });
 

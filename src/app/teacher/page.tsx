@@ -11,9 +11,10 @@ import ChatHistoryView from '@/components/teacher/ChatHistoryView';
 import ContentManager from '@/components/teacher/ContentManager';
 import StudentCreator from '@/components/teacher/StudentCreator';
 import GalleryGrid from '@/components/teacher/GalleryGrid';
+import ClassSettingsPanel from '@/components/teacher/ClassSettingsPanel';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
-type Tab = 'overview' | 'content' | 'students' | 'gallery';
+type Tab = 'overview' | 'content' | 'students' | 'gallery' | 'settings';
 
 // Level for the overview tab drill-down
 type OverviewLevel = 'list' | 'detail' | 'chat';
@@ -130,6 +131,7 @@ export default function TeacherPage() {
     { key: 'content', label: 'Hidden Stories 관리', icon: '\uD83C\uDF0D' },
     { key: 'students', label: '학생 관리', icon: '\uD83D\uDC65' },
     { key: 'gallery', label: '갤러리', icon: '\uD83D\uDDBC\uFE0F' },
+    { key: 'settings', label: '반 설정', icon: '\u2699\uFE0F' },
   ];
 
   const renderOverview = () => {
@@ -201,6 +203,7 @@ export default function TeacherPage() {
         {activeTab === 'content' && <ContentManager />}
         {activeTab === 'students' && <StudentCreator />}
         {activeTab === 'gallery' && <GalleryGrid />}
+        {activeTab === 'settings' && <ClassSettingsPanel />}
       </div>
     </main>
   );

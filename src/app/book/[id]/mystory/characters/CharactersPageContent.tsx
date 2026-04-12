@@ -1,93 +1,68 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import StepProgress from '@/components/story/StepProgress';
-import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
-import type { Story, IllustrationStyle, CharacterDesign } from '@/types/database';
+import type { Story, IllustrationStyle, CharacterDesign, CharacterGender } from '@/types/database';
+import { ILLUSTRATION_STYLE_OPTIONS, getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
+import { getStepRouteWithLang } from '@/lib/mystory-steps';
 
 /* ── Constants ── */
 
 const MAX_CHARACTERS = 3;
 
-interface StyleOption {
-  value: IllustrationStyle;
-  icon: string;
-  label: string;
-  description: string;
-}
-
-const STYLE_OPTIONS: StyleOption[] = [
-  {
-    value: 'colored_pencil',
-    icon: '\uD83D\uDD8D\uFE0F',
-    label: '\uC0C9\uC5F0\uD544',
-    description: '\uB530\uB73B\uD558\uACE0 \uBD80\uB4DC\uB7EC\uC6B4 \uC0C9\uC5F0\uD544 \uB290\uB08C\uC758 \uADF8\uB9BC',
-  },
-  {
-    value: 'watercolor',
-    icon: '\uD83C\uDFA8',
-    label: '\uC218\uCC44\uD654',
-    description: '\uBB3C\uAC10\uC774 \uBC88\uC9C0\uB294 \uD22C\uBA85\uD55C \uC218\uCC44\uD654 \uB290\uB08C',
-  },
-  {
-    value: 'woodblock',
-    icon: '\uD83E\uDEB5',
-    label: '\uD310\uD654',
-    description: '\uC120\uC774 \uAD75\uACE0 \uB300\uBE44\uAC00 \uAC15\uD55C \uD310\uD654 \uB290\uB08C',
-  },
-  {
-    value: 'pastel',
-    icon: '\uD83C\uDF38',
-    label: '\uD30C\uC2A4\uD154',
-    description: '\uBD80\uB4DC\uB7FD\uACE0 \uBABD\uD658\uC801\uC778 \uD30C\uC2A4\uD154 \uD1A4',
-  },
+const GENDER_OPTIONS: Array<{ value: CharacterGender; label: string }> = [
+  { value: 'unspecified', label: '미정' },
+  { value: 'female', label: '여성' },
+  { value: 'male', label: '남성' },
 ];
 
-const STYLE_PROMPT_MAP: Record<IllustrationStyle, string> = {
-  colored_pencil: 'colored pencil illustration',
-  watercolor: 'watercolor painting illustration',
-  woodblock: 'woodblock print illustration',
-  pastel: 'soft pastel illustration',
+const GENDER_PROMPT_LABELS: Record<CharacterGender, string> = {
+  unspecified: '',
+  female: 'female',
+  male: 'male',
 };
-
-const STEP_ROUTES: Record<number, string> = {
-  1: '',
-  2: '/write',
-  3: '/draft',
-  4: '/scenes',
-  5: '/characters',
-  6: '/style',
-  7: '/creating',
-  8: '/finish',
-};
-
-function getStepRedirect(
-  bookId: string,
-  currentStep: number,
-  storyId: string,
-): string {
-  const route = STEP_ROUTES[currentStep] ?? '';
-  return `/book/${bookId}/mystory${route}?storyId=${storyId}`;
-}
 
 function createEmptyCharacter(): CharacterDesign {
-  return { name: '', appearance: '', personality: '', imageUrl: null };
+  return { name: '', gender: 'unspecified', appearance: '', personality: '', imageUrl: null };
+}
+
+function normalizeCharacterDesign(character: Partial<CharacterDesign> | null | undefined): CharacterDesign {
+  const safeGender = character?.gender;
+  const gender: CharacterGender =
+    safeGender === 'female' || safeGender === 'male'
+      ? safeGender
+      : 'unspecified';
+
+  return {
+    name: character?.name ?? '',
+    gender,
+    appearance: character?.appearance ?? '',
+    personality: character?.personality ?? '',
+    imageUrl: character?.imageUrl ?? null,
+  };
+}
+
+function hasMeaningfulCharacter(character: CharacterDesign) {
+  return (
+    character.name.trim().length > 0 ||
+    character.appearance.trim().length > 0 ||
+    character.personality.trim().length > 0 ||
+    character.imageUrl !== null
+  );
 }
 
 /* ── Main Component ── */
 
-export default function CharactersPageContent() {
+export default function CharactersPageContent({ storyId }: { storyId: string | null }) {
   const params = useParams();
-  const searchParams = useSearchParams();
   const bookId = params.id as string;
-  const storyId = searchParams.get('storyId');
   const router = useRouter();
-  const { loading: authLoading } = useAuth();
 
   const [story, setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +70,9 @@ export default function CharactersPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   // Art style
-  const [selectedStyle, setSelectedStyle] = useState<IllustrationStyle>('colored_pencil');
+  const [selectedStyle, setSelectedStyle] = useState<IllustrationStyle>('watercolor');
+  const [showStyleGallery, setShowStyleGallery] = useState(true);
+  const [expandedStyleImage, setExpandedStyleImage] = useState<IllustrationStyle | null>(null);
 
   // Characters
   const [characters, setCharacters] = useState<CharacterDesign[]>([
@@ -110,32 +87,35 @@ export default function CharactersPageContent() {
         setLoading(false);
         return;
       }
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('id', storyId)
-        .single();
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('stories')
+          .select('*')
+          .eq('id', storyId)
+          .single();
 
-      if (data) {
-        const s = data as Story;
-        setStory(s);
+        if (data) {
+          const s = data as Story;
+          setStory(s);
 
-        // Guard: redirect to earlier step if not ready
-        if (s.current_step < 5) {
-          router.replace(getStepRedirect(bookId, s.current_step, storyId));
-          return;
-        }
+          // Guard: character step needs story text first
+          if (!s.final_text || s.final_text.length === 0) {
+            router.replace(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${s.language}`);
+            return;
+          }
 
-        // Pre-fill from existing data
-        if (s.illustration_style) {
-          setSelectedStyle(s.illustration_style);
+          // Pre-fill from existing data
+          if (s.illustration_style) {
+            setSelectedStyle(normalizeIllustrationStyle(s.illustration_style));
+          }
+          if (s.character_designs && s.character_designs.length > 0) {
+            setCharacters(s.character_designs.map((character: CharacterDesign) => normalizeCharacterDesign(character)));
+          }
         }
-        if (s.character_designs && s.character_designs.length > 0) {
-          setCharacters(s.character_designs);
-        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchStory();
   }, [storyId, bookId, router]);
@@ -183,16 +163,23 @@ export default function CharactersPageContent() {
     setGeneratingIndex(index);
 
     try {
-      const styleLabel = STYLE_PROMPT_MAP[selectedStyle];
+      const styleOption = getIllustrationStyleOption(selectedStyle);
+      const styleLabel = styleOption.promptLabel;
+      const styleName = styleOption.label;
+      const genderLabel = GENDER_PROMPT_LABELS[character.gender];
+      const genderPart = genderLabel ? `, gender presentation: ${genderLabel}` : '';
       const personalityPart = character.personality.trim()
         ? `, personality: ${character.personality.trim()}`
         : '';
-      const prompt = `Character sheet, ${styleLabel} style, white background only, full body, children's picture book illustration, ${character.appearance.trim()}${personalityPart}`;
+      const prompt = `캐릭터 시트 생성. 반드시 ${styleName} 스타일로 표현해주세요. 스타일 표현 키워드: ${styleLabel}. 첨부된 레퍼런스 이미지는 ${styleName} 스타일의 디자인 감각을 참고하는 용도이며, 인물, 구도, 구성은 따라 하지 마세요. 전신이 모두 보이게, 흰 배경 위에 한 인물만 그려주세요. 인물의 포즈와 표정이 잘 드러나게 해주세요. ${character.appearance.trim()}${genderPart}${personalityPart}. 텍스트는 넣지 마세요. 예시에 없는 다른 요소는 재현하지 마세요. 다른 인물은 등장시키지 마세요.`;
 
       const res = await fetch('/api/story/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          prompt,
+          style_key: selectedStyle,
+        }),
       });
 
       if (!res.ok) {
@@ -214,44 +201,93 @@ export default function CharactersPageContent() {
     }
   };
 
+  const saveCharacters = useCallback(async (targetStep: number) => {
+    if (!storyId || !story) {
+      throw new Error('Story not found');
+    }
+
+    const normalizedCharacters = characters
+      .map((character) => normalizeCharacterDesign(character))
+      .filter((character) => hasMeaningfulCharacter(character));
+    const validCharacters = normalizedCharacters.filter((character) => character.name.trim());
+
+    if (validCharacters.length === 0) {
+      throw new Error('최소 1명의 주인공 이름을 입력해 주세요.');
+    }
+
+    const supabase = createClient();
+    const { data: updatedStory, error: updateError } = await supabase
+      .from('stories')
+      .update({
+        character_designs: normalizedCharacters,
+        illustration_style: selectedStyle,
+        current_step: Math.max(story.current_step, targetStep),
+      })
+      .eq('id', storyId)
+      .select('id, current_step, language, character_designs')
+      .single();
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    const persistedCharacters = Array.isArray(updatedStory?.character_designs)
+      ? updatedStory.character_designs.filter((character: CharacterDesign) =>
+          typeof character?.name === 'string' && character.name.trim().length > 0
+        )
+      : [];
+
+    if (persistedCharacters.length === 0) {
+      throw new Error('주인공 저장을 확인하지 못했어요.');
+    }
+
+    return updatedStory;
+  }, [characters, selectedStyle, story, storyId]);
+
   // Save and navigate to next step
   const handleNext = async () => {
-    if (!storyId) return;
-
-    // Validate at least one character with a name
-    const validCharacters = characters.filter((c) => c.name.trim());
-    if (validCharacters.length === 0) {
-      setError('최소 1명의 주인공 이름을 입력해 주세요.');
-      return;
-    }
+    if (!storyId || !story) return;
 
     setSaving(true);
     setError(null);
 
     try {
-      const supabase = createClient();
-      const { error: updateError } = await supabase
-        .from('stories')
-        .update({
-          character_designs: validCharacters,
-          illustration_style: selectedStyle,
-          current_step: 6,
-        })
-        .eq('id', storyId);
-
-      if (updateError) throw updateError;
-
-      router.push(`/book/${bookId}/mystory/style?storyId=${storyId}`);
+      const updatedStory = await saveCharacters(6);
+      router.push(getStepRouteWithLang(bookId, 6, storyId, updatedStory.language));
     } catch (err) {
       console.error('Save error:', err);
-      setError('저장에 실패했어요. 다시 시도해 주세요.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : '저장에 실패했어요. 다시 시도해 주세요.'
+      );
       setSaving(false);
     }
   };
 
+  const handleStepSelect = useCallback(async (targetStep: number) => {
+    if (!storyId || !story) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const updatedStory = await saveCharacters(targetStep);
+      router.push(getStepRouteWithLang(bookId, targetStep, storyId, updatedStory.language));
+    } catch (err) {
+      console.error('Step navigation save error:', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : '저장에 실패했어요. 다시 시도해 주세요.'
+      );
+      setSaving(false);
+    }
+  }, [bookId, router, saveCharacters, story, storyId]);
+
   /* ── Render ── */
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <main className="flex-1 flex items-center justify-center min-h-[60vh]">
         <LoadingSpinner message="로딩 중..." />
@@ -271,7 +307,9 @@ export default function CharactersPageContent() {
     characters.some((c) => c.name.trim()) && !saving && generatingIndex === null;
 
   return (
-    <main className="flex-1 px-4 py-6 max-w-3xl mx-auto">
+    <>
+      <MyStoryStepSidebar currentStep={5} busy={saving || generatingIndex !== null} onStepSelect={handleStepSelect} />
+      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto">
       {/* Step Progress */}
       <StepProgress currentStep={5} />
 
@@ -281,7 +319,7 @@ export default function CharactersPageContent() {
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-8"
       >
-        <p className="text-sm text-muted mb-1">Step 5/8</p>
+        <p className="text-sm text-muted mb-1">Step 4/7</p>
         <h1 className="text-2xl font-bold text-foreground">주인공 설정</h1>
         <p className="text-sm text-muted mt-2">
           이야기에 등장할 주인공을 만들어 보세요
@@ -306,67 +344,108 @@ export default function CharactersPageContent() {
         transition={{ delay: 0.1 }}
         className="mb-10"
       >
-        <h2 className="text-lg font-bold text-foreground mb-1">
-          그림 스타일 선택
-        </h2>
-        <p className="text-xs text-muted mb-4">
-          캐릭터 시트에 적용될 그림 스타일을 골라 주세요
-        </p>
-
-        <div className="grid grid-cols-2 gap-3">
-          {STYLE_OPTIONS.map((option) => {
-            const isSelected = selectedStyle === option.value;
-            return (
-              <motion.button
-                key={option.value}
-                type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedStyle(option.value)}
-                className={`
-                  relative p-4 rounded-xl border-2 text-left transition-all
-                  ${
-                    isSelected
-                      ? 'border-secondary bg-secondary/5 shadow-md shadow-secondary/10'
-                      : 'border-border bg-card hover:border-muted hover:bg-card-hover'
-                  }
-                `}
-              >
-                {isSelected && (
-                  <motion.div
-                    layoutId="style-check-char"
-                    className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-secondary flex items-center justify-center"
-                  >
-                    <svg
-                      className="w-3 h-3 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  </motion.div>
-                )}
-                <span className="text-2xl block mb-2">{option.icon}</span>
-                <span
-                  className={`text-sm font-bold block mb-1 ${
-                    isSelected ? 'text-secondary' : 'text-foreground'
-                  }`}
-                >
-                  {option.label}
-                </span>
-                <span className="text-xs text-muted leading-relaxed">
-                  {option.description}
-                </span>
-              </motion.button>
-            );
-          })}
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-foreground mb-1">
+              그림 스타일 선택
+            </h2>
+            <p className="text-xs text-muted">
+              예시 이미지를 보고 스타일을 고르세요. 선택한 스타일은 주인공 생성과 최종 작품 제작에 함께 적용돼요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowStyleGallery((prev) => !prev)}
+            className="mt-2 shrink-0 rounded-xl border border-border bg-white px-3 py-2 text-xs font-medium text-foreground hover:bg-gray-50"
+          >
+            {showStyleGallery ? '접기' : '스타일 보기'}
+          </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowStyleGallery((prev) => !prev)}
+          className="mb-4 w-full rounded-2xl border border-secondary/20 bg-secondary/5 p-4 text-left transition-colors hover:bg-secondary/10"
+        >
+          <p className="text-xs font-medium text-secondary mb-2">선택한 스타일</p>
+          <div className="flex items-center gap-3">
+            <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-secondary/20 bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getIllustrationStyleOption(selectedStyle).exampleImagePath}
+                alt={getIllustrationStyleOption(selectedStyle).label}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-foreground">
+                {getIllustrationStyleOption(selectedStyle).icon} {getIllustrationStyleOption(selectedStyle).label}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                {getIllustrationStyleOption(selectedStyle).description}
+              </p>
+            </div>
+            <span className="text-xs font-medium text-secondary">
+              {showStyleGallery ? '접기' : '열기'}
+            </span>
+          </div>
+        </button>
+
+        {showStyleGallery && (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {ILLUSTRATION_STYLE_OPTIONS.map((option) => {
+              const isSelected = selectedStyle === option.value;
+              return (
+                <motion.div
+                  key={option.value}
+                  whileHover={{ scale: 1.02 }}
+                  className={`
+                    relative overflow-hidden rounded-2xl border-2 transition-all
+                    ${
+                      isSelected
+                        ? 'border-secondary bg-secondary/5 shadow-md shadow-secondary/10'
+                        : 'border-border bg-card hover:border-muted hover:bg-card-hover'
+                    }
+                  `}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedStyle(option.value);
+                      setShowStyleGallery(false);
+                    }}
+                    className="block w-full text-left"
+                  >
+                    <div className="relative aspect-[4/3] w-full bg-gray-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={option.exampleImagePath}
+                      alt={`${option.label} 예시`}
+                      className="h-full w-full object-cover"
+                    />
+                    </div>
+                    <div className="p-3">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="text-lg">{option.icon}</span>
+                        <span className={`text-sm font-bold ${isSelected ? 'text-secondary' : 'text-foreground'}`}>
+                          {option.label}
+                        </span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-muted">{option.description}</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedStyleImage(option.value)}
+                    className="absolute bottom-2 right-2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white"
+                  >
+                    확대
+                  </button>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </motion.section>
 
       {/* Section 2: Character Design Cards */}
@@ -459,10 +538,46 @@ export default function CharactersPageContent() {
             }
           `}
         >
-          {saving ? '저장 중...' : '표지 만들러 가기 \u2192'}
+          {saving ? '저장 중...' : '표지 만들러 가기'}
         </motion.button>
       </motion.div>
-    </main>
+      {expandedStyleImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setExpandedStyleImage(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-white p-4 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setExpandedStyleImage(null)}
+              className="absolute right-4 top-4 rounded-full bg-black/70 px-3 py-1 text-sm font-medium text-white"
+            >
+              닫기
+            </button>
+            <div className="mb-3">
+              <p className="text-lg font-bold text-foreground">
+                {getIllustrationStyleOption(expandedStyleImage).label} 예시
+              </p>
+              <p className="text-sm text-muted mt-1">
+                이 이미지는 스타일과 디자인 감각만 참고합니다.
+              </p>
+            </div>
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-gray-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getIllustrationStyleOption(expandedStyleImage).exampleImagePath}
+                alt={`${getIllustrationStyleOption(expandedStyleImage).label} 확대 예시`}
+                className="h-full w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      </main>
+    </>
   );
 }
 
@@ -548,6 +663,25 @@ function CharacterCard({
             placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30
             focus:border-secondary transition-all"
         />
+      </div>
+
+      {/* Appearance */}
+      <div className="mb-3">
+        <label className="block text-sm font-medium text-foreground mb-1.5">
+          성별
+        </label>
+        <select
+          value={character.gender}
+          onChange={(e) => onUpdate({ gender: e.target.value as CharacterGender })}
+          className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground text-sm
+            focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
+        >
+          {GENDER_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Appearance */}

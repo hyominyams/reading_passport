@@ -22,36 +22,32 @@ export async function POST(request: NextRequest) {
     const worldQs = (questions.world as string[]).filter((q: string) => q.trim());
     const inferenceQs = ((questions.inference ?? []) as string[]).filter((q: string) => q.trim());
 
-    const systemPrompt = `당신은 초등학생의 독서 질문을 검증하는 교육 전문가입니다.
+    const systemPrompt = `당신은 초등학생의 독서 질문을 검증하는 친절한 선생님입니다.
 학생이 그림책 "${book_title ?? '(제목 미정)'}" (국가: ${country_id ?? '미정'})을 읽고 만든 질문을 검증하세요.
 
-[영역별 기준]
-1. 내용이해 (content): 이야기에 있던 일을 묻는 질문이어야 합니다.
-   - 적절: "주인공은 왜 여행을 떠났나요?", "이야기에서 어떤 사건이 일어났나요?"
-   - 부적절: 이야기와 무관한 질문, 단순 감상("재미있었다")
+[핵심 원칙]
+이 검증의 목적은 학생이 성실하게 질문을 작성했는지 확인하는 것입니다.
+완벽한 질문을 요구하는 것이 아니라, 책을 읽고 나름대로 생각해서 쓴 질문인지만 판단하세요.
+웬만하면 통과시켜 주세요. 아래 경우만 부적절로 판단합니다:
+- 아무 의미 없는 글자 나열 (예: "ㅋㅋㅋ", "asdf", "몰라요")
+- 질문 형태가 아닌 단순 감상 한마디 (예: "재미있었다", "좋았다")
+- 해당 영역과 완전히 무관한 질문 (내용이해에 배경 질문 등은 괜찮음 — 애매하면 통과)
 
-2. 인물이해 (character): 등장인물의 마음, 성격, 관계, 변화를 묻는 질문이어야 합니다.
-   - 적절: "주인공의 성격은 어떤가요?", "두 인물의 관계는 어떻게 변했나요?"
-   - 부적절: 인물과 무관한 질문, 외모만 묻는 질문
-
-3. 배경이해 (world): 시간, 장소, 사회문화적 배경이 이야기와 어떻게 연결되는지 묻는 질문, 해당 이야기의 국가에 대한 질문이어야 합니다.
-   - 적절: "이 이야기의 배경이 되는 나라는 어떤 곳인가요?", "왜 그 장소에서 이런 일이 일어났나요?"
-   - 부적절: 배경과 무관한 질문
-
-4. 추론 (inference): 글에 직접 쓰이지 않은 것을 상상하거나 생각해 보는 질문이어야 합니다.
-   - 적절: "주인공이 다른 선택을 했다면 어떻게 됐을까?", "이 이야기 뒤에는 무슨 일이 일어났을까?"
-   - 부적절: 이야기에 이미 답이 나와 있는 질문
-   - 초등학생이라 추론이 어려울 수 있으니 특히 관대하게 판단하세요.
+[영역별 참고 기준]
+1. 내용이해 (content): 이야기 내용에 대한 질문. 줄거리, 사건, 이유 등을 물으면 OK.
+2. 인물이해 (character): 등장인물에 대한 질문. 마음, 성격, 행동, 관계 등 뭐든 OK.
+3. 배경이해 (world): 배경, 장소, 나라, 문화 관련 질문. 넓게 해석해서 통과시켜 주세요.
+4. 추론 (inference): 상상하거나 생각해 보는 질문. "~했다면?", "왜 그랬을까?", "다음엔?" 등 OK.
 
 [검증 규칙]
 - 각 영역별로 질문을 하나씩 검토하세요.
 - 기준에 맞지 않는 질문의 인덱스(0부터 시작)를 invalidIndices에 넣으세요.
 - invalidIndices가 비어있으면 해당 영역은 valid: true입니다.
-- 부적절한 질문이 있으면 해당 영역의 feedback에 "~한 질문을 다시 만들어 보세요" 형태로 짧은 조언을 주세요.
-- 적절한 질문이 있으면 해당 영역의 feedback에 해당 질문의 장점을 1-2문장으로 칭찬해 주세요. (예: "이야기의 핵심을 잘 파악했어! 등장인물의 변화를 묻는 질문이 특히 좋았어.")
+- 부적절한 질문이 있으면 feedback에 짧고 다정한 조언을 주세요.
+- 적절한 질문이 있으면 feedback에 칭찬을 1-2문장으로 해 주세요.
 - feedback은 항상 채워야 합니다. 빈 문자열로 두지 마세요.
-- 초등학생 수준을 고려해서 너무 엄격하지 않게 판단하세요. 의도가 보이면 통과시켜 주세요.
 - 반말, 친근한 톤으로 피드백을 작성하세요.
+- 애매할 때는 무조건 통과시켜 주세요.
 
 [출력 형식 - 반드시 JSON만 출력]
 {
@@ -79,7 +75,7 @@ ${inferenceQs.map((q: string, i: number) => `${i}. ${q}`).join('\n')}`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      { model: 'gpt-5-nano', maxTokens: 800, jsonMode: true }
+      { model: 'gpt-5-nano', maxTokens: 1500, jsonMode: true }
     );
 
     // Parse JSON response
@@ -109,15 +105,12 @@ ${inferenceQs.map((q: string, i: number) => `${i}. ${q}`).join('\n')}`;
       validation.overall = validation.content.valid && validation.character.valid && validation.world.valid && validation.inference.valid;
 
       return Response.json(validation);
-    } catch {
-      // If parsing fails, pass through
-      return Response.json({
-        content: { valid: true, feedback: '', invalidIndices: [] },
-        character: { valid: true, feedback: '', invalidIndices: [] },
-        world: { valid: true, feedback: '', invalidIndices: [] },
-        inference: { valid: true, feedback: '', invalidIndices: [] },
-        overall: true,
-      });
+    } catch (parseError) {
+      console.error('Failed to parse AI validation response:', parseError, 'Raw:', result);
+      return Response.json(
+        { error: 'AI 응답을 처리하지 못했습니다. 다시 시도해 주세요.' },
+        { status: 502 }
+      );
     }
   } catch (error) {
     console.error('Question validation error:', error);

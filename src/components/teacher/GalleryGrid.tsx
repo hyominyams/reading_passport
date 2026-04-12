@@ -128,7 +128,7 @@ export default function GalleryGrid() {
                 disabled={currentPage === 0}
                 className="px-3 py-1.5 text-sm border border-border rounded-lg disabled:opacity-30 hover:bg-muted-light"
               >
-                \u2190 이전
+                이전
               </button>
               <span className="text-sm text-muted">
                 {currentPage + 1} / {pages.length}
@@ -138,7 +138,7 @@ export default function GalleryGrid() {
                 disabled={currentPage === pages.length - 1}
                 className="px-3 py-1.5 text-sm border border-border rounded-lg disabled:opacity-30 hover:bg-muted-light"
               >
-                다음 \u2192
+                다음
               </button>
             </div>
           )}

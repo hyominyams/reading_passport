@@ -12,6 +12,7 @@ interface ClassroomRecord {
   class_name: string;
   school: string;
   grade: number;
+  mystory_required_turns?: number;
 }
 
 interface ClassroomSelectResult {
@@ -99,8 +100,9 @@ export async function ensureTeacherClassRecord(
         school,
         grade,
         class_name: className,
+        mystory_required_turns: 5,
       })
-      .select('id, teacher_id, class_name, school, grade')
+      .select('id, teacher_id, class_name, school, grade, mystory_required_turns')
       .single();
 
     if (data) {
@@ -113,6 +115,37 @@ export async function ensureTeacherClassRecord(
   }
 
   throw new Error('반 코드 생성이 반복해서 충돌했습니다.');
+}
+
+export async function getStudentClassSetting(
+  supabase: SupabaseLike,
+  profile: ClassLookupProfile | null | undefined
+) {
+  const teacherId = profile?.teacher_id ?? null;
+
+  if (!teacherId) {
+    return null;
+  }
+
+  const className = normalizeClassName(profile?.class);
+  const classesTable = getClassesTable(supabase);
+
+  const exactQuery = classesTable.select(
+    'id, teacher_id, class_name, school, grade, mystory_required_turns'
+  );
+
+  if (className) {
+    const { data } = await exactQuery.eq('teacher_id', teacherId).eq('class_name', className).limit(1);
+    if (data?.[0]) {
+      return data[0];
+    }
+  }
+
+  const fallbackQuery = classesTable.select(
+    'id, teacher_id, class_name, school, grade, mystory_required_turns'
+  );
+  const { data } = await fallbackQuery.eq('teacher_id', teacherId).limit(1);
+  return data?.[0] ?? null;
 }
 
 export async function resolveUserClassId(

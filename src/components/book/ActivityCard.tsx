@@ -29,7 +29,7 @@ export default function ActivityCard({
   onHoverEnd,
   index,
 }: ActivityCardProps) {
-  const isInactive = !isHovered && !isLocked;
+  const completedAndResting = isCompleted && !isHovered && !isLocked;
 
   return (
     <motion.button
@@ -49,14 +49,13 @@ export default function ActivityCard({
           ? 'border-border bg-slate-100 opacity-50 grayscale cursor-not-allowed'
           : isCompleted
             ? isHovered
-              ? 'border-stamp-gold bg-stamp-gold/10 shadow-lg'
-              : 'border-border bg-slate-100'
+              ? 'border-red-700/40 bg-red-50/50 shadow-lg'
+              : 'border-slate-200 bg-slate-50'
             : isHovered
               ? 'border-primary bg-primary/5 shadow-lg'
-              : 'border-border bg-slate-100'
+              : 'border-primary/30 bg-white shadow-sm'
         }
-        ${!isLocked && isInactive ? 'grayscale text-slate-500' : ''}
-        ${!isLocked && isInactive ? 'opacity-65' : ''}
+        ${completedAndResting ? 'grayscale opacity-75' : ''}
         ${isLocked ? 'text-slate-400' : 'text-foreground'}
       `}
     >
@@ -69,11 +68,24 @@ export default function ActivityCard({
         </div>
       )}
 
-      {/* Completed stamp overlay */}
+      {/* Completed stamp overlay — passport style */}
       {isCompleted && !isLocked && (
-        <div className="absolute top-3 right-3">
-          <div className="w-8 h-8 rounded-full bg-stamp-gold flex items-center justify-center shadow-sm">
-            <span className="text-white text-sm font-bold">&#10003;</span>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="rotate-[-14deg] w-[76px] h-[76px] rounded-full border-[3px] border-red-700/60 flex items-center justify-center relative">
+            {/* Inner ring */}
+            <div className="absolute inset-[4px] rounded-full border-[1.5px] border-red-700/40" />
+            {/* Stamp content */}
+            <div className="flex flex-col items-center gap-0 z-10">
+              <span className="text-red-700/70 text-[7px] font-bold tracking-[0.15em] uppercase leading-none">
+                ★ WORLD DOCENT ★
+              </span>
+              <span className="text-red-700/70 text-[17px] font-black tracking-[0.08em] uppercase leading-tight mt-0.5">
+                SUCCESS
+              </span>
+              <span className="text-red-700/70 text-[6px] font-semibold tracking-[0.2em] uppercase leading-none mt-px">
+                APPROVED
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -94,11 +106,9 @@ export default function ActivityCard({
             ? 'bg-slate-200 text-slate-400'
             : isCompleted
               ? isHovered
-                ? 'bg-stamp-gold/20 text-secondary-dark'
+                ? 'bg-red-100 text-red-700'
                 : 'bg-slate-200 text-slate-500'
-              : isHovered
-                ? 'bg-muted-light text-muted'
-                : 'bg-slate-200 text-slate-500'
+              : 'bg-primary/10 text-primary'
           }
         `}
       >

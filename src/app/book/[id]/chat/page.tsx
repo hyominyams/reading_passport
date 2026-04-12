@@ -10,6 +10,7 @@ import ChatBubble from '@/components/chat/ChatBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { parseBookCharacterAnalysis } from '@/lib/book-analysis';
 import { createClient } from '@/lib/supabase/client';
 import type { Book, ChatLog, ChatMessage, Activity } from '@/types/database';
 
@@ -84,17 +85,20 @@ export default function ChatPage() {
         setBook(b);
 
         // Parse characters from character_analysis
-        const analysis = b.character_analysis as {
-          characters?: CharacterData[];
-          story_summary?: string;
-        };
-        if (analysis?.characters && Array.isArray(analysis.characters)) {
-          const chars: CharacterData[] = analysis.characters.map(
-            (c: CharacterData, idx: number) => ({
-              ...c,
-              id: String(idx),
-            })
-          );
+        const analysis = parseBookCharacterAnalysis(b.character_analysis);
+        if (analysis.characters.length > 0) {
+          const chars: CharacterData[] = analysis.characters.map((character, idx) => ({
+            id: String(idx),
+            name: character.name,
+            role: character.role ?? '인물',
+            age: character.age,
+            personality: character.personality?.join(', '),
+            speech_style: character.speech_style,
+            background: character.background,
+            core_emotion: character.core_emotion,
+            key_moments: character.key_moments,
+            profile_prompt: character.profile_prompt,
+          }));
           setCharacters(chars);
         }
       }
@@ -444,7 +448,7 @@ export default function ChatPage() {
               onClick={handleBackFromReadonly}
               className="text-sm text-primary font-medium hover:underline"
             >
-              &larr; 돌아가기
+              돌아가기
             </button>
           </div>
 
@@ -496,7 +500,7 @@ export default function ChatPage() {
                 onClick={() => router.back()}
                 className="text-sm text-muted hover:text-foreground transition-colors"
               >
-                &larr; 돌아가기
+                돌아가기
               </button>
             </div>
           </div>

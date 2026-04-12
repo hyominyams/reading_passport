@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Space_Grotesk, Noto_Sans_KR } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthProvider';
+import MobileNav from '@/components/common/MobileNav';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -32,6 +33,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         <AuthProvider>
           {children}
+          <MobileNav />
         </AuthProvider>
       </body>
     </html>

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import type {
   Story, LibraryItem, Visibility, StoryType, Language, CharacterRef,
   GuideAnswers, AiDraftPage, CoverDesign, IllustrationStyle, ProductionStatus,
-  CharacterDesign, CountryFact,
+  CharacterDesign, CountryFact, StoryTranslationMap, StoryTranslatedPdfMap,
 } from '@/types/database';
 
 export async function createStory(data: {
@@ -108,8 +108,10 @@ export async function updateStory(
     production_status: ProductionStatus;
     production_progress: number;
     translation_text: string[] | null;
+    translated_texts: StoryTranslationMap | null;
     pdf_url_original: string | null;
     pdf_url_translated: string | null;
+    translated_pdf_urls: StoryTranslatedPdfMap | null;
     visibility: Visibility;
     // Legacy
     chat_log: Record<string, unknown>;

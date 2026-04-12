@@ -28,7 +28,7 @@ export default function DraftEditor({
 
   const allFilled = studentTexts.every((t) => t.trim().length > 0);
 
-  const sectionLabels = ['도입', '전개', '결말'];
+  const sectionLabels = ['발단', '전개', '위기', '절정', '결말'];
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -36,7 +36,7 @@ export default function DraftEditor({
         <div>
           <h2 className="text-xl font-bold text-foreground">이야기 쓰기</h2>
           <p className="text-sm text-muted mt-1">
-            왼쪽의 AI 초안을 참고하여 오른쪽에 나만의 이야기를 써 보세요
+            토리가 써준 이야기를 읽어보고, 오른쪽에 나만의 이야기로 바꿔 적어 보세요
           </p>
         </div>
         {hiddenStorySummary && (

@@ -1,7 +1,148 @@
 import { NextRequest } from 'next/server';
 import { chatCompletion } from '@/lib/ai/openai';
+import { buildBookAnalysisPromptContext, parseBookCharacterAnalysis } from '@/lib/book-analysis';
 import { createServiceClient } from '@/lib/supabase/service';
 import { extractPreferredPdfText } from '@/lib/pdf-analysis';
+
+type DraftPage = {
+  draft: string;
+  advice: string;
+};
+
+function buildStudentInput(params: {
+  guide_answers?: {
+    content?: string;
+    character?: string;
+    world?: string;
+  } | null;
+  student_freewrite?: string | null;
+  all_student_messages?: string | null;
+}) {
+  const { guide_answers, student_freewrite, all_student_messages } = params;
+  const parts: string[] = [];
+
+  if (guide_answers?.content) parts.push(`내용: ${guide_answers.content}`);
+  if (guide_answers?.character) parts.push(`인물: ${guide_answers.character}`);
+  if (guide_answers?.world) parts.push(`세계: ${guide_answers.world}`);
+  if (student_freewrite) parts.push(`자유 작성:\n${student_freewrite}`);
+
+  const combined = parts.join('\n').trim();
+  if (combined) {
+    return {
+      sourceLabel: '학생이 직접 정리한 이야기 재료',
+      text: combined,
+    };
+  }
+
+  return {
+    sourceLabel: '학생 채팅에서 나온 이야기 재료',
+    text: typeof all_student_messages === 'string' ? all_student_messages.trim() : '',
+  };
+}
+
+function extractJsonObject(text: string): string | null {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidates = [fenced?.[1]?.trim(), trimmed].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // Try extracting the first balanced object below.
+    }
+
+    const start = candidate.indexOf('{');
+    if (start < 0) continue;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < candidate.length; index += 1) {
+      const char = candidate[index];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+      } else if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          const slice = candidate.slice(start, index + 1);
+          try {
+            JSON.parse(slice);
+            return slice;
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildDefaultAdvice(index: number, language: string): string {
+  if (language === 'en') {
+    const prompts = [
+      'Try adding one more feeling or detail to set the scene.',
+      'Show what changes or builds up in this part with your own words.',
+      'What problem or challenge appears here? Add more tension.',
+      'This is the most exciting moment — make it vivid and dramatic.',
+      'How does everything wrap up? Write the ending in your own style.',
+    ];
+    return prompts[index] ?? 'Add one more detail in your own words.';
+  }
+
+  const prompts = [
+    '이야기의 시작 분위기를 네 말로 더 자세히 그려봐.',
+    '여기서 어떤 일이 펼쳐지는지 네 말로 써봐.',
+    '어떤 문제나 어려움이 생기는지 긴장감 있게 써봐.',
+    '가장 중요한 순간이야 — 생생하고 흥미진진하게 써봐.',
+    '이야기가 어떻게 마무리되는지 네 스타일로 써봐.',
+  ];
+  return prompts[index] ?? '이 장면을 네 말로 조금 더 자세히 써봐.';
+}
+
+function normalizePages(payload: unknown, language: string): DraftPage[] {
+  const source =
+    payload && typeof payload === 'object' && Array.isArray((payload as { pages?: unknown[] }).pages)
+      ? (payload as { pages: unknown[] }).pages
+      : [];
+
+  const normalized = source
+    .map((page, index) => {
+      if (!page || typeof page !== 'object') return null;
+      const raw = page as Record<string, unknown>;
+      const draft = typeof raw.draft === 'string' ? raw.draft.trim() : '';
+      const advice = typeof raw.advice === 'string' ? raw.advice.trim() : '';
+
+      if (!draft) return null;
+
+      return {
+        draft,
+        advice: advice || buildDefaultAdvice(index, language),
+      };
+    })
+    .filter((page): page is DraftPage => page !== null)
+    .slice(0, 6);
+
+  return normalized;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +157,6 @@ export async function POST(request: NextRequest) {
       // New 7-step fields
       guide_answers,
       student_freewrite,
-      // Legacy field (still supported)
       all_student_messages,
       book_full_text,
       language = 'ko',
@@ -30,17 +170,17 @@ export async function POST(request: NextRequest) {
       custom: `기타: ${custom_input}`,
     };
 
-    // Build student input from either new or legacy format
-    let studentInput = '';
-    if (guide_answers || student_freewrite) {
-      const parts: string[] = [];
-      if (guide_answers?.content) parts.push(`내용: ${guide_answers.content}`);
-      if (guide_answers?.character) parts.push(`인물: ${guide_answers.character}`);
-      if (guide_answers?.world) parts.push(`세계: ${guide_answers.world}`);
-      if (student_freewrite) parts.push(`자유 작성:\n${student_freewrite}`);
-      studentInput = parts.join('\n');
-    } else {
-      studentInput = typeof all_student_messages === 'string' ? all_student_messages : '';
+    const studentSource = buildStudentInput({
+      guide_answers,
+      student_freewrite,
+      all_student_messages,
+    });
+
+    if (!studentSource.text) {
+      return Response.json(
+        { error: '학생 이야기 재료가 비어 있습니다.' },
+        { status: 400 }
+      );
     }
 
     const serviceClient = createServiceClient();
@@ -48,6 +188,7 @@ export async function POST(request: NextRequest) {
     let resolvedCountry = country ?? '';
     let resolvedStorySummary = story_summary ?? '';
     let resolvedCharacters = characters ?? '';
+    let resolvedAnalysisContext = '';
     let resolvedBookText =
       typeof book_full_text === 'string' ? book_full_text.trim() : '';
 
@@ -62,39 +203,26 @@ export async function POST(request: NextRequest) {
         resolvedBookTitle = resolvedBookTitle || book.title;
         resolvedCountry = resolvedCountry || book.country_id;
 
-        if (!resolvedStorySummary || !resolvedCharacters) {
-          const analysis = (book.character_analysis ?? {}) as Record<string, unknown>;
-          const summary = analysis.story_summary ?? analysis.summary;
-          if (!resolvedStorySummary && typeof summary === 'string') {
-            resolvedStorySummary = summary;
-          }
+        const analysis = parseBookCharacterAnalysis(book.character_analysis);
+        resolvedAnalysisContext = buildBookAnalysisPromptContext(analysis);
 
-          if (!resolvedCharacters) {
-            const analysisCharacters = analysis.characters;
-            if (typeof analysisCharacters === 'string') {
-              resolvedCharacters = analysisCharacters;
-            } else if (Array.isArray(analysisCharacters)) {
-              resolvedCharacters = analysisCharacters
-                .map((character) => {
-                  if (!character || typeof character !== 'object') return String(character);
-
-                  const entry = character as Record<string, unknown>;
-                  const parts = [
-                    typeof entry.name === 'string' ? entry.name : '',
-                    typeof entry.role === 'string' ? entry.role : '',
-                    typeof entry.profile_prompt === 'string' ? entry.profile_prompt : '',
-                    typeof entry.background === 'string' ? entry.background : '',
-                  ].filter(Boolean);
-
-                  return parts.join(' - ');
-                })
-                .filter(Boolean)
-                .join('\n');
-            }
-          }
+        if (!resolvedStorySummary && analysis.story_summary) {
+          resolvedStorySummary = analysis.story_summary;
         }
 
-        if (!resolvedBookText) {
+        if (!resolvedCharacters && analysis.characters.length > 0) {
+          resolvedCharacters = analysis.characters
+            .map((character) => [
+              character.name,
+              character.role ?? '',
+              character.profile_prompt ?? '',
+              character.background ?? '',
+            ].filter(Boolean).join(' - '))
+            .filter(Boolean)
+            .join('\n');
+        }
+
+        if (!resolvedBookText && !resolvedAnalysisContext) {
           try {
             resolvedBookText = await extractPreferredPdfText(
               book.pdf_url_ko,
@@ -109,18 +237,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const bookTextSection = resolvedBookText
-      ? `[원문 텍스트]\n${resolvedBookText}`
-      : '[원문 텍스트]\n(원문을 불러오지 못했습니다.)';
+    const bookContextSection = resolvedAnalysisContext
+      ? `[도서 구조화 요약]\n${resolvedAnalysisContext}`
+      : resolvedBookText
+        ? `[원문 텍스트]\n${resolvedBookText}`
+        : '[도서 맥락]\n(도서 요약을 불러오지 못했습니다.)';
 
-    // New format: generate draft + advice together as JSON
-    const useNewFormat = !!(guide_answers || student_freewrite);
+    const systemPrompt = `당신은 초등학생의 그림책 창작을 돕는 아동 창작 교육 도우미입니다.
 
-    const systemPrompt = useNewFormat
-      ? `당신은 아동 창작 교육 도우미입니다.
-
-[원문 이야기]
-${bookTextSection}
+[도서 맥락]
+${bookContextSection}
 
 [이야기 유형] ${storyTypeLabel[story_type] || story_type}
 
@@ -129,98 +255,60 @@ ${bookTextSection}
 줄거리: ${resolvedStorySummary}
 등장인물: ${resolvedCharacters}
 
-[학생 입력]
-${studentInput}
+[${studentSource.sourceLabel}]
+${studentSource.text}
 
 위 내용을 바탕으로 이야기 초안과 페이지별 조언을 함께 작성하세요.
 
 [초안 작성 규칙]
-1. 의도적으로 부족하게 쓰세요. 감정 묘사, 장면 전환, 문장 어색한 곳을 남겨두세요. 학생이 직접 채워 넣을 여백이 반드시 있어야 합니다.
-2. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
-3. 6개 구역(장면)으로 나눠 작성하세요.
-4. 각 구역은 2~4문장으로만 구성하세요.
+1. 학생이 직접 말한 재료를 최우선으로 사용하세요.
+2. 책의 배경과 분위기는 참고하되, 학생이 말하지 않은 핵심 사건을 멋대로 새로 만들지 마세요.
+3. 초안은 비어 있으면 안 됩니다. 각 장면마다 실제 문장으로 초안을 써 주세요.
+4. 일부 감정 묘사나 연결 문장은 일부러 덜 채워 학생이 다시 쓸 여백을 남기세요.
+5. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
+6. 정확히 5개 장면으로 나누세요: 발단(이야기의 시작, 배경과 인물 소개), 전개(사건이 펼쳐지며 이야기가 진행), 위기(갈등이나 어려움 등장), 절정(가장 긴장감 넘치는 순간), 결말(문제 해결과 마무리).
+7. 각 장면의 draft는 2~4문장으로 쓰세요.
 
 [조언 작성 규칙]
-1. 각 구역마다 학생이 자유 작성에서 쓴 내용을 참고해 "네가 쓴 ~에 대해 더 자세히 적어봐!" 형태로 작성하세요.
-2. 학생이 쓴 내용에서 살릴 수 있는 부분을 구체적으로 언급하세요.
-3. 각 조언은 1~2문장. 반말, 친근한 톤.
+1. 각 장면마다 학생이 이미 말한 내용 중 살릴 만한 요소를 하나씩 짚어 주세요.
+2. 조언은 학생이 오른쪽 칸에 다시 써 볼 수 있게 구체적이어야 합니다.
+3. 각 advice는 1~2문장, 반말, 친근한 톤으로 쓰세요.
+4. advice가 너무 일반적이면 안 됩니다. 가능하면 학생이 말한 인물, 행동, 감정, 배경을 직접 언급하세요.
 
 출력 형식 (반드시 JSON으로만 출력, 다른 텍스트 금지):
-{"pages":[{"draft":"장면1 초안","advice":"장면1 조언"},{"draft":"장면2 초안","advice":"장면2 조언"},{"draft":"장면3 초안","advice":"장면3 조언"},{"draft":"장면4 초안","advice":"장면4 조언"},{"draft":"장면5 초안","advice":"장면5 조언"},{"draft":"장면6 초안","advice":"장면6 조언"}]}
-
-응답 언어: ${language === 'ko' ? '한국어' : 'English'}`
-      : `당신은 학생의 이야기 재료를 바탕으로 이야기 초안을 작성하는 창작 도우미입니다.
-
-[이야기 유형] ${storyTypeLabel[story_type] || story_type}
-
-[책 배경 정보]
-제목: ${resolvedBookTitle} / 국가: ${resolvedCountry}
-${bookTextSection}
-
-[요약 정보]
-줄거리: ${resolvedStorySummary}
-등장인물: ${resolvedCharacters}
-
-[학생이 제공한 이야기 재료]
-${studentInput}
-
-[작성 규칙]
-1. 원문 텍스트를 최우선으로 참고하고, 부족한 부분만 요약과 등장인물 정보로 보완하세요.
-2. 의도적으로 부족하게 쓰세요. 감정 묘사, 장면 전환, 문장 어색한 곳을 남겨두세요.
-3. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
-4. 3~5개 구역으로 나눠 작성하세요. 구역 구분은 반드시 [PAGE_BREAK] 태그를 사용하세요.
-5. 각 구역은 2~4문장으로만 구성하세요.
-
-[출력 형식]
-구역1 내용
-[PAGE_BREAK]
-구역2 내용
-[PAGE_BREAK]
-구역3 내용
+{"pages":[{"draft":"발단 초안","advice":"발단 조언"},{"draft":"전개 초안","advice":"전개 조언"},{"draft":"위기 초안","advice":"위기 조언"},{"draft":"절정 초안","advice":"절정 조언"},{"draft":"결말 초안","advice":"결말 조언"}]}
 
 응답 언어: ${language === 'ko' ? '한국어' : 'English'}`;
 
     const result = await chatCompletion(
       [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: useNewFormat
-          ? '이야기 초안과 조언을 6장면으로 나눠 JSON으로 작성해 주세요.'
-          : '이야기 재료를 바탕으로 6장면 초안을 작성해 주세요.' },
+        {
+          role: 'user',
+          content: language === 'en'
+            ? 'Write the draft and advice as JSON only.'
+            : '이야기 초안과 조언을 JSON으로만 작성해 주세요.',
+        },
       ],
       {
         model: 'gpt-5-mini',
         maxTokens: 3500,
+        jsonMode: true,
       }
     );
 
-    if (useNewFormat) {
-      // Parse JSON response: { pages: [{ draft, advice }] }
-      try {
-        const trimmed = result.trim();
-        const jsonStart = trimmed.indexOf('{');
-        const jsonEnd = trimmed.lastIndexOf('}');
-        const jsonStr = jsonStart >= 0 && jsonEnd > jsonStart
-          ? trimmed.slice(jsonStart, jsonEnd + 1)
-          : trimmed;
-        const parsed = JSON.parse(jsonStr);
-        return Response.json(parsed);
-      } catch {
-        // Fallback: try to split by PAGE_BREAK and generate default advice
-        const pages = result
-          .split('[PAGE_BREAK]')
-          .map((page) => page.trim())
-          .filter((page) => page.length > 0)
-          .map((draft) => ({ draft, advice: '이 부분을 네 말로 다시 써봐!' }));
-        return Response.json({ pages });
-      }
-    } else {
-      // Legacy format: string[]
-      const pages = result
-        .split('[PAGE_BREAK]')
-        .map((page) => page.trim())
-        .filter((page) => page.length > 0);
-      return Response.json({ pages });
+    const jsonText = extractJsonObject(result);
+    const parsed = jsonText ? JSON.parse(jsonText) : {};
+    const pages = normalizePages(parsed, language);
+
+    if (pages.length === 0) {
+      return Response.json(
+        { error: '초안 생성 결과를 해석하지 못했습니다.' },
+        { status: 502 }
+      );
     }
+
+    return Response.json({ pages });
   } catch (error) {
     console.error('Draft generation error:', error);
     return Response.json(

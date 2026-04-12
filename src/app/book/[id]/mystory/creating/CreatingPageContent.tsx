@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { useAuth } from '@/hooks/useAuth';
+import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
 import type { Story, CountryFact } from '@/types/database';
+import { getStepRouteWithLang } from '@/lib/mystory-steps';
 
 const POLL_INTERVAL = 5000;
 const CAROUSEL_INTERVAL = 5000;
@@ -49,15 +50,32 @@ const FALLBACK_FACTS: CountryFact[] = [
   },
 ];
 
-export default function CreatingPageContent() {
+function splitFactIntoLines(text: string | null | undefined): string[] {
+  if (!text) {
+    return [];
+  }
+
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const segments = normalized.match(/[^.]+\.(?:\s*|$)|[^.]+$/g);
+  return (segments ?? [normalized])
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+export default function CreatingPageContent({
+  storyId,
+  lang,
+}: {
+  storyId: string | null;
+  lang: string;
+}) {
   const params = useParams();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const bookId = params.id as string;
-  const storyId = searchParams.get('storyId');
-  const lang = searchParams.get('lang') ?? 'ko';
-
-  const { loading: authLoading } = useAuth();
 
   const [story, setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,20 +96,30 @@ export default function CreatingPageContent() {
         setLoading(false);
         return;
       }
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('id', storyId)
-        .single();
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('stories')
+          .select('*')
+          .eq('id', storyId)
+          .single();
 
-      if (data) {
-        const s = data as Story;
-        setStory(s);
-        setStatus(s.production_status);
-        setProgress(s.production_progress);
+        if (data) {
+          const s = data as Story;
+          setStory(s);
+          setStatus(s.production_status);
+          setProgress(s.production_progress);
+
+          const hasCoverConfig =
+            !!s.cover_design?.title || !!s.cover_design?.description || !!s.cover_design?.image_url;
+          if (!hasCoverConfig && s.production_status === 'pending') {
+            router.replace(`/book/${bookId}/mystory/style?storyId=${storyId}&lang=${s.language}`);
+            return;
+          }
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchStory();
   }, [storyId]);
@@ -225,6 +253,28 @@ export default function CreatingPageContent() {
     startProduction();
   };
 
+  const handleStepSelect = async (targetStep: number) => {
+    if (!storyId || !story) return;
+
+    if (targetStep === 8 && status !== 'completed') {
+      setError(lang === 'en' ? 'The book is still being created.' : '아직 그림책 제작이 끝나지 않았어요.');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('stories')
+        .update({ current_step: Math.max(story.current_step, targetStep) })
+        .eq('id', storyId);
+
+      router.push(getStepRouteWithLang(bookId, targetStep, storyId, story.language));
+    } catch (err) {
+      console.error('Step navigation error:', err);
+      setError(lang === 'en' ? 'Could not move to that step.' : '그 단계로 이동하지 못했어요.');
+    }
+  };
+
   const goToPrev = () => {
     setFactIndex((prev) => (prev - 1 + facts.length) % facts.length);
   };
@@ -233,7 +283,7 @@ export default function CreatingPageContent() {
     setFactIndex((prev) => (prev + 1) % facts.length);
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <main className="flex-1 flex items-center justify-center min-h-[60vh]">
         <LoadingSpinner message="Loading..." />
@@ -250,22 +300,26 @@ export default function CreatingPageContent() {
   }
 
   // Calculate completed / total for display
-  const sceneDescriptions = story.scene_descriptions ?? [];
+  // Images are generated from final_text (student's written text), not scene_descriptions
+  const finalText = story.final_text ?? [];
   const uploadedImages = story.uploaded_images ?? [];
-  const hasCoverToGenerate =
-    story.cover_design?.description && !story.cover_design?.image_url;
 
-  let totalImages = hasCoverToGenerate ? 1 : 0;
-  for (let i = 0; i < sceneDescriptions.length; i++) {
-    if (sceneDescriptions[i] && !uploadedImages[i]) {
+  let totalImages = 0;
+  for (let i = 0; i < finalText.length; i++) {
+    if (finalText[i] && !uploadedImages[i]) {
       totalImages++;
     }
   }
 
   const completedImages = Math.round((progress / 100) * totalImages);
+  const factText = lang === 'en' && facts[factIndex]?.fact_text_en
+    ? facts[factIndex].fact_text_en
+    : facts[factIndex]?.fact_text;
+  const factLines = splitFactIntoLines(factText);
 
   return (
-    <main className="flex-1 px-4 py-8 max-w-lg mx-auto flex flex-col items-center">
+    <>
+      <main className="flex-1 px-4 py-8 max-w-lg mx-auto flex flex-col items-center">
       {/* Animated book icon */}
       <motion.div
         animate={{ rotate: [0, -5, 5, -5, 0] }}
@@ -355,9 +409,11 @@ export default function CreatingPageContent() {
                 transition={{ duration: 0.3 }}
                 className="text-sm text-foreground text-center leading-relaxed px-4"
               >
-                {lang === 'en' && facts[factIndex]?.fact_text_en
-                  ? facts[factIndex].fact_text_en
-                  : facts[factIndex]?.fact_text}
+                {factLines.map((line, index) => (
+                  <span key={`${facts[factIndex]?.id ?? 'fact'}-${index}`} className="block">
+                    {line}
+                  </span>
+                ))}
               </motion.p>
             </AnimatePresence>
 
@@ -427,6 +483,7 @@ export default function CreatingPageContent() {
           )}
         </div>
       )}
-    </main>
+      </main>
+    </>
   );
 }

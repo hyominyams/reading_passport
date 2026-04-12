@@ -27,7 +27,7 @@ export async function chatCompletion(
     messages,
     max_completion_tokens: options?.maxTokens ?? 1024,
     ...(options?.jsonMode && { response_format: { type: 'json_object' as const } }),
-  });
+  }, { timeout: 20_000 });
 
   const content = extractMessageContent(response.choices[0]?.message);
 

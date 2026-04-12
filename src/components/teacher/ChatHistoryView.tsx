@@ -45,7 +45,6 @@ export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHi
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-muted hover:text-foreground mb-4 transition-colors"
         >
-          <span>{'\u2190'}</span>
           <span>돌아가기</span>
         </button>
 

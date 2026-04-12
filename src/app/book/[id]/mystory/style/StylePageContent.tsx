@@ -1,51 +1,50 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { useAuth } from '@/hooks/useAuth';
+import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import type { Story, CoverDesign } from '@/types/database';
+import type { Story, CoverDesign, CharacterRef, PictureBookShape } from '@/types/database';
+import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
+import {
+  DEFAULT_PICTURE_BOOK_SHAPE,
+  getPictureBookShapeOption,
+  normalizePictureBookShape,
+  PICTURE_BOOK_SHAPE_OPTIONS,
+} from '@/lib/picture-book-shapes';
 
 type CoverImageMode = 'upload' | 'describe' | 'skip';
 
-const STEP_ROUTES: Record<number, string> = {
-  1: '',
-  2: '/write',
-  3: '/draft',
-  4: '/scenes',
-  5: '/characters',
-  6: '/style',
-  7: '/creating',
-  8: '/finish',
+const PICTURE_BOOK_SHAPE_BUTTON_LABELS: Record<PictureBookShape, string> = {
+  landscape_4_3: '가로형',
+  portrait_3_4: '세로형',
+  square_1_1: '정사각형',
 };
 
-function getStepRedirect(bookId: string, currentStep: number, storyId: string): string {
-  const route = STEP_ROUTES[currentStep] ?? '';
-  return `/book/${bookId}/mystory${route}?storyId=${storyId}`;
-}
-
-export default function StylePageContent() {
+export default function StylePageContent({ storyId }: { storyId: string | null }) {
   const params = useParams();
-  const searchParams = useSearchParams();
   const bookId = params.id as string;
-  const storyId = searchParams.get('storyId');
   const router = useRouter();
-  const { user, profile, loading: authLoading } = useAuth();
 
   const [story, setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Cover design
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
+  const [pictureBookShape, setPictureBookShape] = useState<PictureBookShape>(DEFAULT_PICTURE_BOOK_SHAPE);
   const [coverImageMode, setCoverImageMode] = useState<CoverImageMode>('skip');
   const [coverDescription, setCoverDescription] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [generatedCoverUrl, setGeneratedCoverUrl] = useState<string | null>(null);
+  const [coverGenerating, setCoverGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load story
@@ -55,50 +54,59 @@ export default function StylePageContent() {
         setLoading(false);
         return;
       }
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('id', storyId)
-        .single();
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('stories')
+          .select('*')
+          .eq('id', storyId)
+          .single();
 
-      if (data) {
-        const s = data as Story;
-        setStory(s);
+        if (data) {
+          const s = data as Story;
+          setStory(s);
 
-        // Guard: if current_step < 6, redirect to appropriate step
-        if (s.current_step < 6) {
-          router.replace(getStepRedirect(bookId, s.current_step, storyId));
-          return;
-        }
+          const hasValidCharacter = Array.isArray(s.character_designs)
+            && s.character_designs.some((character) =>
+              typeof character?.name === 'string' && character.name.trim().length > 0
+            );
 
-        // Pre-fill from existing data
-        if (s.cover_design) {
-          const cd = s.cover_design as CoverDesign;
-          if (cd.title) setTitle(cd.title);
-          if (cd.author) setAuthor(cd.author);
-          if (cd.description) {
-            setCoverImageMode('describe');
-            setCoverDescription(cd.description);
+          // Guard: style step needs at least one saved character
+          if (!hasValidCharacter) {
+            router.replace(`/book/${bookId}/mystory/characters?storyId=${storyId}&lang=${s.language}`);
+            return;
           }
-          if (cd.image_url) {
-            setCoverImageMode('upload');
-            setUploadedImageUrl(cd.image_url);
-            setCoverPreviewUrl(cd.image_url);
+
+          // Pre-fill from existing data
+          if (s.cover_design) {
+            const cd = s.cover_design as CoverDesign;
+            if (cd.title) setTitle(cd.title);
+            if (cd.author) setAuthor(cd.author);
+            setPictureBookShape(normalizePictureBookShape(cd.picture_book_shape));
+            if (cd.description) {
+              setCoverImageMode('describe');
+              setCoverDescription(cd.description);
+            }
+            if (cd.image_url) {
+              setCoverImageMode('upload');
+              setUploadedImageUrl(cd.image_url);
+              setCoverPreviewUrl(cd.image_url);
+            }
+          }
+          if (s.cover_image_url) {
+            setGeneratedCoverUrl(s.cover_image_url);
+            if (s.cover_design?.description && !s.cover_design?.image_url) {
+              setCoverImageMode('describe');
+              setCoverPreviewUrl(s.cover_image_url);
+            }
           }
         }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchStory();
   }, [storyId, bookId, router]);
-
-  // Auto-fill author from profile nickname
-  useEffect(() => {
-    if (profile?.nickname && !author) {
-      setAuthor(profile.nickname);
-    }
-  }, [profile, author]);
 
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,44 +143,183 @@ export default function StylePageContent() {
     return url;
   };
 
-  // Save and navigate
-  const handleSubmit = async () => {
-    if (!storyId || !user || !title.trim()) return;
-    setSaving(true);
+  const buildCharacterRefs = (): CharacterRef[] => {
+    if (!story?.character_designs) return [];
+
+    return story.character_designs
+      .filter((character) => character.imageUrl)
+      .map((character) => ({
+        name: character.name,
+        imageUrl: character.imageUrl!,
+      }));
+  };
+
+  const getMatchedCharacterRefs = () => {
+    const allRefs = buildCharacterRefs();
+    const sourceText = `${title}\n${coverDescription}`.toLowerCase();
+    const matched = allRefs.filter((ref) => sourceText.includes(ref.name.toLowerCase()));
+
+    return {
+      allRefs,
+      matchedRefs: matched,
+      matchedNames: matched.map((ref) => ref.name),
+    };
+  };
+
+  const resetGeneratedCoverIfNeeded = () => {
+    if (coverImageMode !== 'describe') {
+      return;
+    }
+
+    setGeneratedCoverUrl(null);
+    setCoverPreviewUrl(null);
+  };
+
+  const generateCoverImage = async (): Promise<string> => {
+    if (!storyId || !story) {
+      throw new Error('표지 생성을 위한 이야기 정보를 찾지 못했어요.');
+    }
+    if (!coverDescription.trim()) {
+      throw new Error('표지 설명을 먼저 입력해 주세요.');
+    }
+
+    setCoverGenerating(true);
+    setError(null);
 
     try {
-      let imageUrl: string | undefined;
-      if (coverImageMode === 'upload' && (coverFile || uploadedImageUrl)) {
-        const url = await uploadCoverImage();
-        if (url) imageUrl = url;
+      const style = normalizeIllustrationStyle(story.illustration_style);
+      const styleOption = getIllustrationStyleOption(style);
+      const pictureBookShapeOption = getPictureBookShapeOption(pictureBookShape);
+      const { allRefs, matchedRefs, matchedNames } = getMatchedCharacterRefs();
+      const characterInstruction = matchedNames.length > 0
+        ? `표지 설명에 언급된 인물은 ${matchedNames.join(', ')}입니다. 같은 이름의 첨부 캐릭터 레퍼런스를 우선 참고해서 동일한 인물로 표현해 주세요.`
+        : '첨부된 캐릭터 레퍼런스가 있다면 인물 디자인의 일관성을 참고해 주세요.';
+      const coverTitle = title.trim() || '나만의 이야기';
+      const coverAuthor = author.trim() || '작성자';
+      const prompt = `평면 표지 아트워크 생성. 그림책 형태는 ${pictureBookShapeOption.label}이며 목표 비율은 ${pictureBookShapeOption.aspectRatio}입니다. ${pictureBookShapeOption.promptLabel}에 맞는 구도로 구성해주세요. 반드시 ${styleOption.label} 스타일로 표현해주세요. 스타일 표현 키워드: ${styleOption.promptLabel}. 첨부된 레퍼런스 이미지는 ${styleOption.label} 스타일의 디자인 감각만 참고하고, 인물이나 구성은 따라 하지 마세요. 책 실물, 목업, 포스터, 액자, 페이지 형태로 만들지 말고 표지 그림 자체만 만들어 주세요. 스파인이나 입체적인 책 형태는 넣지 마세요. 표지 설명: ${coverDescription.trim()}. ${characterInstruction} 표지 제목에 다음 텍스트 구현: ${coverTitle}. 제목 아래 더 작은 글씨로 다음 텍스트 구현: 글: ${coverAuthor}, 그림: ${coverAuthor}. 텍스트는 표지 디자인 안에 자연스럽게 배치해 주세요. 다른 요소를 임의로 추가하지 마세요.`;
+
+      const response = await fetch('/api/story/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          style_key: style,
+          character_refs: matchedRefs.length > 0 ? matchedRefs : allRefs,
+          matched_character_names: matchedNames,
+          allow_text: true,
+          cover_mode: true,
+          aspect_ratio: pictureBookShapeOption.aspectRatio,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.image_url) {
+        throw new Error(data.error || '표지 생성에 실패했어요.');
       }
 
-      const coverDesign: CoverDesign = {
-        title: title.trim(),
-        author: author.trim() || profile?.nickname || '',
-      };
-      if (coverImageMode === 'upload' && imageUrl) {
-        coverDesign.image_url = imageUrl;
-      }
-      if (coverImageMode === 'describe' && coverDescription.trim()) {
-        coverDesign.description = coverDescription.trim();
-      }
+      setGeneratedCoverUrl(data.image_url);
+      setCoverPreviewUrl(data.image_url);
+      return data.image_url as string;
+    } finally {
+      setCoverGenerating(false);
+    }
+  };
 
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('stories')
-        .update({
-          cover_design: coverDesign,
-          current_step: 7,
-          production_status: 'pending',
-        })
-        .eq('id', storyId);
+  const persistCover = async (targetStep?: number) => {
+    if (!storyId || !story) return { success: false };
 
-      if (error) throw error;
+    let imageUrl: string | undefined;
+    if (coverImageMode === 'upload' && (coverFile || uploadedImageUrl)) {
+      const url = await uploadCoverImage();
+      if (url) imageUrl = url;
+    }
+
+    const coverDesign: CoverDesign = {
+      title: title.trim(),
+      author: author.trim(),
+      picture_book_shape: pictureBookShape,
+    };
+
+    if (coverImageMode === 'upload' && imageUrl) {
+      coverDesign.image_url = imageUrl;
+    }
+    if (coverImageMode === 'describe' && coverDescription.trim()) {
+      coverDesign.description = coverDescription.trim();
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      cover_design: coverDesign,
+    };
+
+    if (coverImageMode === 'upload') {
+      updatePayload.cover_image_url = imageUrl ?? uploadedImageUrl ?? null;
+    } else if (coverImageMode === 'describe') {
+      updatePayload.cover_image_url = generatedCoverUrl ?? null;
+    } else {
+      updatePayload.cover_image_url = null;
+    }
+
+    if (typeof targetStep === 'number') {
+      updatePayload.current_step = Math.max(story.current_step, targetStep);
+      if (targetStep >= 7) {
+        updatePayload.production_status = 'pending';
+      }
+    }
+
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from('stories')
+      .update(updatePayload)
+      .eq('id', storyId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return { success: true };
+  };
+
+  // Save and navigate
+  const handleSubmit = async () => {
+    if (!storyId || !title.trim()) return;
+    if (coverImageMode === 'describe' && !generatedCoverUrl) {
+      setError('표지를 먼저 생성한 뒤 다음 단계로 이동해 주세요.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+
+    try {
+      await persistCover(7);
 
       router.push(`/book/${bookId}/mystory/creating?storyId=${storyId}`);
     } catch (err) {
       console.error('Save error:', err);
+      setError('저장에 실패했어요. 다시 시도해 주세요.');
+      setSaving(false);
+    }
+  };
+
+  const handleStepSelect = async (targetStep: number) => {
+    if (!storyId || !story) return;
+    if (targetStep > 6 && !title.trim()) {
+      setError('제목을 입력해 주세요.');
+      return;
+    }
+    if (targetStep > 6 && coverImageMode === 'describe' && !generatedCoverUrl) {
+      setError('표지를 먼저 생성한 뒤 다음 단계로 이동해 주세요.');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await persistCover(targetStep);
+      router.push(getStepRouteWithLang(bookId, targetStep, storyId, story.language));
+    } catch (err) {
+      console.error('Step navigation save error:', err);
+      setError('저장에 실패했어요. 다시 시도해 주세요.');
       setSaving(false);
     }
   };
@@ -186,7 +333,7 @@ export default function StylePageContent() {
     };
   }, [coverPreviewUrl]);
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <main className="flex-1 flex items-center justify-center">
         <LoadingSpinner message="로딩 중..." />
@@ -210,10 +357,14 @@ export default function StylePageContent() {
     );
   }
 
-  const isFormValid = title.trim().length > 0;
+  const isFormValid =
+    title.trim().length > 0 &&
+    (coverImageMode !== 'describe' || generatedCoverUrl !== null);
 
   return (
-    <main className="flex-1 px-4 py-6 max-w-3xl mx-auto">
+    <>
+      <MyStoryStepSidebar currentStep={6} busy={saving} onStepSelect={handleStepSelect} />
+      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="text-center mb-8">
         <motion.h1
@@ -226,8 +377,14 @@ export default function StylePageContent() {
         <p className="text-sm text-muted mt-2">
           표지를 꾸며 보세요
         </p>
-        <p className="text-xs text-gray-400 mt-1">Step 6/8</p>
+        <p className="text-xs text-gray-400 mt-1">Step 5/7</p>
       </div>
+
+      {error && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Cover Design */}
       <motion.section
@@ -252,7 +409,10 @@ export default function StylePageContent() {
             id="cover-title"
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              resetGeneratedCoverIfNeeded();
+            }}
             placeholder="나만의 이야기 제목을 입력하세요"
             className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
             maxLength={50}
@@ -271,11 +431,42 @@ export default function StylePageContent() {
             id="cover-author"
             type="text"
             value={author}
-            onChange={(e) => setAuthor(e.target.value)}
+            onChange={(e) => {
+              setAuthor(e.target.value);
+              resetGeneratedCoverIfNeeded();
+            }}
             placeholder="글쓴이 이름"
             className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
             maxLength={30}
           />
+        </div>
+
+        <div className="mb-6">
+          <p className="text-sm font-medium text-foreground mb-3">
+            그림책 형태
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {PICTURE_BOOK_SHAPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  setPictureBookShape(option.value);
+                  resetGeneratedCoverIfNeeded();
+                }}
+                className={[
+                  'rounded-xl border px-4 py-3 text-center transition-all',
+                  pictureBookShape === option.value
+                    ? 'border-secondary bg-secondary/10 text-foreground'
+                    : 'border-border bg-card text-muted hover:border-muted hover:text-foreground',
+                ].join(' ')}
+              >
+                <div className="text-sm font-semibold">
+                  {PICTURE_BOOK_SHAPE_BUTTON_LABELS[option.value]}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Cover Image */}
@@ -287,8 +478,8 @@ export default function StylePageContent() {
             {(
               [
                 { mode: 'upload' as CoverImageMode, label: '직접 그린 그림 올리기' },
-                { mode: 'describe' as CoverImageMode, label: '표지 장면 설명하기' },
-                { mode: 'skip' as CoverImageMode, label: '건너뛰기 (자동 생성)' },
+                { mode: 'describe' as CoverImageMode, label: '표지 장면 설명하고 생성하기' },
+                { mode: 'skip' as CoverImageMode, label: '이미지 없이 넘어가기' },
               ] as const
             ).map(({ mode, label }) => (
               <button
@@ -300,7 +491,15 @@ export default function StylePageContent() {
                     if (coverPreviewUrl?.startsWith('blob:')) {
                       URL.revokeObjectURL(coverPreviewUrl);
                     }
-                    setCoverPreviewUrl(uploadedImageUrl);
+                    setCoverPreviewUrl(mode === 'describe' ? generatedCoverUrl : null);
+                  }
+                  if (mode === 'upload') {
+                    setGeneratedCoverUrl(null);
+                  }
+                  if (mode === 'skip') {
+                    setGeneratedCoverUrl(null);
+                    setUploadedImageUrl(null);
+                    setCoverPreviewUrl(null);
                   }
                 }}
                 className={`
@@ -336,7 +535,7 @@ export default function StylePageContent() {
                   <img
                     src={coverPreviewUrl}
                     alt="표지 미리보기"
-                    className="w-full max-h-64 object-contain rounded-xl border border-border"
+                    className="w-full max-h-80 object-contain rounded-xl border border-border bg-white"
                   />
                   <button
                     onClick={() => fileInputRef.current?.click()}
@@ -380,7 +579,10 @@ export default function StylePageContent() {
             >
               <textarea
                 value={coverDescription}
-                onChange={(e) => setCoverDescription(e.target.value)}
+                onChange={(e) => {
+                  setCoverDescription(e.target.value);
+                  resetGeneratedCoverIfNeeded();
+                }}
                 placeholder="표지에 어떤 장면을 그리고 싶은지 설명해 주세요. 예: 주인공이 숲속에서 동물 친구들과 함께 웃고 있는 장면"
                 rows={3}
                 className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all resize-none"
@@ -389,6 +591,29 @@ export default function StylePageContent() {
               <p className="text-right text-xs text-muted mt-1">
                 {coverDescription.length}/300
               </p>
+              <div className="mt-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void generateCoverImage()}
+                  disabled={coverGenerating || !coverDescription.trim()}
+                  className="rounded-xl bg-secondary px-4 py-2.5 text-sm font-bold text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {coverGenerating ? '표지 생성 중...' : generatedCoverUrl ? '표지 다시 생성하기' : '표지 생성하기'}
+                </button>
+                <p className="text-xs text-muted">
+                  표지를 먼저 생성한 뒤 다음 단계로 이동할 수 있어요.
+                </p>
+              </div>
+
+              {coverPreviewUrl && (
+                <div className="mt-4">
+                  <img
+                    src={coverPreviewUrl}
+                    alt="생성된 표지 미리보기"
+                    className="w-full max-h-80 object-contain rounded-xl border border-border bg-white"
+                  />
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -399,7 +624,7 @@ export default function StylePageContent() {
               animate={{ opacity: 1 }}
               className="text-xs text-muted bg-muted-light rounded-xl px-4 py-3"
             >
-              표지 이미지는 이야기 내용을 바탕으로 자동 생성됩니다.
+              표지 이미지를 나중에 직접 추가하지 않고, 이미지 없이 다음 단계로 넘어갑니다.
             </motion.p>
           )}
         </div>
@@ -426,9 +651,12 @@ export default function StylePageContent() {
             }
           `}
         >
-          제작하기!
+          {coverImageMode === 'describe' && !generatedCoverUrl
+            ? '표지를 먼저 생성해 주세요'
+            : '다음 단계로 이동'}
         </motion.button>
       </motion.div>
-    </main>
+      </main>
+    </>
   );
 }

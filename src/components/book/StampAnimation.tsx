@@ -30,55 +30,69 @@ export default function StampAnimation({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
         >
-          {/* Particles / burst effect */}
-          {[...Array(12)].map((_, i) => (
+          {/* Ink splatter particles */}
+          {[...Array(10)].map((_, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 1, scale: 0 }}
+              initial={{ opacity: 0.8, scale: 0 }}
               animate={{
                 opacity: 0,
-                scale: 2,
-                x: Math.cos((i * 30 * Math.PI) / 180) * 120,
-                y: Math.sin((i * 30 * Math.PI) / 180) * 120,
+                scale: 1.5,
+                x: Math.cos((i * 36 * Math.PI) / 180) * 100,
+                y: Math.sin((i * 36 * Math.PI) / 180) * 100,
               }}
-              transition={{ duration: 1, delay: 0.3 }}
-              className="absolute w-3 h-3 rounded-full bg-stamp-gold"
+              transition={{ duration: 0.8, delay: 0.15 }}
+              className="absolute w-2 h-2 rounded-full bg-red-700/50"
             />
           ))}
 
-          {/* Stamp */}
+          {/* Passport stamp */}
           <motion.div
-            initial={{ scale: 3, opacity: 0, rotate: -30 }}
-            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            initial={{ scale: 4, opacity: 0, rotate: -25 }}
+            animate={{ scale: 1, opacity: 1, rotate: -14 }}
             transition={{
               type: 'spring',
-              stiffness: 200,
-              damping: 15,
+              stiffness: 250,
+              damping: 18,
               delay: 0.1,
             }}
-            className="flex flex-col items-center gap-4"
+            className="flex flex-col items-center gap-5"
           >
+            {/* Stamp body */}
             <motion.div
               animate={{
                 boxShadow: [
-                  '0 0 0 0 rgba(251,191,36,0.4)',
-                  '0 0 0 20px rgba(251,191,36,0)',
+                  '0 0 0 0 rgba(185,28,28,0.3)',
+                  '0 0 0 16px rgba(185,28,28,0)',
                 ],
               }}
               transition={{ duration: 1, repeat: 2 }}
-              className="w-28 h-28 rounded-full bg-stamp-gold flex items-center justify-center shadow-xl"
+              className="w-32 h-32 rounded-full border-[4px] border-red-700/80 bg-white/95 flex items-center justify-center relative shadow-xl"
             >
-              <span className="text-5xl">&#9733;</span>
+              {/* Inner ring */}
+              <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700/50" />
+              {/* Stamp text */}
+              <div className="flex flex-col items-center z-10">
+                <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">
+                  ★ WORLD DOCENT ★
+                </span>
+                <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">
+                  SUCCESS
+                </span>
+                <span className="text-red-700/70 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">
+                  APPROVED
+                </span>
+              </div>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="text-center"
+              className="text-center rotate-[14deg]"
             >
-              <p className="text-2xl font-bold text-white mb-1">도장 획득!</p>
-              <p className="text-base text-stamp-gold font-medium">
+              <p className="text-2xl font-bold text-white mb-1">스탬프 획득!</p>
+              <p className="text-base text-red-300 font-medium">
                 {stampLabel}
               </p>
             </motion.div>

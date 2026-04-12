@@ -141,10 +141,6 @@ export default function LibraryPage() {
     }
 
     return Array.from(grouped.values())
-      .map((g) => ({
-        ...g,
-        items: [...g.items].sort((a, b) => b.likes - a.likes),
-      }))
       .sort((a, b) => b.items.length - a.items.length);
   }, [items]);
 

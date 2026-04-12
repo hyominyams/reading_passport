@@ -1,14 +1,13 @@
 'use client';
 
 const STEPS = [
-  { num: 1, label: '질문' },
-  { num: 2, label: '쓰기' },
-  { num: 3, label: '초안' },
-  { num: 4, label: '장면' },
-  { num: 5, label: '주인공' },
-  { num: 6, label: '표지' },
-  { num: 7, label: '제작' },
-  { num: 8, label: '완성' },
+  { step: 1, label: '질문' },
+  { step: 3, label: '초안' },
+  { step: 4, label: '장면' },
+  { step: 5, label: '주인공' },
+  { step: 6, label: '표지' },
+  { step: 7, label: '제작' },
+  { step: 8, label: '완성' },
 ];
 
 interface StepProgressProps {
@@ -20,11 +19,12 @@ export default function StepProgress({ currentStep }: StepProgressProps) {
     <div className="w-full max-w-2xl mx-auto mb-6">
       <div className="flex items-center justify-between">
         {STEPS.map((step, index) => {
-          const isCompleted = currentStep > step.num;
-          const isCurrent = currentStep === step.num;
+          const isCompleted = currentStep > step.step;
+          const isCurrent = currentStep === step.step;
+          const displayNumber = index + 1;
 
           return (
-            <div key={step.num} className="flex items-center flex-1 last:flex-none">
+            <div key={step.step} className="flex items-center flex-1 last:flex-none">
               {/* Circle */}
               <div className="flex flex-col items-center">
                 <div
@@ -36,7 +36,7 @@ export default function StepProgress({ currentStep }: StepProgressProps) {
                         : 'bg-gray-100 text-gray-400'
                   }`}
                 >
-                  {isCompleted ? '✓' : step.num}
+                  {isCompleted ? '✓' : displayNumber}
                 </div>
                 <span
                   className={`text-[10px] mt-1 ${
@@ -51,7 +51,7 @@ export default function StepProgress({ currentStep }: StepProgressProps) {
               {index < STEPS.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-1 ${
-                    currentStep > step.num ? 'bg-indigo-400' : 'bg-gray-200'
+                    currentStep > step.step ? 'bg-indigo-400' : 'bg-gray-200'
                   }`}
                 />
               )}

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { useAuth } from '@/hooks/useAuth';
+import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
 import type { Story } from '@/types/database';
+import { getStepRouteWithLang } from '@/lib/mystory-steps';
 
 type PageChoice = 'upload' | 'describe' | 'skip';
 
@@ -39,13 +40,10 @@ function buildInitialStates(
   });
 }
 
-export default function ScenesPageContent() {
+export default function ScenesPageContent({ storyId }: { storyId: string | null }) {
   const params = useParams();
-  const searchParams = useSearchParams();
   const bookId = params.id as string;
-  const storyId = searchParams.get('storyId');
   const router = useRouter();
-  const { loading: authLoading } = useAuth();
 
   const [story, setStory] = useState<Story | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,36 +58,37 @@ export default function ScenesPageContent() {
         setLoading(false);
         return;
       }
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('id', storyId)
-        .single();
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('stories')
+          .select('*')
+          .eq('id', storyId)
+          .single();
 
-      if (data) {
-        const s = data as Story;
-        setStory(s);
+        if (data) {
+          const s = data as Story;
+          setStory(s);
 
-        // Guard: if current_step < 4, redirect to appropriate step
-        if (s.current_step < 4) {
-          const stepRoutes: Record<number, string> = { 1: '', 2: '/write', 3: '/draft' };
-          const route = stepRoutes[s.current_step] ?? '';
-          router.replace(`/book/${bookId}/mystory${route}?storyId=${storyId}`);
-          return;
+          // Guard: scenes needs story text to exist
+          if (!s.final_text || s.final_text.length === 0) {
+            router.replace(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${s.language}`);
+            return;
+          }
+
+          if (s.final_text && s.final_text.length > 0) {
+            setPageStates(
+              buildInitialStates(
+                s.final_text.length,
+                s.uploaded_images,
+                s.scene_descriptions,
+              ),
+            );
+          }
         }
-
-        if (s.final_text && s.final_text.length > 0) {
-          setPageStates(
-            buildInitialStates(
-              s.final_text.length,
-              s.uploaded_images,
-              s.scene_descriptions,
-            ),
-          );
-        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchStory();
   }, [storyId, bookId, router]);
@@ -220,9 +219,43 @@ export default function ScenesPageContent() {
     }
   };
 
+  const handleStepSelect = useCallback(async (targetStep: number) => {
+    if (!storyId || !story) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const uploadedImages = pageStates.map((s) =>
+        s.choice === 'upload' ? s.imageUrl : null
+      );
+      const sceneDescriptions = pageStates.map((s) =>
+        s.choice === 'describe' ? s.description || null : null
+      );
+
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from('stories')
+        .update({
+          uploaded_images: uploadedImages as string[],
+          scene_descriptions: sceneDescriptions as string[],
+          current_step: Math.max(story.current_step, targetStep),
+        })
+        .eq('id', storyId);
+
+      if (updateError) throw updateError;
+
+      router.push(getStepRouteWithLang(bookId, targetStep, storyId, story.language));
+    } catch (err) {
+      console.error('Step navigation save error:', err);
+      setError('저장에 실패했어요. 다시 시도해 주세요.');
+      setSaving(false);
+    }
+  }, [bookId, pageStates, router, story, storyId]);
+
   // --- Render ---
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <main className="flex-1 flex items-center justify-center min-h-[60vh]">
         <LoadingSpinner message="로딩 중..." />
@@ -241,62 +274,98 @@ export default function ScenesPageContent() {
   const pages = story.final_text;
 
   return (
-    <main className="flex-1 px-4 py-8 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <p className="text-sm text-muted mb-1">Step 4/8</p>
-        <h1 className="text-2xl font-heading font-bold text-foreground">
-          장면 상상하기
-        </h1>
-        <p className="text-sm text-muted mt-2">
-          각 페이지에 들어갈 그림을 직접 올리거나, 장면을 설명해 주세요.
-          비워두기를 선택해도 괜찮아요.
-        </p>
-      </div>
-
-      {/* Error banner */}
-      {error && (
-        <div className="mb-6 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-          {error}
+    <>
+      <MyStoryStepSidebar currentStep={4} busy={saving} onStepSelect={handleStepSelect} />
+      <div className="flex-1 flex justify-center">
+      <main className="flex-1 px-4 py-8 max-w-3xl">
+        {/* Header */}
+        <div className="mb-8">
+          <p className="text-sm text-muted mb-1">Step 3/7</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground">
+            장면 상상하기
+          </h1>
+          <p className="text-sm text-muted mt-2">
+            각 페이지에 들어갈 그림을 직접 올리거나, 장면을 설명해 주세요.
+            비워두기를 선택해도 괜찮아요.
+          </p>
         </div>
-      )}
 
-      {/* Page cards */}
-      <div className="flex flex-col gap-6">
-        {pages.map((text, index) => (
-          <PageCard
-            key={index}
-            index={index}
-            text={text}
-            state={pageStates[index]}
-            onChoiceChange={(choice) => {
-              updatePageState(index, {
-                choice,
-                // Reset image when switching away from upload
-                ...(choice !== 'upload' ? { imageUrl: pageStates[index]?.imageUrl ?? null } : {}),
-              });
-            }}
-            onDescriptionChange={(desc) =>
-              updatePageState(index, { description: desc })
-            }
-            onFileUpload={(file) => handleFileUpload(index, file)}
-          />
-        ))}
-      </div>
+        {/* Error banner */}
+        {error && (
+          <div className="mb-6 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
 
-      {/* Bottom button */}
-      <div className="mt-10 flex justify-end">
-        <button
-          type="button"
-          onClick={() => void handleFinish()}
-          disabled={saving}
-          className="px-6 py-3 rounded-xl bg-foreground text-white font-medium text-sm
-            hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saving ? '저장 중...' : '주인공 설정하러 가기 \u2192'}
-        </button>
+        {/* Page cards */}
+        <div className="flex flex-col gap-6">
+          {pages.map((text, index) => (
+            <PageCard
+              key={index}
+              index={index}
+              text={text}
+              state={pageStates[index]}
+              onChoiceChange={(choice) => {
+                updatePageState(index, {
+                  choice,
+                  // Reset image when switching away from upload
+                  ...(choice !== 'upload' ? { imageUrl: pageStates[index]?.imageUrl ?? null } : {}),
+                });
+              }}
+              onDescriptionChange={(desc) =>
+                updatePageState(index, { description: desc })
+              }
+              onFileUpload={(file) => handleFileUpload(index, file)}
+            />
+          ))}
+        </div>
+
+        {/* Bottom button */}
+        <div className="mt-10 flex justify-end">
+          <button
+            type="button"
+            onClick={() => void handleFinish()}
+            disabled={saving}
+            className="px-6 py-3 rounded-xl bg-foreground text-white font-medium text-sm
+              hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? '저장 중...' : '주인공 설정하러 가기'}
+          </button>
+        </div>
+      </main>
+
+      {/* Right-side CTA — desktop only */}
+      <aside className="hidden lg:block w-52 shrink-0 pt-32 pr-4">
+        <div className="sticky top-28">
+          <div className="flex flex-col items-center text-center">
+            {/* Artist character */}
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-100 to-pink-100 border-2 border-amber-200 flex items-center justify-center text-3xl shadow-sm mb-3">
+              🎨
+            </div>
+
+            {/* Speech bubble */}
+            <div className="relative bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm mb-3">
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-gray-200 rotate-45" />
+              <p className="text-xs text-gray-600 leading-relaxed font-medium">
+                그림을 잘 만드는 법을<br />알고 싶지 않아?
+              </p>
+            </div>
+
+            {/* CTA button */}
+            <button
+              type="button"
+              onClick={() => window.open('/guide/prompt-tips', '_blank')}
+              className="px-4 py-2 rounded-full bg-amber-400 hover:bg-amber-500
+                text-white text-xs font-bold shadow-sm
+                hover:shadow-md transition-all hover:scale-105 active:scale-95"
+            >
+              배우러 가기
+            </button>
+          </div>
+        </div>
+      </aside>
       </div>
-    </main>
+    </>
   );
 }
 

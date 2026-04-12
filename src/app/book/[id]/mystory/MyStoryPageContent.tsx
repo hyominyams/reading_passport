@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import StoryTypeSelector from '@/components/story/StoryTypeSelector';
+import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import ChatInput from '@/components/chat/ChatInput';
 import { createClient } from '@/lib/supabase/client';
 import type { Book, StoryType } from '@/types/database';
@@ -16,9 +17,27 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface ValidationResult {
+  character: boolean;
+  setting: boolean;
+  conflict: boolean;
+  ending: boolean;
+  pass: boolean;
+  feedback: string;
+  missing_fields: Array<'character' | 'setting' | 'conflict' | 'ending'>;
+  feedback_lines: string[];
+  retry_prompt: string;
+}
+
+interface ValidationNotice {
+  status: 'success' | 'needs_more';
+  title: string;
+  lines: string[];
+  retryPrompt?: string;
+}
+
 /* ── Constants ── */
 
-const FIRST_VALIDATE_AT = 5;
 const REVALIDATE_INTERVAL = 3;
 
 const TYPE_LABELS: Record<StoryType, string> = {
@@ -37,14 +56,73 @@ const TYPE_COLORS: Record<StoryType, string> = {
   custom: 'bg-rose-100 text-rose-700 border-rose-200',
 };
 
-const TORI_AVATAR = '📖✨';
-const CHAT_FALLBACK_REPLY = '앗, 잠깐 생각이 끊겼어! 네 이야기를 한 번만 더 말해줄래?';
+const TORI_AVATAR = '🪔';
+const CHAT_FALLBACK_REPLY = '오호, 그 이야기를 조금만 더 또렷하게 들려주면 좋겠어.';
+
+function normalizeGeneratedPages(payload: unknown): Array<{ draft: string; advice: string }> {
+  if (!Array.isArray(payload)) return [];
+
+  return payload
+    .map((page) => {
+      if (typeof page === 'string') {
+        const draft = page.trim();
+        return draft ? { draft, advice: '' } : null;
+      }
+
+      if (!page || typeof page !== 'object') return null;
+
+      const raw = page as Record<string, unknown>;
+      const draft = typeof raw.draft === 'string' ? raw.draft.trim() : '';
+      const advice = typeof raw.advice === 'string' ? raw.advice.trim() : '';
+
+      if (!draft) return null;
+
+      return { draft, advice };
+    })
+    .filter((page): page is { draft: string; advice: string } => page !== null);
+}
+
+function pickFocusField(result: ValidationResult): 'character' | 'conflict' | 'setting' | 'ending' | null {
+  if (result.missing_fields.length > 0) {
+    const [firstMissingField] = result.missing_fields;
+    if (firstMissingField === 'character' || firstMissingField === 'conflict' || firstMissingField === 'setting' || firstMissingField === 'ending') {
+      return firstMissingField;
+    }
+  }
+
+  if (!result.character) return 'character';
+  if (!result.conflict) return 'conflict';
+  if (!result.setting) return 'setting';
+  if (!result.ending) return 'ending';
+  return null;
+}
 
 function buildToriGreeting(storyType: StoryType, customInput: string | null): string {
   const typeLabel = storyType === 'custom' && customInput
     ? customInput
     : TYPE_LABELS[storyType];
-  return `안녕! 나는 이야기 도우미 토리야 🌟\n\n"${typeLabel}" 이야기를 쓰고 싶구나! 어떤 이야기를 상상하고 있어? 자유롭게 말해줘!`;
+  return `안녕! 나는 이야기 램프 토리야 ${TORI_AVATAR}\n\n이번에는 "${typeLabel}"로 시작해볼까?`;
+}
+
+function getMissingFieldLabel(field: 'character' | 'setting' | 'conflict' | 'ending'): string {
+  switch (field) {
+    case 'character':
+      return '인물';
+    case 'setting':
+      return '배경';
+    case 'conflict':
+      return '사건';
+    case 'ending':
+      return '결말';
+    default:
+      return '이야기';
+  }
+}
+
+function buildRetryAssistantMessage(result: ValidationResult): string {
+  const labels = result.missing_fields.slice(0, 2).map(getMissingFieldLabel);
+  const missingText = labels.length > 0 ? labels.join(', ') : '이야기 재료';
+  return `오호, 여기까지도 흥미로운 이야기인걸. ${missingText} 쪽을 조금 더 들려주면 더 탄탄해질 것 같아. 두 가지 정도만 더 들려줄래?`;
 }
 
 /* ── Props ── */
@@ -56,6 +134,9 @@ interface MyStoryPageContentProps {
   userId: string;
   storyId: string;
   initialStoryType: StoryType;
+  initialCurrentStep: number;
+  requiredTurns: number;
+  hasExistingDraft: boolean;
   initialChatLog: ChatMessage[] | null;
 }
 
@@ -68,10 +149,14 @@ export default function MyStoryPageContent({
   userId,
   storyId,
   initialStoryType,
+  initialCurrentStep,
+  requiredTurns,
+  hasExistingDraft,
   initialChatLog,
 }: MyStoryPageContentProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const firstValidateAt = Math.max(3, requiredTurns);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
@@ -103,6 +188,7 @@ export default function MyStoryPageContent({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
+  const [validationNotice, setValidationNotice] = useState<ValidationNotice | null>(null);
 
   // Count student turns
   const studentTurnCount = messages.filter((m) => m.role === 'user').length;
@@ -183,7 +269,7 @@ export default function MyStoryPageContent({
             student_id: userId,
             book_id: book.id,
             character_id: null,
-            character_name: '토리',
+            character_name: '이야기 램프 토리',
             chat_type: 'story_gauge',
             messages: chatMessages,
             language,
@@ -234,6 +320,7 @@ export default function MyStoryPageContent({
     };
     setMessages([greeting]);
     setValidated(false);
+    setValidationNotice(null);
     setPhase('chat');
 
     // Save to DB in background
@@ -249,10 +336,17 @@ export default function MyStoryPageContent({
 
   /* ── New chat: reset session ── */
   const handleNewChat = () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    messagesRef.current = [];
+
     // Clear chat from DB
     supabase
       .from('stories')
-      .update({ chat_log: {}, all_student_messages: null })
+      .update({ chat_log: [], all_student_messages: null })
       .eq('id', storyId)
       .then(({ error: dbErr }: { error: unknown }) => {
         if (dbErr) console.error('Failed to clear chat:', dbErr);
@@ -260,13 +354,14 @@ export default function MyStoryPageContent({
 
     setMessages([]);
     setValidated(false);
+    setValidationNotice(null);
     setError(null);
     setPhase('type');
   };
 
   /* ── Run validation ── */
   const runValidation = useCallback(
-    async (msgs: ChatMessage[]): Promise<boolean> => {
+    async (msgs: ChatMessage[]): Promise<ValidationResult> => {
       const studentMessages = msgs
         .filter((m) => m.role === 'user')
         .map((m) => m.content)
@@ -279,9 +374,37 @@ export default function MyStoryPageContent({
           body: JSON.stringify({ all_student_messages: studentMessages }),
         });
         const data = await res.json();
-        return data.pass === true;
+        return {
+          character: data.character === true,
+          setting: data.setting === true,
+          conflict: data.conflict === true,
+          ending: data.ending === true,
+          pass: data.pass === true,
+          feedback: typeof data.feedback === 'string' ? data.feedback : '',
+          missing_fields: Array.isArray(data.missing_fields)
+            ? data.missing_fields.filter((field: unknown) =>
+              field === 'character' || field === 'setting' || field === 'conflict' || field === 'ending')
+            : [],
+          feedback_lines: Array.isArray(data.feedback_lines)
+            ? data.feedback_lines.filter((line: unknown): line is string => typeof line === 'string')
+            : [],
+          retry_prompt: typeof data.retry_prompt === 'string' ? data.retry_prompt : '',
+        };
       } catch {
-        return false;
+        return {
+          character: false,
+          setting: false,
+          conflict: false,
+          ending: false,
+          pass: false,
+          feedback: '',
+          missing_fields: ['character', 'setting', 'conflict', 'ending'],
+          feedback_lines: [
+            '지금은 이야기 재료를 제대로 확인하지 못했어.',
+            '중요한 인물과 사건이 보이게 조금만 더 들려줘.',
+          ],
+          retry_prompt: '좋아, 두 가지 정도만 더 들려줄래?',
+        };
       }
     },
     [],
@@ -313,23 +436,26 @@ export default function MyStoryPageContent({
 
     // Validation check
     const shouldValidate =
-      newTurnCount >= FIRST_VALIDATE_AT &&
-      (newTurnCount === FIRST_VALIDATE_AT ||
-        (newTurnCount - FIRST_VALIDATE_AT) % REVALIDATE_INTERVAL === 0);
+      newTurnCount >= firstValidateAt &&
+      (newTurnCount === firstValidateAt ||
+        (newTurnCount - firstValidateAt) % REVALIDATE_INTERVAL === 0);
+
+    let focusField: 'character' | 'conflict' | 'setting' | 'ending' | null = null;
+    let validationFeedback: string | null = null;
 
     if (shouldValidate) {
       const checkMsg: ChatMessage = {
         role: 'system',
-        content: '잠시만, 이야기를 쓸 수 있는지 확인해볼게!',
+        content: '흠, 이야기가 충분한지 볼까??',
         timestamp: new Date().toISOString(),
       };
       currentMsgs = [...currentMsgs, checkMsg];
       setMessages(currentMsgs);
       setValidating(true);
 
-      const passed = await runValidation(currentMsgs);
+      const validation = await runValidation(currentMsgs);
 
-      if (passed) {
+      if (validation.pass) {
         const passMsg: ChatMessage = {
           role: 'assistant',
           content: '좋아! 이야기 재료가 충분히 모였어! 🎉 아래 "제출하기" 버튼을 눌러서 이야기를 만들어 보자!',
@@ -339,11 +465,37 @@ export default function MyStoryPageContent({
         setMessages(currentMsgs);
         saveChatLog(currentMsgs);
         setValidated(true);
+        setValidationNotice({
+          status: 'success',
+          title: '이야기 재료가 충분해!',
+          lines: validation.feedback_lines.length > 0
+            ? validation.feedback_lines
+            : ['이제 초안을 만들 만큼 이야기의 뼈대가 잘 모였어.'],
+        });
         setValidating(false);
         return;
       }
 
+      focusField = pickFocusField(validation);
+      validationFeedback = validation.feedback || null;
+      const retryMessage: ChatMessage = {
+        role: 'assistant',
+        content: buildRetryAssistantMessage(validation),
+        timestamp: new Date().toISOString(),
+      };
+      currentMsgs = [...currentMsgs, retryMessage];
+      setMessages(currentMsgs);
+      saveChatLog(currentMsgs);
+      setValidationNotice({
+        status: 'needs_more',
+        title: '조금만 더 들려주면 돼',
+        lines: validation.feedback_lines.length > 0
+          ? validation.feedback_lines
+          : ['중요한 인물과 사건이 더 또렷해지면 좋아.'],
+        retryPrompt: validation.retry_prompt || '좋아, 두 가지 정도만 더 들려줄래?',
+      });
       setValidating(false);
+      return;
     }
 
     // Get 토리 response
@@ -359,6 +511,9 @@ export default function MyStoryPageContent({
           story_type: storyType,
           custom_input: customInput,
           language,
+          student_turn_count: newTurnCount,
+          focus_field: focusField,
+          validation_feedback: validationFeedback,
         }),
       });
 
@@ -416,8 +571,9 @@ export default function MyStoryPageContent({
       });
 
       const draftData = await draftRes.json();
+      const generatedPages = normalizeGeneratedPages(draftData.pages);
 
-      if (!draftData.pages || draftData.pages.length === 0) {
+      if (generatedPages.length === 0) {
         setError('초안 생성에 실패했어요. 다시 시도해 주세요.');
         setSubmitting(false);
         return;
@@ -425,7 +581,7 @@ export default function MyStoryPageContent({
 
       await supabase
         .from('stories')
-        .update({ ai_draft: draftData.pages, current_step: 3 })
+        .update({ ai_draft: generatedPages, current_step: 3 })
         .eq('id', storyId);
 
       router.push(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${language}`);
@@ -434,6 +590,43 @@ export default function MyStoryPageContent({
       setError('오류가 발생했어요. 다시 시도해 주세요.');
       setSubmitting(false);
     }
+  };
+
+  const handleSidebarStepSelect = async (targetStep: number) => {
+    if (targetStep === 1) return;
+
+    if (targetStep === 3) {
+      if (hasExistingDraft) {
+        await supabase
+          .from('stories')
+          .update({ current_step: Math.max(initialCurrentStep, 3) })
+          .eq('id', storyId);
+        router.push(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${language}`);
+        return;
+      }
+
+      if (!validated) {
+        setError('먼저 토리와 대화를 마치고 제출해 주세요.');
+        return;
+      }
+      await handleSubmit();
+      return;
+    }
+
+    setError('지금은 다음 단계로 바로 이동할 수 없어요.');
+  };
+
+  const handleValidatedAction = async () => {
+    if (hasExistingDraft) {
+      await supabase
+        .from('stories')
+        .update({ current_step: Math.max(initialCurrentStep, 3) })
+        .eq('id', storyId);
+      router.push(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${language}`);
+      return;
+    }
+
+    await handleSubmit();
   };
 
   /* ── Kicked screen ── */
@@ -467,21 +660,36 @@ export default function MyStoryPageContent({
   /* ── Submitting screen ── */
   if (submitting) {
     return (
-      <main className="flex-1 flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="w-12 h-12 border-4 rounded-full border-muted-light border-t-primary animate-spin" />
-          <div>
-            <p className="text-lg font-bold text-foreground">이야기 초안을 만들고 있어요...</p>
-            <p className="text-sm text-muted mt-1">토리가 열심히 준비하고 있어! 잠깐만 기다려 줘 🌟</p>
+      <>
+        <MyStoryStepSidebar
+          currentStep={1}
+          busy
+          onStepSelect={handleSidebarStepSelect}
+        />
+        <main className="flex-1 flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-12 h-12 border-4 rounded-full border-muted-light border-t-primary animate-spin" />
+            <div>
+              <p className="text-lg font-bold text-foreground">이야기 초안을 만들고 있어요...</p>
+              <p className="text-sm text-muted mt-1">이야기 램프 토리가 열심히 초안을 밝히고 있어! 잠깐만 기다려 줘 🌟</p>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </>
     );
   }
 
   /* ── Render ── */
   return (
-    <main className="flex-1 flex flex-col">
+    <>
+      {(phase === 'chat' || phase === 'type') && (
+        <MyStoryStepSidebar
+          currentStep={1}
+          busy={responding || validating || submitting}
+          onStepSelect={handleSidebarStepSelect}
+        />
+      )}
+      <main className="flex-1 min-h-0 flex flex-col">
       <AnimatePresence mode="wait">
         {phase === 'type' ? (
           <motion.div
@@ -499,10 +707,10 @@ export default function MyStoryPageContent({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col max-w-2xl mx-auto w-full"
+            className="flex-1 min-h-0 flex flex-col max-w-2xl mx-auto w-full"
           >
             {/* Header */}
-            <div className="px-4 pt-4 pb-3">
+            <div className="sticky top-14 z-20 px-4 pt-4 pb-3 bg-background/95 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={handleNewChat}
@@ -521,23 +729,25 @@ export default function MyStoryPageContent({
               </div>
               <div className="flex items-center justify-between">
                 <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <span className="text-xl">{TORI_AVATAR}</span> 토리와 이야기 만들기
+                  <span className="text-xl">{TORI_AVATAR}</span> 이야기 램프 토리
                 </h1>
                 <div className="flex items-center gap-1.5 text-xs text-muted bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
                   <span>💬</span>
                   <span className="font-semibold text-amber-700">{studentTurnCount}</span>
-                  {!validated && studentTurnCount < FIRST_VALIDATE_AT && (
-                    <span className="text-amber-500">/ {FIRST_VALIDATE_AT}회</span>
+                  {!validated && studentTurnCount < firstValidateAt && (
+                    <span className="text-amber-500">/ {firstValidateAt}회</span>
                   )}
                   {validated && <span className="text-emerald-600">완료!</span>}
                 </div>
               </div>
+              <p className="text-xs text-gray-400 mt-0.5 ml-8">
+                토리에게 이야기를 들려주세요. 상상력을 발휘한 이야기가 많을수록 더 좋은 결과물을 만들어낸답니다.
+              </p>
+              <div className="mt-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
             </div>
 
-            <div className="mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-
             {/* Chat messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
               {messages.map((msg, i) => {
                 if (msg.role === 'system') {
                   return (
@@ -567,7 +777,7 @@ export default function MyStoryPageContent({
                         {TORI_AVATAR}
                       </div>
                       <div className="max-w-[78%]">
-                        <p className="text-[10px] font-bold text-amber-600 mb-1 ml-1">토리</p>
+                        <p className="text-[10px] font-bold text-amber-600 mb-1 ml-1">이야기 램프 토리</p>
                         <div className="bg-white border border-amber-100 rounded-2xl rounded-tl-md px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm">
                           <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                         </div>
@@ -635,6 +845,32 @@ export default function MyStoryPageContent({
               </div>
             )}
 
+            {validationNotice && (
+              <div className={`mx-4 mb-3 rounded-2xl border px-4 py-3 shadow-sm ${
+                validationNotice.status === 'success'
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-amber-200 bg-amber-50'
+              }`}>
+                <p className={`text-sm font-bold ${
+                  validationNotice.status === 'success' ? 'text-emerald-700' : 'text-amber-700'
+                }`}>
+                  {validationNotice.title}
+                </p>
+                <div className="mt-2 space-y-1">
+                  {validationNotice.lines.map((line, index) => (
+                    <p key={`${line}-${index}`} className="text-sm leading-relaxed text-foreground/85">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+                {validationNotice.retryPrompt && (
+                  <p className="mt-2 text-sm font-medium text-amber-700">
+                    {validationNotice.retryPrompt}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Bottom area */}
             <div className="border-t border-amber-100 bg-gradient-to-t from-amber-50/50 to-white">
               {validated ? (
@@ -646,10 +882,15 @@ export default function MyStoryPageContent({
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={handleSubmit}
-                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl text-base font-bold shadow-lg shadow-amber-500/20 hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                    onClick={() => void handleValidatedAction()}
+                    className={`w-full py-3.5 rounded-2xl text-base font-bold transition-all flex items-center justify-center gap-2 ${
+                      hasExistingDraft
+                        ? 'bg-gray-200 text-gray-700 shadow-sm hover:bg-gray-300'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/20 hover:shadow-xl'
+                    }`}
                   >
-                    <span>✨</span> 이야기 만들러 가기
+                    <span>{hasExistingDraft ? '📖' : '✨'}</span>
+                    {hasExistingDraft ? '이미 만든 이야기 보러 가기' : '이야기 만들러 가기'}
                   </motion.button>
                 </motion.div>
               ) : (
@@ -657,7 +898,7 @@ export default function MyStoryPageContent({
                   <ChatInput
                     onSend={handleSend}
                     disabled={responding || validating}
-                    placeholder="토리에게 이야기를 설명해 보세요..."
+                    placeholder="이야기 램프 토리에게 이야기를 들려주세요..."
                   />
                 </div>
               )}
@@ -669,16 +910,17 @@ export default function MyStoryPageContent({
                     dbConnected === null ? 'bg-gray-300' : dbConnected ? 'bg-emerald-400' : 'bg-red-400'
                   }`} />
                   {dbConnected === null
-                    ? '토리와 연결 확인 중...'
+                    ? '이야기 램프 토리와 연결 확인 중...'
                     : dbConnected
-                      ? '토리와 연결되었습니다'
-                      : '토리와 연결이 끊겼습니다'}
+                      ? '이야기 램프 토리와 연결되었습니다'
+                      : '이야기 램프 토리와 연결이 끊겼습니다'}
                 </span>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </main>
+      </main>
+    </>
   );
 }

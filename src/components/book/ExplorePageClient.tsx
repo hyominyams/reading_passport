@@ -217,7 +217,7 @@ export default function ExplorePageClient({
           onClick={() => router.back()}
           className="text-sm text-muted hover:text-foreground transition-colors"
         >
-          &larr; 돌아가기
+          돌아가기
         </button>
       </div>
 
@@ -320,29 +320,38 @@ export default function ExplorePageClient({
         </>
       )}
 
-      {/* Stamp animation */}
+      {/* Stamp animation — passport style */}
       <AnimatePresence>
         {showStampAnimation && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 pointer-events-none"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 pointer-events-none"
           >
             <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
+              initial={{ scale: 4, opacity: 0, rotate: -25 }}
+              animate={{ scale: 1, opacity: 1, rotate: -14 }}
               exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: 'spring', damping: 12, stiffness: 200 }}
-              className="bg-white rounded-3xl p-8 shadow-2xl text-center"
+              transition={{ type: 'spring', stiffness: 250, damping: 18 }}
+              className="flex flex-col items-center gap-5"
             >
-              <div className="text-6xl mb-4">🔍</div>
-              <h2 className="text-xl font-bold text-foreground mb-2">
-                탐험 스탬프 획득!
-              </h2>
-              <p className="text-sm text-muted">
-                숨겨진 이야기를 모두 탐험했어요
-              </p>
+              <div className="w-32 h-32 rounded-full border-[4px] border-red-700/80 bg-white/95 flex items-center justify-center relative shadow-xl">
+                <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700/50" />
+                <div className="flex flex-col items-center z-10">
+                  <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">★ WORLD DOCENT ★</span>
+                  <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">SUCCESS</span>
+                  <span className="text-red-700/70 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">APPROVED</span>
+                </div>
+              </div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="text-center rotate-[14deg]"
+              >
+                <p className="text-2xl font-bold text-white mb-1">스탬프 획득!</p>
+                <p className="text-base text-red-300 font-medium">탐험</p>
+              </motion.div>
             </motion.div>
           </motion.div>
         )}

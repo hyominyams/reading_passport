@@ -6,8 +6,13 @@
 - **스택**: Next.js (App Router) + Supabase + Vercel + Tailwind + Framer Motion
 - **AI**: GPT-5-mini (텍스트), Nanobanana2 (이미지, cref 지원)
 - **역할**: 관리자 / 교사(이메일 가입) / 학생(6자리 코드 로그인)
-- **핵심 흐름**: 로그인 → 국가/책 선택 → 언어 선택(한/영) → 3분할 활동(Read, Hidden, Chat) → My Story 창작 → 서재 등록
-- **도장 시스템**: 책 1권당 4개 (Read/Hidden/Chat/MyStory), 4개 완성 시 여권 페이지 완성
+- **핵심 흐름**: 로그인 → 국가/책 선택 → 언어 선택(한/영) → 4단계 활동(Story Read → Hidden Stories → Expanding World → My World) → 서재 등록
+- **4단계 도장 시스템**:
+  - STEP 1 Story Read (인지·사회정서) → 도장 1
+  - STEP 2 Hidden Stories (인지·사회정서) → 도장 2
+  - STEP 3 Expanding World (인지) → 도장 3
+  - STEP 4 My World (행동) → 도장 4
+  - 4개 도장 획득 → 해당 국가 여권 페이지 완성 → 서재 자동 등록
 
 ## DB 핵심 테이블
 
@@ -19,10 +24,10 @@ users, classes, books, hidden_content, activities, chat_logs, stories, library, 
 /login
 /map                          — 국가/책 선택
 /book/[id]                    — 책 표지 & 소개
-/book/[id]/activity           — 3분할 카드 선택
+/book/[id]/activity           — 4단계 활동 카드 선택
 /book/[id]/read               — Story Read (PDF 뷰어)
 /book/[id]/explore            — Hidden Stories (카드 피드)
-/book/[id]/chat               — Talk with Character (AI 챗봇)
+/book/[id]/questions           — Expanding World (질문 만들기)
 /book/[id]/mystory            — 유형 선택 + 게이지 채팅
 /book/[id]/mystory/write      — 좌우 에디터
 /book/[id]/mystory/characters — 캐릭터 디자인
@@ -52,22 +57,23 @@ users, classes, books, hidden_content, activities, chat_logs, stories, library, 
 - 국가/책 선택 UI (지도 or 카드 그리드)
 - 언어 선택 모달
 - 책 표지 & 소개 페이지
-- 3분할 카드 선택 (호버 인터랙션, 도장 표시)
-- Story Read: PDF 뷰어 + 감정 스티커 + 한줄 감상 → 도장 1
+- 4단계 활동 카드 선택 (호버 인터랙션, 도장 표시)
+- Story Read (인지·사회정서): PDF 뷰어 + 감정 스티커 + 한줄 감상 → 도장 1
 - activities 테이블 연동
 
-### Stream B: Hidden Stories + Talk with Character
-> 라우트: `/book/[id]/explore`, `/book/[id]/chat`
+### Stream B: Hidden Stories + Expanding World
+> 라우트: `/book/[id]/explore`, `/book/[id]/questions`
 
-- Hidden Stories: 콘텐츠 카드 피드 (YouTube/PDF/이미지/링크) → 도장 2
-- Talk with Character: 등장인물 선택 → AI 1인칭 챗봇 + 사이드바 → 도장 3
-- 책 등록 시 등장인물 자동 스캔 (GPT-5-mini)
+- Hidden Stories (인지·사회정서): 콘텐츠 카드 피드 (YouTube/PDF/이미지/링크) → 도장 2
+- Expanding World (인지): 책에 대한 질문 만들기 → 세계 확장 + 사고 심화 → 도장 3
+- 책 등록 시 등장인물 자동 스캔 (GPT-5-nano)
 - 부적절 내용 플래그 스크리닝
-- chat_logs, hidden_content 테이블 연동
+- hidden_content 테이블 연동
 
-### Stream C: My Story 창작 파이프라인
+### Stream C: My World 창작 파이프라인
 > 라우트: `/book/[id]/mystory`, `/mystory/write`, `/mystory/characters`, `/mystory/scenes`, `/mystory/finish`, `/library`
 
+- My World (행동): 나만의 이야기 창작 + 그림책 완성 → 도장 4
 - 이야기 유형 선택 (5가지)
 - 게이지 채팅 (클라이언트 사이드 게이지 계산 + AI 대화)
 - 소형모델 최종 검증
@@ -75,7 +81,7 @@ users, classes, books, hidden_content, activities, chat_logs, stories, library, 
 - 좌우 에디터 (AI 초안 vs 학생 작성)
 - 캐릭터 디자인 (외모 입력 → enhancer → Nanobanana2)
 - 장면별 이미지 생성 (cref 자동 감지)
-- 완성: 번역 + PDF + 서재 등록 + 도장 4
+- 완성: 번역 + PDF + 서재 등록
 - stories, library 테이블 연동
 
 ### Stream D: 관리 시스템
@@ -94,8 +100,8 @@ users, classes, books, hidden_content, activities, chat_logs, stories, library, 
 ```
 Phase 0 (Foundation)
     ├── Stream A (책 열람) ─────────────────────┐
-    ├── Stream B (Hidden + Chat) ───────────────┤ 공유: books 테이블, activities 테이블
-    ├── Stream C (My Story) ────────────────────┤ C는 B의 Hidden Stories 요약 참조 (약한 의존)
+    ├── Stream B (Hidden + Expanding) ────────────┤ 공유: books 테이블, activities 테이블
+    ├── Stream C (My World) ────────────────────┤ C는 B의 Hidden Stories 요약 참조 (약한 의존)
     └── Stream D (관리) ────────────────────────┘ D는 A/B/C의 데이터 읽기만 함
 ```
 
