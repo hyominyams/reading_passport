@@ -5,8 +5,18 @@ import { updateSession } from '@/lib/supabase/middleware';
 const protectedRoutes = ['/map', '/book', '/library', '/teacher', '/admin', '/onboarding', '/passport', '/mypage'];
 const teacherRoutes = ['/teacher'];
 const adminRoutes = ['/admin'];
+const studentOnlyRoutes = ['/passport'];
 
-export async function middleware(request: NextRequest) {
+function getBookPreviewRedirect(pathname: string) {
+  const match = pathname.match(/^\/book\/([^/]+)\//);
+  if (!match) {
+    return '/map';
+  }
+
+  return `/book/${match[1]}`;
+}
+
+export async function proxy(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request);
   const pathname = request.nextUrl.pathname;
 
@@ -34,8 +44,12 @@ export async function middleware(request: NextRequest) {
   const isAdminRoute = adminRoutes.some((route) =>
     pathname.startsWith(route)
   );
+  const isStudentOnlyRoute = studentOnlyRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
+  const isStudentOnlyBookRoute = /^\/book\/[^/]+\/(activity|read|explore|questions|mystory)(\/.*)?$/.test(pathname);
 
-  if (isTeacherRoute || isAdminRoute) {
+  if (isTeacherRoute || isAdminRoute || isStudentOnlyRoute || isStudentOnlyBookRoute) {
     const serviceClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -52,9 +66,16 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (isTeacherRoute && profile?.role !== 'teacher' && profile?.role !== 'admin') {
+    if (isTeacherRoute && profile?.role !== 'teacher') {
       const url = request.nextUrl.clone();
       url.pathname = '/map';
+      return NextResponse.redirect(url);
+    }
+
+    if ((isStudentOnlyRoute || isStudentOnlyBookRoute) && profile?.role !== 'student') {
+      const url = request.nextUrl.clone();
+      url.pathname = isStudentOnlyBookRoute ? getBookPreviewRedirect(pathname) : '/map';
+      url.search = '';
       return NextResponse.redirect(url);
     }
   }

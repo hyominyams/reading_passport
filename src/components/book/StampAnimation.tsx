@@ -28,7 +28,7 @@ export default function StampAnimation({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
         >
           {/* Ink splatter particles */}
           {[...Array(10)].map((_, i) => (
@@ -42,7 +42,7 @@ export default function StampAnimation({
                 y: Math.sin((i * 36 * Math.PI) / 180) * 100,
               }}
               transition={{ duration: 0.8, delay: 0.15 }}
-              className="absolute w-2 h-2 rounded-full bg-red-700/50"
+              className="absolute w-2 h-2 rounded-full bg-red-700"
             />
           ))}
 
@@ -67,19 +67,19 @@ export default function StampAnimation({
                 ],
               }}
               transition={{ duration: 1, repeat: 2 }}
-              className="w-32 h-32 rounded-full border-[4px] border-red-700/80 bg-white/95 flex items-center justify-center relative shadow-xl"
+              className="w-32 h-32 rounded-full border-[4px] border-red-700 bg-white flex items-center justify-center relative shadow-xl"
             >
               {/* Inner ring */}
-              <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700/50" />
+              <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700" />
               {/* Stamp text */}
               <div className="flex flex-col items-center z-10">
-                <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">
-                  ★ WORLD DOCENT ★
+                <span className="text-red-700 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">
+                  ★ WORLD STORY ★
                 </span>
                 <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">
                   SUCCESS
                 </span>
-                <span className="text-red-700/70 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">
+                <span className="text-red-700 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">
                   APPROVED
                 </span>
               </div>

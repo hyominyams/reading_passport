@@ -29,8 +29,6 @@ export default function ActivityCard({
   onHoverEnd,
   index,
 }: ActivityCardProps) {
-  const completedAndResting = isCompleted && !isHovered && !isLocked;
-
   return (
     <motion.button
       onClick={() => { if (!isLocked) onClick(); }}
@@ -49,13 +47,12 @@ export default function ActivityCard({
           ? 'border-border bg-slate-100 opacity-50 grayscale cursor-not-allowed'
           : isCompleted
             ? isHovered
-              ? 'border-red-700/40 bg-red-50/50 shadow-lg'
-              : 'border-slate-200 bg-slate-50'
+              ? 'border-red-200 bg-red-50/60 shadow-lg'
+              : 'border-green-200 bg-green-50/40 shadow-sm'
             : isHovered
               ? 'border-primary bg-primary/5 shadow-lg'
               : 'border-primary/30 bg-white shadow-sm'
         }
-        ${completedAndResting ? 'grayscale opacity-75' : ''}
         ${isLocked ? 'text-slate-400' : 'text-foreground'}
       `}
     >
@@ -68,22 +65,17 @@ export default function ActivityCard({
         </div>
       )}
 
-      {/* Completed stamp overlay — passport style */}
+      {/* Completed stamp — top-right corner, passport style */}
       {isCompleted && !isLocked && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="rotate-[-14deg] w-[76px] h-[76px] rounded-full border-[3px] border-red-700/60 flex items-center justify-center relative">
-            {/* Inner ring */}
-            <div className="absolute inset-[4px] rounded-full border-[1.5px] border-red-700/40" />
-            {/* Stamp content */}
-            <div className="flex flex-col items-center gap-0 z-10">
-              <span className="text-red-700/70 text-[7px] font-bold tracking-[0.15em] uppercase leading-none">
-                ★ WORLD DOCENT ★
+        <div className="absolute -top-3 -right-3 pointer-events-none z-10">
+          <div className="rotate-[12deg] w-14 h-14 rounded-full border-[3px] border-red-600 bg-white flex items-center justify-center shadow-md">
+            <div className="absolute inset-[3px] rounded-full border-[1.5px] border-red-600" />
+            <div className="flex flex-col items-center z-10">
+              <span className="text-red-600 text-[5px] font-bold tracking-[0.1em] uppercase leading-none">
+                WORLD STORY
               </span>
-              <span className="text-red-700/70 text-[17px] font-black tracking-[0.08em] uppercase leading-tight mt-0.5">
-                SUCCESS
-              </span>
-              <span className="text-red-700/70 text-[6px] font-semibold tracking-[0.2em] uppercase leading-none mt-px">
-                APPROVED
+              <span className="text-red-600 text-[11px] font-black uppercase leading-tight">
+                CLEAR
               </span>
             </div>
           </div>
@@ -105,14 +97,16 @@ export default function ActivityCard({
           ${isLocked
             ? 'bg-slate-200 text-slate-400'
             : isCompleted
-              ? isHovered
-                ? 'bg-red-100 text-red-700'
-                : 'bg-slate-200 text-slate-500'
+              ? 'bg-green-100 text-green-700'
               : 'bg-primary/10 text-primary'
           }
         `}
       >
-        {isLocked ? '도장 1~3을 먼저 완료하세요' : stampLabel}
+        {isLocked
+          ? 'Step 1~3을 먼저 완료하세요'
+          : isCompleted
+            ? `${stampLabel} ✓`
+            : stampLabel}
       </span>
     </motion.button>
   );

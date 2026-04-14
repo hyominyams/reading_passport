@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import type { CampaignContentType } from '@/types/database';
+import type { CampaignContentType, ContentScope } from '@/types/database';
 
 const contentTypeOptions: { key: CampaignContentType; label: string }[] = [
   { key: 'poster', label: '포스터' },
@@ -27,6 +27,7 @@ export default function CampaignCreateForm() {
   const [deadline, setDeadline] = useState('');
   const [maxFiles, setMaxFiles] = useState(3);
   const [maxSizeMb, setMaxSizeMb] = useState(5);
+  const [scope, setScope] = useState<ContentScope>('class');
 
   const toggleType = (key: CampaignContentType) => {
     setSelectedTypes((prev) =>
@@ -66,6 +67,7 @@ export default function CampaignCreateForm() {
             deadline: deadline || null,
             max_files_per_submission: maxFiles,
             max_file_size_mb: maxSizeMb,
+            scope,
             status,
           }),
         });
@@ -144,6 +146,36 @@ export default function CampaignCreateForm() {
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 resize-none"
               disabled={isPending}
             />
+          </div>
+
+          {/* Scope */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              공개 범위
+            </label>
+            <div className="flex gap-2">
+              {([
+                { key: 'class' as ContentScope, label: '학급', desc: '우리 반 학생만 참여할 수 있어요' },
+                { key: 'global' as ContentScope, label: '전체', desc: '모든 학생이 참여할 수 있어요' },
+              ]).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setScope(opt.key)}
+                  disabled={isPending}
+                  className={`flex-1 rounded-xl border-2 px-4 py-3 text-left transition ${
+                    scope === opt.key
+                      ? 'border-slate-900 bg-slate-50'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <p className={`text-sm font-medium ${scope === opt.key ? 'text-slate-900' : 'text-slate-500'}`}>
+                    {opt.label}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Content types */}

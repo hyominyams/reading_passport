@@ -5,8 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import type { Story, AiDraftPage } from '@/types/database';
 import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import type { Story, AiDraftPage } from '@/types/database';
 
 interface PageData {
   draft: string;
@@ -66,6 +66,11 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
         if (data) {
           const s = data as Story;
           setStory(s);
+
+          if (s.story_status === 'archived') {
+            router.replace(`/book/${bookId}/mystory?lang=${s.language}`);
+            return;
+          }
 
           if (s.current_step < 3) {
             router.replace(`/book/${bookId}/mystory?storyId=${storyId}&lang=${s.language}`);

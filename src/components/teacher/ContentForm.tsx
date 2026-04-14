@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import type { HiddenContent, ContentType } from '@/types/database';
+import { FileText } from 'lucide-react';
+import type { Class, HiddenContent, ContentType } from '@/types/database';
 
 interface ContentFormProps {
   bookId: string;
   countryId: string;
+  classes?: Class[];
   existingContent?: HiddenContent | null;
   onClose: () => void;
   onSave: () => void;
@@ -14,6 +16,7 @@ interface ContentFormProps {
 export default function ContentForm({
   bookId,
   countryId,
+  classes = [],
   existingContent,
   onClose,
   onSave,
@@ -24,7 +27,10 @@ export default function ContentForm({
   const [type, setType] = useState<ContentType>(existingContent?.type ?? 'video');
   const [url, setUrl] = useState(existingContent?.url ?? '');
   const [scope, setScope] = useState<'class' | 'global'>(existingContent?.scope ?? 'class');
+  const [className, setClassName] = useState(classes[0]?.class_name ?? '기본반');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
   const [error, setError] = useState('');
 
   const typeOptions: { value: ContentType; label: string }[] = [
@@ -33,6 +39,36 @@ export default function ContentForm({
     { value: 'image', label: '\uC774\uBBF8\uC9C0' },
     { value: 'link', label: '\uC678\uBD80\uB9C1\uD06C' },
   ];
+
+  const allowFileUpload = type === 'pdf' || type === 'image';
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('kind', 'hidden-content');
+      formData.append('file', file);
+
+      const res = await fetch('/api/teacher/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '파일 업로드에 실패했습니다');
+      }
+
+      setUrl(data.asset.publicUrl);
+      setUploadedFileName(file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '파일 업로드에 실패했습니다');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,15 +101,16 @@ export default function ContentForm({
         const res = await fetch('/api/teacher/content', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bookId,
-            countryId,
-            type,
-            title: title.trim(),
-            url: url.trim(),
-            scope,
-          }),
-        });
+              body: JSON.stringify({
+                bookId,
+                countryId,
+                type,
+                title: title.trim(),
+                url: url.trim(),
+                scope,
+                className,
+              }),
+            });
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || '등록에 실패했습니다');
@@ -146,13 +183,53 @@ export default function ContentForm({
             <label className="block text-sm font-medium text-muted mb-1">
               URL
             </label>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-            />
+            {uploadedFileName ? (
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span className="truncate text-sm font-medium text-emerald-800">{uploadedFileName}</span>
+                <button
+                  type="button"
+                  onClick={() => { setUrl(''); setUploadedFileName(''); }}
+                  className="ml-auto shrink-0 text-xs text-slate-400 hover:text-slate-600"
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder={allowFileUpload ? '파일 업로드 후 자동 입력되거나 외부 URL을 직접 넣을 수 있어요' : 'https://...'}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              />
+            )}
+            {allowFileUpload && (
+              <div className="mt-3 rounded-xl border border-dashed border-border bg-muted-light/40 p-3">
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
+                  <span className="text-muted">
+                    PDF나 이미지 파일을 직접 업로드할 수 있습니다.
+                  </span>
+                  <span className="rounded-lg bg-white px-3 py-2 text-xs font-medium text-foreground shadow-sm">
+                    파일 선택
+                  </span>
+                  <input
+                    type="file"
+                    accept={type === 'pdf' ? 'application/pdf' : 'image/*'}
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        void handleFileUpload(file);
+                      }
+                    }}
+                  />
+                </label>
+                {uploading && (
+                  <p className="mt-2 text-xs text-muted">파일을 업로드하는 중...</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Scope (only for new content) */}
@@ -193,6 +270,29 @@ export default function ContentForm({
             </div>
           )}
 
+          {!isEdit && scope === 'class' && (
+            <div>
+              <label className="block text-sm font-medium text-muted mb-1">
+                배정 반
+              </label>
+              <select
+                value={className}
+                onChange={(event) => setClassName(event.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              >
+                {classes.length === 0 ? (
+                  <option value="기본반">기본반</option>
+                ) : (
+                  classes.map((item) => (
+                    <option key={item.id} value={item.class_name}>
+                      {item.grade}학년 {item.class_name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
+
           {error && (
             <p className="text-sm text-error">{error}</p>
           )}
@@ -208,10 +308,10 @@ export default function ContentForm({
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || uploading}
               className="flex-1 px-4 py-2.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
             >
-              {saving ? '저장 중...' : isEdit ? '수정' : '등록'}
+              {saving ? '저장 중...' : uploading ? '업로드 중...' : isEdit ? '수정' : '등록'}
             </button>
           </div>
         </form>

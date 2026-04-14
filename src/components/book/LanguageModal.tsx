@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Book, Language } from '@/types/database';
+import { getLanguageMeta } from '@/types/database';
 
 interface LanguageModalProps {
   book: Book | null;
@@ -17,6 +18,8 @@ export default function LanguageModal({
   onSelect,
 }: LanguageModalProps) {
   if (!book) return null;
+
+  const languages = book.languages_available ?? [];
 
   return (
     <AnimatePresence>
@@ -49,30 +52,22 @@ export default function LanguageModal({
 
               {/* Language buttons */}
               <div className="flex flex-col gap-3">
-                {book.languages_available.includes('ko') && (
-                  <button
-                    onClick={() => onSelect(book.id, 'ko')}
-                    className="flex items-center justify-center gap-3 w-full py-3.5 px-6
-                               rounded-xl border border-border bg-white
-                               hover:border-foreground/20 hover:bg-background
-                               transition-all text-sm font-medium"
-                  >
-                    <span className="text-xl">🇰🇷</span>
-                    <span>한국어</span>
-                  </button>
-                )}
-                {book.languages_available.includes('en') && (
-                  <button
-                    onClick={() => onSelect(book.id, 'en')}
-                    className="flex items-center justify-center gap-3 w-full py-3.5 px-6
-                               rounded-xl border border-border bg-white
-                               hover:border-foreground/20 hover:bg-background
-                               transition-all text-sm font-medium"
-                  >
-                    <span className="text-xl">🇺🇸</span>
-                    <span>English</span>
-                  </button>
-                )}
+                {languages.map((langCode) => {
+                  const meta = getLanguageMeta(langCode);
+                  return (
+                    <button
+                      key={langCode}
+                      onClick={() => onSelect(book.id, langCode)}
+                      className="flex items-center justify-center gap-3 w-full py-3.5 px-6
+                                 rounded-xl border border-border bg-white
+                                 hover:border-foreground/20 hover:bg-background
+                                 transition-all text-sm font-medium"
+                    >
+                      <span className="text-xl">{meta.flag}</span>
+                      <span>{meta.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Close */}

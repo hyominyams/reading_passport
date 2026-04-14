@@ -24,7 +24,7 @@ const allNavItems = [
   { href: '/library', icon: BookOpen, label: '도서관' },
   { href: '/campaign', icon: Megaphone, label: '캠페인' },
   { href: '/passport', icon: IdCard, label: '여권', roles: ['student'] as string[] },
-  { href: '/teacher', icon: GraduationCap, label: '교사 관리', roles: ['teacher', 'admin'] as string[] },
+  { href: '/teacher', icon: GraduationCap, label: '교사 관리', roles: ['teacher'] as string[] },
   { href: '/admin', icon: Settings, label: '관리자', roles: ['admin'] as string[] },
   { href: '/mypage', icon: User, label: '마이페이지' },
 ];

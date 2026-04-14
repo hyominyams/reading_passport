@@ -3,17 +3,20 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import BookViewerModal from '@/components/story/BookViewerModal';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
+import { normalizeTranslatedTextsMap } from '@/lib/story-translations';
 import {
   avatarOptions,
   buildAutoNickname,
   getAvatarEmoji,
   getRoleLabel,
 } from '@/lib/profile';
-import type { StampType, User } from '@/types/database';
+import type { CoverDesign, StampType, User, Visibility } from '@/types/database';
 
 const requiredStamps: StampType[] = ['read', 'hidden', 'questions', 'mystory'];
 
@@ -24,6 +27,20 @@ type StudentActivityRow = {
 };
 
 type TeacherStudentRow = Pick<User, 'id' | 'nickname' | 'student_code' | 'created_at'>;
+
+type MyStoryRow = {
+  id: string;
+  book_id: string;
+  cover_image_url: string | null;
+  cover_design: CoverDesign | null;
+  scene_images: string[] | null;
+  final_text: string[] | null;
+  translation_text: string[] | null;
+  translated_texts: Record<string, string[]> | null;
+  visibility: Visibility;
+  created_at: string;
+  language: string;
+};
 
 type StudentStats = {
   booksStarted: number;
@@ -54,6 +71,27 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString('ko-KR');
 }
 
+const studentStatMeta = [
+  { key: 'booksStarted', label: '시작한 책', suffix: '권', icon: '📖', gradient: 'from-blue-500/10 to-indigo-500/10', border: 'border-blue-200/60' },
+  { key: 'completedBooks', label: '완성한 여권', suffix: '개', icon: '🛂', gradient: 'from-emerald-500/10 to-teal-500/10', border: 'border-emerald-200/60' },
+  { key: 'totalStamps', label: '획득한 도장', suffix: '개', icon: '🏅', gradient: 'from-amber-500/10 to-orange-500/10', border: 'border-amber-200/60' },
+  { key: 'storyCount', label: '완성한 이야기', suffix: '편', icon: '✍️', gradient: 'from-purple-500/10 to-pink-500/10', border: 'border-purple-200/60' },
+] as const;
+
+const teacherStatMeta = [
+  { key: 'studentCount', label: '담당 학생', suffix: '명', icon: '👥', gradient: 'from-blue-500/10 to-indigo-500/10', border: 'border-blue-200/60' },
+  { key: 'activeStudentCount', label: '활동 시작 학생', suffix: '명', icon: '🎯', gradient: 'from-emerald-500/10 to-teal-500/10', border: 'border-emerald-200/60' },
+  { key: 'storyCount', label: '완성된 작품', suffix: '편', icon: '📚', gradient: 'from-amber-500/10 to-orange-500/10', border: 'border-amber-200/60' },
+  { key: 'flaggedChatCount', label: '검토 필요 대화', suffix: '건', icon: '🔍', gradient: 'from-rose-500/10 to-red-500/10', border: 'border-rose-200/60' },
+] as const;
+
+const studentQuickLinks = [
+  { href: '/map', label: '책 고르기', icon: '🗺️' },
+  { href: '/passport', label: '여권 보기', icon: '🛂' },
+  { href: '/library', label: '서재 보기', icon: '📚' },
+  { href: '/campaign', label: '캠페인', icon: '🏆' },
+];
+
 export default function MyPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
@@ -64,6 +102,9 @@ export default function MyPage() {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [myStories, setMyStories] = useState<MyStoryRow[]>([]);
+  const [selectedMyStory, setSelectedMyStory] = useState<MyStoryRow | null>(null);
+  const [storyViewerSession, setStoryViewerSession] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
@@ -95,7 +136,7 @@ export default function MyPage() {
 
       try {
         if (profile.role === 'student') {
-          const [activitiesResult, storiesResult] = await Promise.all([
+          const [activitiesResult, storiesCountResult, storiesListResult] = await Promise.all([
             supabase
               .from('activities')
               .select('created_at, stamps_earned, book:book_id(title)')
@@ -106,6 +147,12 @@ export default function MyPage() {
               .select('id', { count: 'exact', head: true })
               .eq('student_id', user.id)
               .not('final_text', 'is', null),
+            supabase
+              .from('stories')
+              .select('id, book_id, cover_image_url, cover_design, scene_images, final_text, translation_text, translated_texts, visibility, created_at, language')
+              .eq('student_id', user.id)
+              .not('final_text', 'is', null)
+              .order('created_at', { ascending: false }),
           ]);
 
           if (cancelled) {
@@ -121,13 +168,15 @@ export default function MyPage() {
             requiredStamps.every((stamp) => (activity.stamps_earned ?? []).includes(stamp))
           ).length;
 
+          setMyStories((storiesListResult.data ?? []) as MyStoryRow[]);
+
           setStats({
             kind: 'student',
             value: {
               booksStarted: activities.length,
               completedBooks,
               totalStamps,
-              storyCount: storiesResult.count ?? 0,
+              storyCount: storiesCountResult.count ?? 0,
               latestBookTitle: latestActivity?.book?.[0]?.title ?? null,
               latestActivityAt: latestActivity?.created_at ?? null,
             },
@@ -237,43 +286,16 @@ export default function MyPage() {
     }
 
     if (profile.role === 'student') {
-      return [
-        { href: '/map', label: '책 고르기' },
-        { href: '/passport', label: '여권 보기' },
-        { href: '/library', label: '서재 보기' },
-        { href: '/campaign', label: '캠페인 보기' },
-      ];
+      return studentQuickLinks;
     }
 
     return [
-      { href: '/teacher', label: '교사 대시보드' },
-      { href: '/library', label: '학생 작품 보기' },
-      { href: '/campaign', label: '캠페인 보기' },
-      ...(profile.role === 'admin' ? [{ href: '/admin', label: '관리자 페이지' }] : []),
+      ...(profile.role === 'teacher' ? [{ href: '/teacher', label: '교사 대시보드', icon: '📊' }] : []),
+      { href: '/library', label: '학생 작품 보기', icon: '📚' },
+      { href: '/campaign', label: '캠페인', icon: '🏆' },
+      ...(profile.role === 'admin' ? [{ href: '/admin', label: '관리자', icon: '⚙️' }] : []),
     ];
   }, [profile]);
-
-  const statCards = useMemo(() => {
-    if (!stats) {
-      return [];
-    }
-
-    if (stats.kind === 'student') {
-      return [
-        { label: '시작한 책', value: `${stats.value.booksStarted}권` },
-        { label: '완성한 여권', value: `${stats.value.completedBooks}개` },
-        { label: '획득한 도장', value: `${stats.value.totalStamps}개` },
-        { label: '완성한 이야기', value: `${stats.value.storyCount}편` },
-      ];
-    }
-
-    return [
-      { label: '담당 학생', value: `${stats.value.studentCount}명` },
-      { label: '활동 시작 학생', value: `${stats.value.activeStudentCount}명` },
-      { label: '완성된 작품', value: `${stats.value.storyCount}편` },
-      { label: '검토 필요 대화', value: `${stats.value.flaggedChatCount}건` },
-    ];
-  }, [stats]);
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -341,7 +363,11 @@ export default function MyPage() {
     }
   };
 
-  // Still loading auth state
+  const handleMyStoryOpen = (story: MyStoryRow) => {
+    setStoryViewerSession((prev) => prev + 1);
+    setSelectedMyStory(story);
+  };
+
   if (authLoading) {
     return (
       <>
@@ -353,13 +379,11 @@ export default function MyPage() {
     );
   }
 
-  // Not authenticated — redirect to login
   if (!user) {
     router.replace('/login');
     return null;
   }
 
-  // Authenticated but profile not loaded — show error with retry
   if (!profile || !profilePreview) {
     return (
       <>
@@ -388,319 +412,500 @@ export default function MyPage() {
   return (
     <>
       <Header />
-      <main className="flex-1 bg-muted-light/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-            <section className="space-y-6">
-              <div className="rounded-3xl border border-border bg-white p-6 shadow-sm">
-                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-foreground/[0.06] text-3xl">
-                      {avatarEmoji ?? displayName.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-foreground text-xs font-medium text-white px-3 py-1">
-                          {roleLabel}
+      <main className="flex-1 bg-muted-light/40 pb-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+          {/* ── Hero profile card ── */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-50 via-white to-blue-50 border border-border/60 shadow-sm"
+          >
+            <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-secondary/[0.06]" />
+            <div className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-accent/[0.06]" />
+
+            <div className="relative z-10 p-6 sm:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-5">
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
+                    className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-3xl bg-white shadow-lg text-4xl sm:text-5xl border border-border/40"
+                  >
+                    {avatarEmoji ?? displayName.charAt(0)}
+                  </motion.div>
+                  <div className="min-w-0">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-foreground text-[11px] font-semibold text-white px-3 py-1 tracking-wide uppercase">
+                        {roleLabel}
+                      </span>
+                      {profile.role === 'student' && profile.student_code && (
+                        <span className="inline-flex items-center rounded-full bg-secondary/10 text-[11px] font-medium text-secondary px-3 py-1">
+                          CODE {profile.student_code}
                         </span>
-                        {profile.role === 'student' && profile.student_code && (
-                          <span className="rounded-full bg-muted-light text-xs font-medium text-foreground px-3 py-1">
-                            학생 코드 {profile.student_code}
-                          </span>
-                        )}
-                      </div>
-                      <h1 className="text-2xl font-heading font-bold text-foreground">
-                        {displayName}
-                      </h1>
-                      <p className="mt-1 text-sm text-muted">
-                        {profile.email ?? '이메일 정보 없음'}
-                      </p>
-                      <div className="mt-4 grid gap-2 text-sm text-muted sm:grid-cols-2">
-                        <div>가입일 {formatDate(profile.created_at)}</div>
-                        <div>
-                          {profile.role === 'student'
-                            ? `학급 ${profile.class ?? '미설정'}`
-                            : `학교 ${profile.school ?? '미설정'}`}
-                        </div>
-                        {profile.role !== 'student' && (
-                          <div>
-                            반 정보 {profile.grade ? `${profile.grade}학년` : '-'} {profile.class ?? ''}
-                          </div>
-                        )}
-                      </div>
+                      )}
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground truncate">
+                      {displayName}
+                    </h1>
+                    <p className="mt-0.5 text-sm text-muted truncate">
+                      {profile.email ?? '이메일 정보 없음'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                      <span>가입일 {formatDate(profile.created_at)}</span>
+                      <span className="hidden sm:inline text-border">|</span>
+                      <span>
+                        {profile.role === 'student'
+                          ? `학급 ${profile.class ?? '미설정'}`
+                          : `${profile.school ?? '학교 미설정'} · ${profile.grade ? `${profile.grade}학년` : ''} ${profile.class ?? ''}`}
+                      </span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {quickLinks.map((link) => (
+                <div className="flex flex-wrap gap-2">
+                  {quickLinks.map((link, i) => (
+                    <motion.div
+                      key={link.href}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25 + i * 0.06 }}
+                    >
                       <Link
-                        key={link.href}
                         href={link.href}
-                        className="inline-flex items-center justify-center rounded-full border border-border bg-white px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted-light"
+                        className="group inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-white/80 backdrop-blur-sm px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:shadow-md hover:bg-white hover:-translate-y-0.5"
                       >
+                        <span className="text-base">{link.icon}</span>
                         {link.label}
                       </Link>
-                    ))}
-                  </div>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
+            </div>
+          </motion.section>
 
-              <div className="rounded-3xl border border-border bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-heading font-semibold text-foreground">
-                      내 활동 요약
-                    </h2>
-                    <p className="mt-1 text-sm text-muted">
-                      지금까지의 학습 현황과 운영 지표를 한눈에 확인하세요.
-                    </p>
-                  </div>
-                </div>
+          {/* ── Stats cards ── */}
+          {!statsLoading && stats && (
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+            >
+              <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
+                {(stats.kind === 'student' ? studentStatMeta : teacherStatMeta).map((meta, i) => {
+                  const value = stats.value[meta.key as keyof typeof stats.value] as number;
+                  return (
+                    <motion.article
+                      key={meta.key}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + i * 0.08 }}
+                      className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br ${meta.gradient} ${meta.border} p-4 sm:p-5`}
+                    >
+                      <div className="pointer-events-none absolute -right-3 -top-3 text-4xl opacity-[0.12]">
+                        {meta.icon}
+                      </div>
+                      <p className="text-xs sm:text-sm font-medium text-muted">{meta.label}</p>
+                      <p className="mt-1.5 text-2xl sm:text-3xl font-heading font-bold text-foreground tabular-nums">
+                        {value}
+                        <span className="ml-0.5 text-sm sm:text-base font-medium text-muted">{meta.suffix}</span>
+                      </p>
+                    </motion.article>
+                  );
+                })}
+              </div>
+            </motion.section>
+          )}
 
-                {statsLoading ? (
-                  <div className="flex min-h-40 items-center justify-center">
-                    <LoadingSpinner message="현황을 불러오는 중..." />
-                  </div>
-                ) : stats ? (
-                  <div className="space-y-5">
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      {statCards.map((card) => (
-                        <article
-                          key={card.label}
-                          className="rounded-2xl border border-border bg-muted-light/50 p-4"
-                        >
-                          <p className="text-sm text-muted">{card.label}</p>
-                          <p className="mt-2 text-2xl font-heading font-semibold text-foreground">
-                            {card.value}
-                          </p>
-                        </article>
-                      ))}
+          {/* ── Recent activity highlights ── */}
+          {!statsLoading && stats && (
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35, duration: 0.5 }}
+              className="rounded-3xl border border-border/60 bg-white p-6 shadow-sm"
+            >
+              {stats.kind === 'student' ? (
+                <>
+                  <h2 className="text-lg font-heading font-semibold text-foreground">최근 학습 기록</h2>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/60 p-5">
+                      <div className="text-[10px] font-bold tracking-[0.16em] uppercase text-muted/70">
+                        Last Book
+                      </div>
+                      <div className="mt-2 text-base font-medium text-foreground">
+                        {stats.value.latestBookTitle ?? '아직 시작한 책이 없습니다'}
+                      </div>
                     </div>
-
-                    {stats.kind === 'student' ? (
-                      <div className="rounded-2xl border border-border bg-white p-5">
-                        <h3 className="text-base font-semibold text-foreground">
-                          최근 학습 기록
-                        </h3>
-                        <div className="mt-4 grid gap-3 text-sm text-muted sm:grid-cols-2">
-                          <div className="rounded-2xl bg-muted-light/60 p-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-muted">
-                              Last Book
-                            </div>
-                            <div className="mt-2 text-base font-medium text-foreground">
-                              {stats.value.latestBookTitle ?? '아직 시작한 책이 없습니다'}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl bg-muted-light/60 p-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-muted">
-                              Last Activity
-                            </div>
-                            <div className="mt-2 text-base font-medium text-foreground">
-                              {formatDate(stats.value.latestActivityAt)}
-                            </div>
-                          </div>
-                        </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100/60 p-5">
+                      <div className="text-[10px] font-bold tracking-[0.16em] uppercase text-muted/70">
+                        Last Activity
                       </div>
+                      <div className="mt-2 text-base font-medium text-foreground">
+                        {formatDate(stats.value.latestActivityAt)}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-lg font-heading font-semibold text-foreground">최근 등록 학생</h2>
+                  <div className="mt-4 space-y-2.5">
+                    {stats.value.recentStudents.length === 0 ? (
+                      <p className="text-sm text-muted py-4">아직 등록된 학생이 없습니다.</p>
                     ) : (
-                      <div className="rounded-2xl border border-border bg-white p-5">
-                        <h3 className="text-base font-semibold text-foreground">
-                          최근 등록 학생
-                        </h3>
-                        <div className="mt-4 space-y-3">
-                          {stats.value.recentStudents.length === 0 ? (
-                            <p className="text-sm text-muted">
-                              아직 등록된 학생이 없습니다.
-                            </p>
-                          ) : (
-                            stats.value.recentStudents.map((student) => (
-                              <div
-                                key={student.id}
-                                className="flex items-center justify-between rounded-2xl bg-muted-light/60 px-4 py-3"
-                              >
-                                <div>
-                                  <div className="font-medium text-foreground">
-                                    {buildAutoNickname({
-                                      id: student.id,
-                                      role: 'student',
-                                      nickname: student.nickname,
-                                      student_code: student.student_code,
-                                    })}
-                                  </div>
-                                  <div className="text-xs text-muted">
-                                    등록일 {formatDate(student.created_at)}
-                                  </div>
-                                </div>
-                                <div className="text-sm font-medium text-muted">
-                                  {student.student_code ?? '코드 없음'}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                      stats.value.recentStudents.map((student, i) => (
+                        <motion.div
+                          key={student.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.4 + i * 0.06 }}
+                          className="flex items-center justify-between rounded-2xl bg-muted-light/50 border border-border/40 px-4 py-3 transition-colors hover:bg-muted-light"
+                        >
+                          <div>
+                            <div className="font-medium text-foreground text-sm">
+                              {buildAutoNickname({
+                                id: student.id,
+                                role: 'student',
+                                nickname: student.nickname,
+                                student_code: student.student_code,
+                              })}
+                            </div>
+                            <div className="text-xs text-muted mt-0.5">
+                              등록일 {formatDate(student.created_at)}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-foreground/[0.06] px-3 py-1 text-xs font-medium text-muted">
+                            {student.student_code ?? '코드 없음'}
+                          </span>
+                        </motion.div>
+                      ))
                     )}
                   </div>
+                </>
+              )}
+            </motion.section>
+          )}
+
+          {statsLoading && (
+            <div className="flex min-h-40 items-center justify-center rounded-3xl border border-border/60 bg-white shadow-sm">
+              <LoadingSpinner message="현황을 불러오는 중..." />
+            </div>
+          )}
+
+          {!statsLoading && !stats && (
+            <div className="rounded-3xl border border-border/60 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl bg-muted-light/60 p-5 text-sm text-muted text-center">
+                현황을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+              </div>
+            </div>
+          )}
+
+          {/* ── Profile settings + Guide ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="grid gap-6 lg:grid-cols-[1fr_1fr]"
+          >
+            <section className="rounded-3xl border border-border/60 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">⚙️</span>
+                <h2 className="text-lg font-heading font-semibold text-foreground">프로필 설정</h2>
+              </div>
+              <p className="text-sm text-muted mb-6">
+                닉네임은 비워두면 기본값으로 자동 저장됩니다.
+              </p>
+
+              <form className="space-y-5" onSubmit={handleSave}>
+                {saveError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl border border-error/20 bg-error/5 px-4 py-3 text-sm text-error"
+                  >
+                    {saveError}
+                  </motion.div>
+                )}
+
+                {saveSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-sm text-accent"
+                  >
+                    {saveSuccess}
+                  </motion.div>
+                )}
+
+                <div>
+                  <label htmlFor="nickname" className="mb-2 block text-sm font-medium text-foreground">
+                    닉네임
+                  </label>
+                  <input
+                    id="nickname"
+                    type="text"
+                    value={nickname}
+                    onChange={(event) => setNickname(event.target.value)}
+                    placeholder={buildAutoNickname(profile)}
+                    maxLength={20}
+                    disabled={saving}
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary/40"
+                  />
+                </div>
+
+                {profile.role === 'student' ? (
+                  <div>
+                    <div className="mb-3 block text-sm font-medium text-foreground">아바타</div>
+                    <div className="grid grid-cols-5 gap-2.5">
+                      {avatarOptions.map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setSelectedAvatar(option.key)}
+                          disabled={saving}
+                          className={`flex h-14 items-center justify-center rounded-xl border-2 text-2xl transition-all hover:scale-105 ${
+                            selectedAvatar === option.key
+                              ? 'border-secondary bg-secondary/[0.08] shadow-sm shadow-secondary/10'
+                              : 'border-border/60 bg-white hover:border-border'
+                          }`}
+                        >
+                          {option.emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ) : (
-                  <div className="rounded-2xl bg-muted-light/60 p-5 text-sm text-muted">
-                    현황을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+                  <>
+                    <div>
+                      <label htmlFor="school" className="mb-2 block text-sm font-medium text-foreground">
+                        학교
+                      </label>
+                      <input
+                        id="school"
+                        type="text"
+                        value={school}
+                        onChange={(event) => setSchool(event.target.value)}
+                        placeholder="학교명을 입력하세요"
+                        disabled={saving}
+                        className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary/40"
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="grade" className="mb-2 block text-sm font-medium text-foreground">
+                          학년
+                        </label>
+                        <input
+                          id="grade"
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={grade}
+                          onChange={(event) => setGrade(event.target.value)}
+                          placeholder="예: 4"
+                          disabled={saving}
+                          className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary/40"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="class-name" className="mb-2 block text-sm font-medium text-foreground">
+                          반
+                        </label>
+                        <input
+                          id="class-name"
+                          type="text"
+                          value={className}
+                          onChange={(event) => setClassName(event.target.value)}
+                          placeholder="예: 2반"
+                          disabled={saving}
+                          className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary/40"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-foreground/90 hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? '저장 중...' : '프로필 저장'}
+                </button>
+              </form>
+            </section>
+
+            <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-amber-50/60 via-white to-orange-50/40 p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-lg">💡</span>
+                <h2 className="text-lg font-heading font-semibold text-foreground">안내</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-xl bg-white/70 border border-amber-100/60 p-4">
+                  <h3 className="text-sm font-semibold text-foreground mb-1">닉네임 자동 설정</h3>
+                  <p className="text-sm text-muted leading-relaxed">
+                    닉네임이 비어 있는 계정은 로그인 시 자동으로 기본 닉네임이 설정됩니다.
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/70 border border-amber-100/60 p-4">
+                  <h3 className="text-sm font-semibold text-foreground mb-1">프로필 수정</h3>
+                  <p className="text-sm text-muted leading-relaxed">
+                    학생은 아바타를 바꾸고, 교사는 학교와 반 정보를 바로 수정할 수 있습니다.
+                  </p>
+                </div>
+                {profile.role === 'student' && (
+                  <div className="rounded-xl bg-white/70 border border-amber-100/60 p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-1">도장 모으기</h3>
+                    <p className="text-sm text-muted leading-relaxed">
+                      4단계 활동을 모두 완료하면 해당 국가의 여권 페이지가 완성됩니다!
+                    </p>
                   </div>
                 )}
               </div>
             </section>
+          </motion.div>
 
-            <aside className="space-y-6">
-              <section className="rounded-3xl border border-border bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-heading font-semibold text-foreground">
-                  프로필 설정
-                </h2>
-                <p className="mt-1 text-sm text-muted">
-                  닉네임은 비워두면 기본값으로 자동 저장됩니다.
-                </p>
-
-                <form className="mt-6 space-y-5" onSubmit={handleSave}>
-                  {saveError && (
-                    <div className="rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm text-error">
-                      {saveError}
-                    </div>
-                  )}
-
-                  {saveSuccess && (
-                    <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
-                      {saveSuccess}
-                    </div>
-                  )}
-
-                  <div>
-                    <label
-                      htmlFor="nickname"
-                      className="mb-2 block text-sm font-medium text-foreground"
-                    >
-                      닉네임
-                    </label>
-                    <input
-                      id="nickname"
-                      type="text"
-                      value={nickname}
-                      onChange={(event) => setNickname(event.target.value)}
-                      placeholder={buildAutoNickname(profile)}
-                      maxLength={20}
-                      disabled={saving}
-                      className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/15"
-                    />
-                  </div>
-
-                  {profile.role === 'student' ? (
-                    <div>
-                      <div className="mb-3 block text-sm font-medium text-foreground">
-                        아바타
-                      </div>
-                      <div className="grid grid-cols-5 gap-3">
-                        {avatarOptions.map((option) => (
-                          <button
-                            key={option.key}
-                            type="button"
-                            onClick={() => setSelectedAvatar(option.key)}
-                            disabled={saving}
-                            className={`flex h-14 items-center justify-center rounded-2xl border text-2xl transition-transform hover:scale-[1.03] ${
-                              selectedAvatar === option.key
-                                ? 'border-foreground bg-foreground/[0.06]'
-                                : 'border-border bg-white'
-                            }`}
-                          >
-                            {option.emoji}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div>
-                        <label
-                          htmlFor="school"
-                          className="mb-2 block text-sm font-medium text-foreground"
-                        >
-                          학교
-                        </label>
-                        <input
-                          id="school"
-                          type="text"
-                          value={school}
-                          onChange={(event) => setSchool(event.target.value)}
-                          placeholder="학교명을 입력하세요"
-                          disabled={saving}
-                          className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/15"
-                        />
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label
-                            htmlFor="grade"
-                            className="mb-2 block text-sm font-medium text-foreground"
-                          >
-                            학년
-                          </label>
-                          <input
-                            id="grade"
-                            type="number"
-                            min={1}
-                            max={12}
-                            value={grade}
-                            onChange={(event) => setGrade(event.target.value)}
-                            placeholder="예: 4"
-                            disabled={saving}
-                            className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/15"
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor="class-name"
-                            className="mb-2 block text-sm font-medium text-foreground"
-                          >
-                            반
-                          </label>
-                          <input
-                            id="class-name"
-                            type="text"
-                            value={className}
-                            onChange={(event) => setClassName(event.target.value)}
-                            placeholder="예: 2반"
-                            disabled={saving}
-                            className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/15"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="w-full rounded-2xl bg-foreground px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {saving ? '저장 중...' : '프로필 저장'}
-                  </button>
-                </form>
-              </section>
-
-              <section className="rounded-3xl border border-border bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-heading font-semibold text-foreground">
-                  안내
-                </h2>
-                <div className="mt-4 space-y-3 text-sm text-muted">
-                  <p>
-                    닉네임이 비어 있는 계정은 로그인 시 자동으로 기본 닉네임이 설정됩니다.
-                  </p>
-                  <p>
-                    학생은 여기서 아바타를 바꾸고, 교사는 학교와 반 정보를 바로 수정할 수 있습니다.
-                  </p>
+          {/* ── My stories (student only) ── */}
+          {stats?.kind === 'student' && (
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+              className="rounded-3xl border border-border/60 bg-white p-6 shadow-sm"
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-heading font-semibold text-foreground">나의 서재</h2>
+                  <p className="mt-1 text-sm text-muted">내가 만든 그림책을 한눈에 볼 수 있어요.</p>
                 </div>
-              </section>
-            </aside>
-          </div>
+                {myStories.length > 0 && (
+                  <Link
+                    href="/library"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors shrink-0"
+                  >
+                    전체 서재
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                )}
+              </div>
+
+              {statsLoading ? (
+                <div className="flex min-h-40 items-center justify-center">
+                  <LoadingSpinner message="서재를 불러오는 중..." />
+                </div>
+              ) : myStories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50/60 to-blue-50/60 border border-indigo-100/40 py-14 px-6 text-center">
+                  <span className="text-5xl mb-4">📚</span>
+                  <p className="text-sm text-muted mb-5">아직 만든 그림책이 없어요.</p>
+                  <Link
+                    href="/map"
+                    className="inline-flex items-center rounded-full bg-foreground px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-foreground/90 hover:shadow-md"
+                  >
+                    책 고르고 이야기 만들기
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {myStories.map((story, i) => {
+                    const coverUrl =
+                      story.cover_image_url ??
+                      story.cover_design?.image_url ??
+                      story.scene_images?.[0] ??
+                      null;
+                    const title = story.cover_design?.title ?? '나의 이야기';
+                    const visLabel =
+                      story.visibility === 'public'
+                        ? '공개'
+                        : story.visibility === 'class'
+                          ? '반 공개'
+                          : '비공개';
+
+                    return (
+                      <motion.div
+                        key={story.id}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.55 + i * 0.06 }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleMyStoryOpen(story)}
+                          className="group text-left w-full"
+                        >
+                          <div className="relative overflow-hidden rounded-xl bg-muted-light/60 shadow-sm transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-1">
+                            {coverUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={coverUrl}
+                                alt={title}
+                                className="aspect-[3/4] w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="aspect-[3/4] w-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-50">
+                                <span className="text-4xl">📖</span>
+                              </div>
+                            )}
+                            <span className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${
+                              story.visibility === 'public'
+                                ? 'bg-emerald-500/80 text-white'
+                                : story.visibility === 'class'
+                                  ? 'bg-amber-500/80 text-white'
+                                  : 'bg-gray-500/80 text-white'
+                            }`}>
+                              {visLabel}
+                            </span>
+                          </div>
+                          <div className="mt-2.5 px-0.5">
+                            <p className="text-sm font-medium text-foreground truncate group-hover:text-secondary transition-colors">
+                              {title}
+                            </p>
+                            <p className="text-xs text-muted mt-0.5">
+                              {formatDate(story.created_at)}
+                            </p>
+                          </div>
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.section>
+          )}
         </div>
       </main>
+
+      {selectedMyStory && selectedMyStory.final_text && (
+        <BookViewerModal
+          key={storyViewerSession}
+          isOpen={!!selectedMyStory}
+          onClose={() => setSelectedMyStory(null)}
+          pages={selectedMyStory.final_text}
+          sceneImages={selectedMyStory.scene_images ?? []}
+          translatedPages={selectedMyStory.translation_text ?? undefined}
+          translatedPagesByLanguage={normalizeTranslatedTextsMap(
+            selectedMyStory.translated_texts,
+            selectedMyStory.translation_text,
+            selectedMyStory.language
+          )}
+          comments={[]}
+          canComment={false}
+          commentLockMessage="내 서재 작품은 책처럼 다시 읽어볼 수 있어요."
+          commentText=""
+          onCommentChange={() => {}}
+          onSubmitComment={() => {}}
+          submittingComment={false}
+          commentCount={0}
+        />
+      )}
     </>
   );
 }

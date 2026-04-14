@@ -47,6 +47,10 @@ export function normalizeTranslatedTextsMap(
   return normalized;
 }
 
+export function hasMeaningfulTranslatedPages(pages?: string[] | null) {
+  return Array.isArray(pages) && pages.some((page) => page.trim().length > 0);
+}
+
 export function normalizeTranslatedPdfUrlMap(
   translatedPdfUrls: StoryTranslatedPdfMap | null | undefined,
   legacyTranslatedPdfUrl?: string | null,

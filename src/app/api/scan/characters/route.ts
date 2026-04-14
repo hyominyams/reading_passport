@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { parseBookCharacterAnalysis } from '@/lib/book-analysis';
 import {
   extractPdfTextFromUrl,
-  pickPreferredPdfUrl,
+  pickPreferredPdfUrlFromMap,
 } from '@/lib/pdf-analysis';
 import type { BookCharacterAnalysis } from '@/types/database';
 
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const { data: book, error: bookError } = await serviceClient
       .from('books')
-      .select('id, title, pdf_url_ko, pdf_url_en')
+      .select('id, title, pdf_urls, pdf_url_ko, pdf_url_en')
       .eq('id', bookId)
       .single();
 
@@ -90,7 +90,12 @@ export async function POST(request: NextRequest) {
     let sourceLabel = manualText ? 'manual text' : '';
 
     if (!sourceText) {
-      const pdfUrl = pickPreferredPdfUrl(book.pdf_url_ko, book.pdf_url_en);
+      const pdfUrls = (book.pdf_urls as Record<string, string>) ?? {};
+      if (!Object.keys(pdfUrls).length) {
+        if (book.pdf_url_ko) pdfUrls.ko = book.pdf_url_ko as string;
+        if (book.pdf_url_en) pdfUrls.en = book.pdf_url_en as string;
+      }
+      const pdfUrl = pickPreferredPdfUrlFromMap(pdfUrls);
       if (!pdfUrl) {
         return NextResponse.json(
           { error: '자동 분석을 위해 PDF URL 또는 본문 텍스트가 필요합니다.' },

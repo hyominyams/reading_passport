@@ -43,21 +43,26 @@ export default function TeacherLayout({
   return (
     <>
       <Header />
-      <div className="bg-muted-light/50 min-h-[calc(100vh-56px)]">
+      <div className="min-h-[calc(100vh-56px)] bg-[#f8f9fb]">
         {/* Teacher info bar */}
-        <div className="bg-white border-b border-border">
+        <div className="border-b border-amber-100 bg-white/90 backdrop-blur">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="flex items-center gap-3 text-sm">
-              <span className="font-medium text-foreground">
-                {profile?.nickname ?? '교사'}
-              </span>
-              {profile?.school && (
-                <span className="text-muted">
-                  {profile.school}
-                  {profile.grade && ` ${profile.grade}학년`}
-                  {profile.class && ` ${profile.class}반`}
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <div className="flex items-center gap-3">
+                <span className="font-medium text-foreground">
+                  {profile?.nickname ?? '교사'}
                 </span>
-              )}
+                {profile?.school && (
+                  <span className="text-muted">
+                    {profile.school}
+                    {profile.grade && ` ${profile.grade}학년`}
+                    {profile.class && ` ${profile.class}반`}
+                  </span>
+                )}
+              </div>
+              <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700">
+                Teacher
+              </span>
             </div>
           </div>
         </div>

@@ -111,7 +111,7 @@ function nextUniqueStudentCode(existingCodes: Set<string>): string {
 export async function bulkCreateStudents(
   teacherId: string,
   nicknames: string[],
-  classId: string
+  className: string
 ): Promise<{ success: boolean; students?: { nickname: string; code: string }[]; error?: string }> {
   const supabase = createServiceClient();
   const cleanNicknames = nicknames.map((nickname) => nickname.trim()).filter(Boolean);
@@ -158,7 +158,7 @@ export async function bulkCreateStudents(
         nickname,
         student_code: code,
         teacher_id: teacherId,
-        class: classId,
+        class: className,
       });
 
       if (profileError) {
@@ -182,6 +182,101 @@ export async function bulkCreateStudents(
       error: error instanceof Error ? error.message : '학생 생성에 실패했습니다',
     };
   }
+}
+
+export async function updateStudentAccount(options: {
+  studentId: string;
+  teacherId: string;
+  nickname?: string;
+  className?: string | null;
+  isAdmin?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServiceClient();
+  const { studentId, teacherId, nickname, className, isAdmin = false } = options;
+
+  const { data: target, error: targetError } = await supabase
+    .from('users')
+    .select('id, teacher_id, role')
+    .eq('id', studentId)
+    .single();
+
+  if (targetError || !target) {
+    return { success: false, error: '학생을 찾을 수 없습니다.' };
+  }
+
+  if (target.role !== 'student') {
+    return { success: false, error: '학생 계정만 수정할 수 있습니다.' };
+  }
+
+  if (!isAdmin && target.teacher_id !== teacherId) {
+    return { success: false, error: '학생 수정 권한이 없습니다.' };
+  }
+
+  const updateData: Record<string, string | null> = {};
+
+  if (nickname !== undefined) {
+    const trimmedNickname = nickname.trim();
+    if (!trimmedNickname) {
+      return { success: false, error: '학생 이름을 입력해주세요.' };
+    }
+    updateData.nickname = trimmedNickname;
+  }
+
+  if (className !== undefined) {
+    updateData.class = className?.trim() || null;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return { success: false, error: '변경할 항목이 없습니다.' };
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update(updateData)
+    .eq('id', studentId);
+
+  if (error) {
+    console.error('Error updating student account:', error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function deleteStudentAccount(options: {
+  studentId: string;
+  teacherId: string;
+  isAdmin?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServiceClient();
+  const { studentId, teacherId, isAdmin = false } = options;
+
+  const { data: target, error: targetError } = await supabase
+    .from('users')
+    .select('id, teacher_id, role')
+    .eq('id', studentId)
+    .single();
+
+  if (targetError || !target) {
+    return { success: false, error: '학생을 찾을 수 없습니다.' };
+  }
+
+  if (target.role !== 'student') {
+    return { success: false, error: '학생 계정만 삭제할 수 있습니다.' };
+  }
+
+  if (!isAdmin && target.teacher_id !== teacherId) {
+    return { success: false, error: '학생 삭제 권한이 없습니다.' };
+  }
+
+  const { error } = await supabase.auth.admin.deleteUser(studentId);
+
+  if (error) {
+    console.error('Error deleting student auth account:', error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
 }
 
 export async function resetStudentCode(

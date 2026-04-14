@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { pickPreferredPdfUrl } from '@/lib/pdf-analysis';
+import { pickPreferredPdfUrlFromMap } from '@/lib/pdf-analysis';
 import { storeGeneratedImageBuffer } from '@/lib/storage/generated-images';
 
 const COVER_MIME_TYPE = 'image/png';
@@ -66,11 +66,19 @@ async function renderPdfFirstPage(pdfUrl: string, baseUrl?: string) {
 
 export async function generateAndStoreBookCover(options: {
   bookId: string;
+  pdfUrls?: Record<string, string> | null;
+  /** @deprecated pass pdfUrls instead */
   pdfUrlKo?: string | null;
+  /** @deprecated pass pdfUrls instead */
   pdfUrlEn?: string | null;
   baseUrl?: string;
 }) {
-  const pdfUrl = pickPreferredPdfUrl(options.pdfUrlKo, options.pdfUrlEn);
+  const map: Record<string, string> = { ...(options.pdfUrls ?? {}) };
+  if (!Object.keys(map).length) {
+    if (options.pdfUrlKo?.trim()) map.ko = options.pdfUrlKo.trim();
+    if (options.pdfUrlEn?.trim()) map.en = options.pdfUrlEn.trim();
+  }
+  const pdfUrl = pickPreferredPdfUrlFromMap(map);
 
   if (!pdfUrl) {
     return null;

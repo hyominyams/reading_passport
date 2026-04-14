@@ -15,49 +15,88 @@ function buildStudentEmail(studentId: string): string {
   return `student-${studentId}@student.worlddocent.local`;
 }
 
+function normalizeTeacherEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export async function teacherLogin(
   email: string,
   password: string
 ): Promise<LoginResult> {
+  const normalizedEmail = normalizeTeacherEmail(email);
+  if (!normalizedEmail) {
+    return { success: false, error: '이메일을 입력해주세요.' };
+  }
+
   const supabase = await createClient();
 
+  await supabase.auth.signOut({ scope: 'local' });
+
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: normalizedEmail,
     password,
   });
 
-  if (error) {
+  if (error || !data.user) {
     return { success: false, error: '이메일 또는 비밀번호가 올바르지 않습니다.' };
   }
 
   // Check role using service client (bypasses RLS - session cookies not yet available in same request)
   const serviceClient = createServiceClient();
-  const { data: profileData } = await serviceClient
+  const { data: profileData, error: profileError } = await serviceClient
     .from('users')
     .select('role, nickname')
     .eq('id', data.user.id)
-    .single();
+    .maybeSingle();
 
   const profile = profileData as { role: 'admin' | 'teacher' | 'student'; nickname: string | null } | null;
 
-  if (!profile || (profile.role !== 'teacher' && profile.role !== 'admin')) {
+  if (profileError) {
+    await supabase.auth.signOut();
+    return { success: false, error: '로그인 후 계정 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.' };
+  }
+
+  if (!profile) {
+    await supabase.auth.signOut();
+    return {
+      success: false,
+      error: '계정 프로필을 찾을 수 없습니다. 관리자에게 계정 복구를 요청해주세요.',
+    };
+  }
+
+  if (profile.role !== 'teacher' && profile.role !== 'admin') {
     await supabase.auth.signOut();
     return { success: false, error: '교사 계정이 아닙니다. 학생 로그인을 이용해주세요.' };
   }
 
-  if (!hasNickname(profile.nickname)) {
-    const fallbackNickname = buildAutoNickname({
-      id: data.user.id,
-      role: profile.role,
-      email: data.user.email,
-      nickname: profile.nickname,
-    });
+  const resolvedNickname = hasNickname(profile.nickname)
+    ? profile.nickname
+    : buildAutoNickname({
+        id: data.user.id,
+        role: profile.role,
+        email: data.user.email,
+        nickname: profile.nickname,
+      });
 
+  if (!hasNickname(profile.nickname)) {
     await serviceClient
       .from('users')
-      .update({ nickname: fallbackNickname })
+      .update({ nickname: resolvedNickname })
       .eq('id', data.user.id);
   }
+
+  await serviceClient.auth.admin.updateUserById(data.user.id, {
+    email: normalizedEmail,
+    email_confirm: true,
+    app_metadata: {
+      ...(data.user.app_metadata ?? {}),
+      role: profile.role,
+    },
+    user_metadata: {
+      ...(data.user.user_metadata ?? {}),
+      nickname: resolvedNickname,
+    },
+  }).catch(() => undefined);
 
   return {
     success: true,
@@ -95,6 +134,7 @@ export async function studentLogin(
 
   // Use the hashed token to verify the OTP and create a session
   const supabase = await createClient();
+  await supabase.auth.signOut({ scope: 'local' });
   const tokenHash = authData.properties?.hashed_token;
 
   if (tokenHash) {
@@ -128,4 +168,10 @@ export async function studentLogin(
     redirectTo: '/map',
     needsOnboarding: false,
   };
+}
+
+export async function signOutAction(): Promise<void> {
+  const supabase = await createClient();
+
+  await supabase.auth.signOut({ scope: 'local' });
 }

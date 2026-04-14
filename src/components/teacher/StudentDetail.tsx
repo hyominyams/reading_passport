@@ -19,27 +19,44 @@ interface ActivityWithBook extends Activity {
 export default function StudentDetail({ student, onBack, onViewChat }: StudentDetailProps) {
   const [activities, setActivities] = useState<ActivityWithBook[]>([]);
   const [loading, setLoading] = useState(true);
+  const [storyCount, setStoryCount] = useState(0);
+  const [libraryCount, setLibraryCount] = useState(0);
+  const [questionCount, setQuestionCount] = useState(0);
 
   useEffect(() => {
     async function fetchData() {
       const supabase = createClient();
 
-      // Fetch activities with books
-      const { data: actData } = await supabase
-        .from('activities')
-        .select('*, book:books(*)')
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false });
+      const [actResult, chatResult, storiesResult] = await Promise.all([
+        supabase
+          .from('activities')
+          .select('*, book:books(*)')
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('chat_logs')
+          .select('*')
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('stories')
+          .select('id')
+          .eq('student_id', student.id)
+          .not('final_text', 'is', null),
+      ]);
 
-      // Fetch chat logs
-      const { data: chatData } = await supabase
-        .from('chat_logs')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false });
+      const acts = (actResult.data ?? []) as ActivityWithBook[];
+      const chats = (chatResult.data ?? []) as ChatLog[];
+      const storyIds = (storiesResult.data ?? []).map((story: { id: string }) => story.id);
 
-      const acts = (actData ?? []) as ActivityWithBook[];
-      const chats = (chatData ?? []) as ChatLog[];
+      let libraryStoryIds = new Set<string>();
+      if (storyIds.length > 0) {
+        const { data: libraryData } = await supabase
+          .from('library')
+          .select('story_id')
+          .in('story_id', storyIds);
+        libraryStoryIds = new Set((libraryData ?? []).map((item: { story_id: string }) => item.story_id));
+      }
 
       // Group chats by book_id
       const chatsByBook = new Map<string, ChatLog[]>();
@@ -55,6 +72,13 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
       }
 
       setActivities(acts);
+      setStoryCount(storyIds.length);
+      setLibraryCount(libraryStoryIds.size);
+      setQuestionCount(
+        chats
+          .filter((chat) => chat.chat_type === 'questions')
+          .reduce((sum, chat) => sum + (chat.messages ?? []).filter((message) => message.role === 'user').length, 0)
+      );
       setLoading(false);
     }
 
@@ -84,7 +108,7 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
     { key: 'read', icon: '\uD83D\uDCD6', label: 'Story Read' },
     { key: 'hidden', icon: '\uD83C\uDF0D', label: 'Hidden Stories' },
     { key: 'questions', icon: '\u2753', label: '질문 만들기' },
-    { key: 'mystory', icon: '\u270F\uFE0F', label: 'My Story' },
+    { key: 'mystory', icon: '\u270F\uFE0F', label: 'My World' },
   ];
 
   if (loading) {
@@ -100,9 +124,9 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
       {/* Header */}
       <button
         onClick={onBack}
-        className="flex items-center gap-2 text-sm text-muted hover:text-foreground mb-4 transition-colors"
+        className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground mb-4 transition-colors"
       >
-        <span>{student.nickname}의 활동 기록</span>
+        ← {student.nickname}의 활동 기록
       </button>
 
       {activities.length === 0 ? (
@@ -111,10 +135,25 @@ export default function StudentDetail({ student, onBack, onViewChat }: StudentDe
         </div>
       ) : (
         <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-muted">질문 수</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{questionCount}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-muted">완성 작품</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{storyCount}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-muted">도서관 등록</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{libraryCount}</p>
+            </div>
+          </div>
+
           {activities.map((activity) => (
             <div
               key={activity.id}
-              className="border border-border rounded-xl p-5"
+              className="border border-border rounded-2xl p-5"
             >
               {/* Book title and stamps */}
               <div className="flex items-center justify-between mb-4">

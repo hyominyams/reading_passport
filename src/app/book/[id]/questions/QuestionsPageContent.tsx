@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/lib/supabase/client';
 import type { Book, Activity, ChatLog } from '@/types/database';
+import { buildQuestionRequirements } from '@/lib/question-requirements';
 
 type CategoryKey = 'content' | 'character' | 'world' | 'inference';
 
@@ -13,15 +14,14 @@ interface CategoryConfig {
   icon: string;
   title: string;
   helper: string;
-  min: number;
   max: number;
 }
 
 const CATEGORIES: CategoryConfig[] = [
-  { key: 'content', icon: '📖', title: '내용이해', helper: '이야기에 있던 일을 묻는 질문을 만들어 보세요', min: 2, max: 3 },
-  { key: 'character', icon: '👤', title: '인물이해', helper: '등장인물의 마음, 성격, 관계, 변화를 묻는 질문을 만들어 보세요', min: 2, max: 3 },
-  { key: 'world', icon: '🌍', title: '배경이해', helper: '시간, 장소, 문화적 배경과 이야기의 연결을 묻는 질문을 만들어 보세요', min: 2, max: 3 },
-  { key: 'inference', icon: '💡', title: '추론', helper: '글에 직접 쓰이지 않은 것을 상상하거나 생각해 보는 질문을 만들어 보세요', min: 1, max: 2 },
+  { key: 'content', icon: '📖', title: '내용이해', helper: '이야기에 있던 일을 묻는 질문을 만들어 보세요', max: 3 },
+  { key: 'character', icon: '👤', title: '인물이해', helper: '등장인물의 마음, 성격, 관계, 변화를 묻는 질문을 만들어 보세요', max: 3 },
+  { key: 'world', icon: '🌍', title: '배경이해', helper: '시간, 장소, 문화적 배경과 이야기의 연결을 묻는 질문을 만들어 보세요', max: 3 },
+  { key: 'inference', icon: '💡', title: '추론', helper: '글에 직접 쓰이지 않은 것을 상상하거나 생각해 보는 질문을 만들어 보세요', max: 2 },
 ];
 
 const EXAMPLE_PLACEHOLDERS: Record<string, string> = {
@@ -30,8 +30,6 @@ const EXAMPLE_PLACEHOLDERS: Record<string, string> = {
   world: '예) 이 이야기의 배경이 되는 나라는 어떤 곳인가요?',
   inference: '예) 주인공이 다른 선택을 했다면 어떻게 됐을까?',
 };
-
-const EMPTY_QUESTIONS: QuestionsData = { content: ['', ''], character: ['', ''], world: ['', ''], inference: [''] };
 
 interface QuestionsData {
   content: string[];
@@ -60,6 +58,7 @@ interface QuestionsPageContentProps {
   userId: string;
   initialActivity: Activity | null;
   existingLog: ChatLog | null;
+  requiredQuestionCount: number;
 }
 
 export default function QuestionsPageContent({
@@ -68,6 +67,7 @@ export default function QuestionsPageContent({
   userId,
   initialActivity,
   existingLog,
+  requiredQuestionCount,
 }: QuestionsPageContentProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -75,9 +75,26 @@ export default function QuestionsPageContent({
   const logIdRef = useRef<string | null>(existingLog?.id ?? null);
   const latestQuestionsRef = useRef<QuestionsData | null>(null);
   const saveQuestionsRef = useRef<((data: QuestionsData) => Promise<void>) | null>(null);
+  const questionRequirements = useMemo(
+    () => buildQuestionRequirements(requiredQuestionCount),
+    [requiredQuestionCount]
+  );
+  const requiredByCategory = useMemo(() => Object.fromEntries(
+    questionRequirements.map((item) => [item.key, item.required])
+  ) as Record<CategoryKey, number>, [questionRequirements]);
+  const requiredTotal = useMemo(
+    () => questionRequirements.reduce((sum, item) => sum + item.required, 0),
+    [questionRequirements]
+  );
+  const buildInitialQuestions = useCallback((): QuestionsData => ({
+    content: Array.from({ length: requiredByCategory.content }, () => ''),
+    character: Array.from({ length: requiredByCategory.character }, () => ''),
+    world: Array.from({ length: requiredByCategory.world }, () => ''),
+    inference: Array.from({ length: requiredByCategory.inference }, () => ''),
+  }), [requiredByCategory]);
 
   const parseExistingQuestions = useCallback((): QuestionsData => {
-    if (!existingLog?.messages) return EMPTY_QUESTIONS;
+    if (!existingLog?.messages) return buildInitialQuestions();
 
     const dataMsg = existingLog.messages.find(
       (m) => m.role === 'system' && m.content.startsWith('{')
@@ -91,15 +108,15 @@ export default function QuestionsPageContent({
           return result;
         };
         return {
-          content: pad(parsed.content, 2),
-          character: pad(parsed.character, 2),
-          world: pad(parsed.world, 2),
-          inference: pad(parsed.inference, 1),
+          content: pad(parsed.content, requiredByCategory.content),
+          character: pad(parsed.character, requiredByCategory.character),
+          world: pad(parsed.world, requiredByCategory.world),
+          inference: pad(parsed.inference, requiredByCategory.inference),
         };
       } catch { /* fall through */ }
     }
-    return EMPTY_QUESTIONS;
-  }, [existingLog]);
+    return buildInitialQuestions();
+  }, [buildInitialQuestions, existingLog, requiredByCategory]);
 
   const parseExistingFeedback = useCallback((): ValidationResult | null => {
     if (!existingLog?.messages) return null;
@@ -123,10 +140,10 @@ export default function QuestionsPageContent({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savedFeedback, setSavedFeedback] = useState<ValidationResult | null>(parseExistingFeedback);
   const [showSavedFeedback, setShowSavedFeedback] = useState(false);
-  const [isRecreating, setIsRecreating] = useState(false);
   const [showFeedbackScreen, setShowFeedbackScreen] = useState(false);
 
   const stampAlreadyEarned = initialActivity?.stamps_earned?.includes('questions') ?? false;
+  const isRecreating = false;
   const isReadOnly = stampAlreadyEarned && !isRecreating;
 
   // Count filled questions per category
@@ -134,7 +151,7 @@ export default function QuestionsPageContent({
     (questions[cat.key] ?? []).filter((q) => q.trim().length > 0).length
   );
   const totalFilled = filledPerCategory.reduce((a, b) => a + b, 0);
-  const allMinMet = CATEGORIES.every((cat, idx) => filledPerCategory[idx] >= cat.min);
+  const allMinMet = CATEGORIES.every((cat, idx) => filledPerCategory[idx] >= requiredByCategory[cat.key]);
 
   const canSubmit = allMinMet && (!stampAlreadyEarned || isRecreating) && (!validation || validation.overall || dirtyAfterValidation);
 
@@ -225,28 +242,12 @@ export default function QuestionsPageContent({
 
   const handleRemoveQuestion = (category: CategoryKey, index: number) => {
     if (isReadOnly) return;
-    const cat = CATEGORIES.find(c => c.key === category);
-    if (!cat) return;
     setQuestions((prev) => {
-      if (prev[category].length <= cat.min) return prev;
+      if (prev[category].length <= requiredByCategory[category]) return prev;
       const updated = { ...prev, [category]: prev[category].filter((_, i) => i !== index) };
       debouncedSave(updated);
       return updated;
     });
-  };
-
-  const handleRecreate = () => {
-    const resetQuestions = { content: ['', ''], character: ['', ''], world: ['', ''], inference: [''] };
-    setQuestions(resetQuestions);
-    setValidation(null);
-    setSavedFeedback(null);
-    setShowSavedFeedback(false);
-    setIsRecreating(true);
-    setDirtyAfterValidation(false);
-    setErrorMessage(null);
-    setShowFeedbackScreen(false);
-    logIdRef.current = null;
-    debouncedSave(resetQuestions);
   };
 
   const saveFeedbackToLog = async (result: ValidationResult) => {
@@ -455,7 +456,7 @@ export default function QuestionsPageContent({
           <span className="text-sm font-medium text-foreground">진행 상황</span>
           <div className="flex-1 flex gap-1.5">
             {CATEGORIES.map((cat, idx) => {
-              const pct = (filledPerCategory[idx] / cat.min) * 100;
+              const pct = (filledPerCategory[idx] / requiredByCategory[cat.key]) * 100;
               return (
                 <div key={cat.key} className={`h-2 rounded-full bg-border overflow-hidden ${cat.key === 'inference' ? 'w-12' : 'flex-1'}`}>
                   <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -463,7 +464,7 @@ export default function QuestionsPageContent({
               );
             })}
           </div>
-          <span className="text-sm text-muted">{totalFilled}/7 질문 작성</span>
+          <span className="text-sm text-muted">{totalFilled}/{requiredTotal} 질문 작성</span>
         </div>
       )}
 
@@ -571,6 +572,9 @@ export default function QuestionsPageContent({
             <div className="flex items-center gap-2 mb-1">
               <span className="text-2xl">{cat.icon}</span>
               <h2 className="text-lg font-bold text-foreground">{cat.title}</h2>
+              <span className="rounded-full bg-muted-light px-2 py-1 text-[11px] font-medium text-muted">
+                필수 {requiredByCategory[cat.key]}개
+              </span>
               <span className="ml-auto text-xs text-muted">
                 {filledPerCategory[catIndex]}/{(questions[cat.key] ?? []).length}
               </span>
@@ -599,7 +603,7 @@ export default function QuestionsPageContent({
                             ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-400 bg-red-50'
                             : 'bg-white border-border focus:ring-2 focus:ring-primary/30 focus:border-primary'}`}
                     />
-                    {!isReadOnly && (questions[cat.key] ?? []).length > cat.min && (
+                    {!isReadOnly && (questions[cat.key] ?? []).length > requiredByCategory[cat.key] && (
                       <button
                         onClick={() => handleRemoveQuestion(cat.key, qIndex)}
                         className="mt-1.5 p-1 text-muted hover:text-red-500 transition-colors"
@@ -664,7 +668,7 @@ export default function QuestionsPageContent({
             )}
             {!allMinMet && (
               <p className="text-center text-xs text-muted mt-2">
-                영역별 2개씩, 추론 1개 — 총 7개 질문을 작성하면 제출할 수 있어요
+                내용 {requiredByCategory.content}개, 인물 {requiredByCategory.character}개, 배경 {requiredByCategory.world}개, 추론 {requiredByCategory.inference}개를 작성하면 제출할 수 있어요
               </p>
             )}
           </>
@@ -701,7 +705,7 @@ export default function QuestionsPageContent({
               <div className="w-32 h-32 rounded-full border-[4px] border-red-700/80 bg-white/95 flex items-center justify-center relative shadow-xl">
                 <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700/50" />
                 <div className="flex flex-col items-center z-10">
-                  <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">★ WORLD DOCENT ★</span>
+                  <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">★ WORLD STORY ★</span>
                   <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">SUCCESS</span>
                   <span className="text-red-700/70 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">APPROVED</span>
                 </div>

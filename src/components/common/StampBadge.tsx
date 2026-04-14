@@ -13,7 +13,7 @@ const stampLabels: Record<StampType, string> = {
   read: '읽기',
   hidden: '탐험',
   questions: '질문만들기',
-  mystory: '내 이야기',
+  mystory: '내 세계',
 };
 
 const stampIcons: Record<StampType, string> = {

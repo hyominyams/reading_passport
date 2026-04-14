@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import type { LibraryStoryItem } from '@/components/story/LibraryGrid';
@@ -11,11 +11,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { countries } from '@/lib/data/countries';
 import { generateDummyLibraryItems, isDummyId } from '@/lib/data/dummyLibrary';
+import { normalizeTranslatedTextsMap } from '@/lib/story-translations';
 
 interface Comment {
   author: string;
   text: string;
   date: string;
+}
+
+function getLocalReadProgressKey(storyId: string, userId: string) {
+  return `library-read-progress:${userId}:${storyId}`;
 }
 
 export default function LibraryPage() {
@@ -30,6 +35,7 @@ export default function LibraryPage() {
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedReadCompleted, setSelectedReadCompleted] = useState(false);
+  const likeRequestVersionsRef = useRef(new Map<string, number>());
 
   useEffect(() => {
     let active = true;
@@ -173,75 +179,74 @@ export default function LibraryPage() {
     if (!user) return;
 
     const isLiked = likedStories.has(storyId);
+    const nextLiked = !isLiked;
+    const likeDelta = nextLiked ? 1 : -1;
 
-    // Dummy data: local-only toggle without DB
-    if (isDummyId(storyId)) {
+    const applyLikeState = (liked: boolean, delta: number) => {
       setLikedStories((prev) => {
         const next = new Set(prev);
-        if (isLiked) next.delete(storyId); else next.add(storyId);
+        if (liked) {
+          next.add(storyId);
+        } else {
+          next.delete(storyId);
+        }
         return next;
       });
+
       setItems((prev) =>
         prev.map((item) =>
           item.story_id === storyId
-            ? { ...item, likes: item.likes + (isLiked ? -1 : 1) }
+            ? { ...item, likes: Math.max(0, item.likes + delta) }
             : item
         )
       );
+
+      setSelectedItem((prev) =>
+        prev && prev.story_id === storyId
+          ? { ...prev, likes: Math.max(0, prev.likes + delta) }
+          : prev
+      );
+    };
+
+    // Dummy data: local-only toggle without DB
+    if (isDummyId(storyId)) {
+      applyLikeState(nextLiked, likeDelta);
       return;
     }
 
     const supabase = createClient();
+    const requestVersion = (likeRequestVersionsRef.current.get(storyId) ?? 0) + 1;
+    likeRequestVersionsRef.current.set(storyId, requestVersion);
 
-    if (isLiked) {
-      const { error } = await supabase
-        .from('story_likes')
-        .delete()
-        .eq('story_id', storyId)
-        .eq('user_id', user.id);
+    applyLikeState(nextLiked, likeDelta);
 
-      if (error) {
-        console.error('Error unliking story:', error);
-        return;
+    try {
+      if (nextLiked) {
+        const { error } = await supabase
+          .from('story_likes')
+          .insert({ story_id: storyId, user_id: user.id });
+
+        if (error) {
+          throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from('story_likes')
+          .delete()
+          .eq('story_id', storyId)
+          .eq('user_id', user.id);
+
+        if (error) {
+          throw error;
+        }
       }
+    } catch (error) {
+      console.error('Error toggling story like:', error);
 
-      setLikedStories((prev) => {
-        const next = new Set(prev);
-        next.delete(storyId);
-        return next;
-      });
-    } else {
-      const { error } = await supabase
-        .from('story_likes')
-        .insert({ story_id: storyId, user_id: user.id });
-
-      if (error) {
-        console.error('Error liking story:', error);
-        return;
+      if (likeRequestVersionsRef.current.get(storyId) === requestVersion) {
+        applyLikeState(isLiked, -likeDelta);
       }
-
-      setLikedStories((prev) => new Set([...prev, storyId]));
     }
-
-    // Reconcile counts from the source table so the UI cannot drift from persistence.
-    const { data: likeRows } = await supabase
-      .from('story_likes')
-      .select('story_id')
-      .in('story_id', items.map((item) => item.story_id));
-
-    const counts = (likeRows ?? []).reduce((acc: Map<string, number>, row: { story_id: string }) => {
-      acc.set(row.story_id, (acc.get(row.story_id) ?? 0) + 1);
-      return acc;
-    }, new Map<string, number>());
-
-    setItems((prev) =>
-      prev
-        .map((item) => ({
-          ...item,
-          likes: counts.get(item.story_id) ?? 0,
-        }))
-        .sort((a, b) => b.likes - a.likes)
-    );
   };
 
   const fetchComments = async (storyId: string) => {
@@ -300,6 +305,15 @@ export default function LibraryPage() {
         setCommentText('');
         await fetchComments(selectedItem.story_id);
       }
+
+      // Update comment count locally
+      setItems((prev) =>
+        prev.map((item) =>
+          item.story_id === selectedItem.story_id
+            ? { ...item, comment_count: (item.comment_count ?? 0) + 1 }
+            : item
+        )
+      );
     } catch (err) {
       console.error('Error submitting comment:', err);
     }
@@ -330,17 +344,24 @@ export default function LibraryPage() {
 
     const supabase = createClient();
     if (user) {
-      const { data: progress, error: progressError } = await supabase
-        .from('story_read_progress')
-        .select('completed')
-        .eq('story_id', item.story_id)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      try {
+        const response = await fetch(`/api/library/read-progress?storyId=${encodeURIComponent(item.story_id)}`);
+        const payload = await response.json();
 
-      if (progressError) {
+        if (response.ok) {
+          if (payload.trackingAvailable === false) {
+            const localReadProgress = window.localStorage.getItem(
+              getLocalReadProgressKey(item.story_id, user.id)
+            );
+            setSelectedReadCompleted(localReadProgress === 'completed');
+          } else {
+            setSelectedReadCompleted(!!payload.progress?.completed);
+          }
+        } else {
+          console.error('Error fetching story read progress:', payload.error);
+        }
+      } catch (progressError) {
         console.error('Error fetching story read progress:', progressError);
-      } else {
-        setSelectedReadCompleted(!!progress?.completed);
       }
     }
 
@@ -367,26 +388,36 @@ export default function LibraryPage() {
       return;
     }
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from('story_read_progress')
-      .upsert(
-        {
-          story_id: selectedItem.story_id,
-          user_id: user.id,
-          last_page: totalPages,
-          total_pages_snapshot: totalPages,
-          completed: true,
-          completed_at: new Date().toISOString(),
-        },
-        { onConflict: 'story_id,user_id' }
-      );
+    try {
+      const response = await fetch('/api/library/read-progress', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storyId: selectedItem.story_id,
+          totalPages,
+        }),
+      });
+      const payload = await response.json();
 
-    if (error) {
+      if (!response.ok) {
+        console.error('Error saving story read progress:', payload);
+        setErrorMessage('읽기 완료를 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+        return;
+      }
+
+      if (payload.trackingAvailable === false) {
+        window.localStorage.setItem(
+          getLocalReadProgressKey(selectedItem.story_id, user.id),
+          'completed'
+        );
+      }
+    } catch (error) {
       console.error('Error saving story read progress:', error);
+      setErrorMessage('읽기 완료를 저장하지 못했어요. 네트워크 상태를 확인해주세요.');
       return;
     }
 
+    setErrorMessage(null);
     setSelectedReadCompleted(true);
   };
 
@@ -458,6 +489,11 @@ export default function LibraryPage() {
             pages={selectedItem.story.final_text}
             sceneImages={selectedItem.story.scene_images || []}
             translatedPages={selectedItem.story.translation_text || undefined}
+            translatedPagesByLanguage={normalizeTranslatedTextsMap(
+              selectedItem.story.translated_texts,
+              selectedItem.story.translation_text,
+              selectedItem.story.language
+            )}
             comments={comments}
             canComment={canComment}
             commentLockMessage={commentLockMessage}
@@ -466,6 +502,10 @@ export default function LibraryPage() {
             onCommentChange={setCommentText}
             onSubmitComment={handleSubmitComment}
             submittingComment={submittingComment}
+            likeCount={selectedItem.likes}
+            isLiked={likedStories.has(selectedItem.story_id)}
+            onLike={() => handleLike(selectedItem.story_id)}
+            commentCount={selectedItem.comment_count ?? 0}
           />
         )}
       </main>

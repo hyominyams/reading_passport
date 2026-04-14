@@ -31,10 +31,19 @@ export default function ShelfBook({
   bookCoverUrl,
 }: ShelfBookProps) {
   const coverImage =
-    item.story.scene_images?.[0] || bookCoverUrl || item.book?.cover_url || null;
+    item.thumbnail_url ||
+    item.story.cover_image_url ||
+    item.story.cover_design?.image_url ||
+    item.story.scene_images?.[0] ||
+    bookCoverUrl ||
+    item.book?.cover_url ||
+    null;
   const title =
-    item.story.final_text?.[0]?.slice(0, 20) || '이야기';
-  const authorName = item.story.author?.nickname || '작성자';
+    item.story_title?.trim() ||
+    item.story.cover_design?.title?.trim() ||
+    item.story.final_text?.[0]?.slice(0, 20) ||
+    '이야기';
+  const authorName = item.author_nickname?.trim() || item.story.author?.nickname || '작성자';
   const spineColor = SPINE_COLORS[item.country_id] || '#4f5b73';
 
   return (

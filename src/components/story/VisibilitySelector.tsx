@@ -15,12 +15,6 @@ const options: { value: Visibility; label: string; description: string; icon: st
     icon: '🌍',
   },
   {
-    value: 'class',
-    label: '우리 반만',
-    description: '같은 반 친구들만 볼 수 있어요',
-    icon: '🏫',
-  },
-  {
     value: 'private',
     label: '나만 보기',
     description: '나만 볼 수 있어요',

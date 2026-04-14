@@ -22,12 +22,19 @@ export default function LibraryCard({
   bookCoverUrl,
 }: LibraryCardProps) {
   const coverImage =
-    item.story.scene_images?.[0] || bookCoverUrl || item.book?.cover_url || null;
-  const firstPage = item.story.final_text?.[0] || '';
-  const title = firstPage.includes(' — ')
-    ? firstPage.split(' — ')[0]
-    : firstPage.slice(0, 30) || '이야기';
-  const authorName = item.story.author?.nickname || '작성자';
+    item.thumbnail_url ||
+    item.story.cover_image_url ||
+    item.story.cover_design?.image_url ||
+    item.story.scene_images?.[0] ||
+    bookCoverUrl ||
+    item.book?.cover_url ||
+    null;
+  const title =
+    item.story_title?.trim() ||
+    item.story.cover_design?.title?.trim() ||
+    item.story.final_text?.[0]?.slice(0, 30) ||
+    '이야기';
+  const authorName = item.author_nickname?.trim() || item.story.author?.nickname || '작성자';
 
   return (
     <motion.div
@@ -88,6 +95,14 @@ export default function LibraryCard({
           </motion.svg>
           <span className="font-medium">{item.likes}</span>
         </button>
+        {(item.comment_count ?? 0) > 0 && (
+          <span className="flex items-center gap-1 text-xs text-muted">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span className="font-medium">{item.comment_count}</span>
+          </span>
+        )}
         <span className="text-[11px] text-muted">{item.views}회</span>
       </div>
     </motion.div>

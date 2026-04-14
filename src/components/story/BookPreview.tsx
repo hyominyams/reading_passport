@@ -114,11 +114,11 @@ export default function BookPreview({
               )}
 
               {/* Text */}
-              <div className="p-6">
-                <p className="text-base leading-relaxed text-foreground whitespace-pre-wrap">
-                  {showTranslation && translatedPages
+              <div className="p-6 flex-1 flex items-center justify-center">
+                <p className="text-base leading-relaxed text-foreground whitespace-pre-wrap text-center">
+                  {(showTranslation && translatedPages
                     ? translatedPages[currentPage] || pages[currentPage]
-                    : pages[currentPage]}
+                    : pages[currentPage] || '').trim()}
                 </p>
                 <p className="text-xs text-muted mt-4">
                   {currentPage + 1} / {totalPages}

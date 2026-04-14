@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
     if (bookId) {
       const { data: book } = await serviceClient
         .from('books')
-        .select('title, country_id, pdf_url_ko, pdf_url_en, character_analysis')
+        .select('title, country_id, pdf_urls, pdf_url_ko, pdf_url_en, character_analysis')
         .eq('id', bookId)
         .single();
 
@@ -223,10 +223,13 @@ export async function POST(request: NextRequest) {
         }
 
         if (!resolvedBookText && !resolvedAnalysisContext) {
+          const bookPdfUrls = (book.pdf_urls as Record<string, string>) ?? {};
+          const fallbackKo = bookPdfUrls.ko ?? (book.pdf_url_ko as string | null);
+          const fallbackEn = bookPdfUrls.en ?? (book.pdf_url_en as string | null);
           try {
             resolvedBookText = await extractPreferredPdfText(
-              book.pdf_url_ko,
-              book.pdf_url_en,
+              fallbackKo,
+              fallbackEn,
               request.url,
               100
             );

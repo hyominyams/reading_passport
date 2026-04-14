@@ -22,6 +22,22 @@
    - `002`, `004`에서 추가한 정책을 최종 형태로 다시 정의하므로 반드시 마지막에 적용되어야 합니다.
    - 원격 DB에 과거 수동 정책이 남아 있던 경우, 이 파일을 다시 실행해 legacy policy를 정리해야 합니다.
 
+6. `008_class_mystory_settings.sql`
+   - `classes`에 My World 검증 시작 대화 수 설정을 추가합니다.
+
+7. `012_class_question_settings.sql`
+   - `classes`에 질문 만들기 필수 개수 설정을 추가합니다.
+
+8. `013_story_comment_teacher_scope.sql`
+   - 교사 댓글 권한을 자신의 학생 작품으로 제한합니다.
+
+9. `014_student_only_activity_policies.sql`
+   - 학생 활동/대화/스토리 생성 정책을 학생 계정으로만 제한합니다.
+
+10. `020_repair_class_mystory_settings.sql`
+   - 일부 환경에서 누락된 `classes.mystory_required_turns` 컬럼을 실제 스키마에 복구합니다.
+   - PostgREST schema cache도 함께 갱신합니다.
+
 ## 원격 DB 상태 점검
 
 - 애플리케이션 레벨 점검은 `npx tsx scripts/check-books.ts` 또는 `npx tsx scripts/check-db-health.ts`로 확인합니다.

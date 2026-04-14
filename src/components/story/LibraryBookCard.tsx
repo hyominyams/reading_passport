@@ -27,12 +27,25 @@ export default function LibraryBookCard({
   storyTitle,
   studentName,
 }: LibraryBookCardProps) {
-  const coverImage = item.story.scene_images?.[0] || bookCoverUrl || item.book?.cover_url || null;
+  const coverImage =
+    item.thumbnail_url ||
+    item.story.cover_image_url ||
+    item.story.cover_design?.image_url ||
+    item.story.scene_images?.[0] ||
+    bookCoverUrl ||
+    item.book?.cover_url ||
+    null;
   const title =
     storyTitle?.trim() ||
+    item.story_title?.trim() ||
+    item.story.cover_design?.title?.trim() ||
     item.story.final_text?.[0]?.slice(0, 30) ||
     '이야기';
-  const authorName = studentName?.trim() || item.story.author?.nickname || '작성자';
+  const authorName =
+    studentName?.trim() ||
+    item.author_nickname?.trim() ||
+    item.story.author?.nickname ||
+    '작성자';
   const originalBookTitle =
     bookTitle?.trim() || item.book?.title?.trim() || null;
 

@@ -13,6 +13,7 @@ interface ClassroomRecord {
   school: string;
   grade: number;
   mystory_required_turns?: number;
+  questions_required_count?: number;
 }
 
 interface ClassroomSelectResult {
@@ -101,8 +102,9 @@ export async function ensureTeacherClassRecord(
         grade,
         class_name: className,
         mystory_required_turns: 5,
+        questions_required_count: 7,
       })
-      .select('id, teacher_id, class_name, school, grade, mystory_required_turns')
+      .select('id, teacher_id, class_name, school, grade, mystory_required_turns, questions_required_count')
       .single();
 
     if (data) {
@@ -131,7 +133,7 @@ export async function getStudentClassSetting(
   const classesTable = getClassesTable(supabase);
 
   const exactQuery = classesTable.select(
-    'id, teacher_id, class_name, school, grade, mystory_required_turns'
+    'id, teacher_id, class_name, school, grade, mystory_required_turns, questions_required_count'
   );
 
   if (className) {
@@ -142,7 +144,7 @@ export async function getStudentClassSetting(
   }
 
   const fallbackQuery = classesTable.select(
-    'id, teacher_id, class_name, school, grade, mystory_required_turns'
+    'id, teacher_id, class_name, school, grade, mystory_required_turns, questions_required_count'
   );
   const { data } = await fallbackQuery.eq('teacher_id', teacherId).limit(1);
   return data?.[0] ?? null;

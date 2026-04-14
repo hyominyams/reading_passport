@@ -4,11 +4,14 @@ import { createBrowserClient } from '@supabase/ssr';
 // Supabase auth acquires a navigator lock; if the client is destroyed
 // while holding it (e.g. during HMR), a new client's getSession() hangs.
 const GLOBAL_KEY = '__supabase_browser_client';
+type BrowserClient = ReturnType<typeof createBrowserClient>;
+type SupabaseBrowserGlobal = typeof globalThis & {
+  [GLOBAL_KEY]?: BrowserClient;
+};
 
 export function createClient() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const g = globalThis as any;
-  if (g[GLOBAL_KEY]) return g[GLOBAL_KEY] as ReturnType<typeof createBrowserClient>;
+  const g = globalThis as SupabaseBrowserGlobal;
+  if (g[GLOBAL_KEY]) return g[GLOBAL_KEY];
 
   const client = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +20,6 @@ export function createClient() {
       auth: {
         flowType: 'pkce',
         // Bypass navigator.locks to prevent deadlock on HMR / Fast Refresh
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         lock: async <R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn(),
       },
     }

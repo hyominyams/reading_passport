@@ -1,7 +1,9 @@
-import { createServiceClient } from '@/lib/supabase/service';
+import { ensurePublicBucket } from '@/lib/storage/buckets';
 
 const GENERATED_IMAGES_BUCKET =
   process.env.SUPABASE_GENERATED_IMAGES_BUCKET || 'generated-images';
+const GENERATED_IMAGES_FILE_SIZE_LIMIT = 5 * 1024 * 1024;
+const IMMUTABLE_CACHE_CONTROL = '31536000';
 
 function getFileExtension(mimeType: string) {
   switch (mimeType.split(';', 1)[0]) {
@@ -16,41 +18,19 @@ function getFileExtension(mimeType: string) {
   }
 }
 
-async function ensureBucket() {
-  const supabase = createServiceClient();
-  const { data, error } = await supabase.storage.getBucket(
-    GENERATED_IMAGES_BUCKET
-  );
-
-  if (data && !error) {
-    return supabase;
-  }
-
-  const { error: createError } = await supabase.storage.createBucket(
-    GENERATED_IMAGES_BUCKET,
-    {
-      public: true,
-      fileSizeLimit: 5 * 1024 * 1024,
-    }
-  );
-
-  if (
-    createError &&
-    !/already exists/i.test(createError.message) &&
-    !/duplicate/i.test(createError.message)
-  ) {
-    throw createError;
-  }
-
-  return supabase;
-}
-
 async function uploadImageBuffer(options: {
   fileBuffer: Buffer;
   mimeType: string;
   folder: string;
 }) {
-  const supabase = await ensureBucket();
+  if (options.fileBuffer.byteLength > GENERATED_IMAGES_FILE_SIZE_LIMIT) {
+    throw new Error('Generated image exceeds the 5MB storage limit.');
+  }
+
+  const supabase = await ensurePublicBucket(
+    GENERATED_IMAGES_BUCKET,
+    GENERATED_IMAGES_FILE_SIZE_LIMIT
+  );
   const extension = getFileExtension(options.mimeType);
   const filePath = `${options.folder}/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${extension}`;
 
@@ -59,7 +39,7 @@ async function uploadImageBuffer(options: {
     .upload(filePath, options.fileBuffer, {
       contentType: options.mimeType,
       upsert: false,
-      cacheControl: '3600',
+      cacheControl: IMMUTABLE_CACHE_CONTROL,
     });
 
   if (uploadError) {

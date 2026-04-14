@@ -1,29 +1,68 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { User } from '@/types/database';
+import type { Class, User } from '@/types/database';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+
+interface EditableStudent {
+  nickname: string;
+  className: string;
+}
 
 export default function StudentCreator() {
   const [students, setStudents] = useState<User[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
+  const [selectedClassName, setSelectedClassName] = useState('기본반');
   const [creating, setCreating] = useState(false);
   const [createdStudents, setCreatedStudents] = useState<{ nickname: string; code: string }[] | null>(null);
   const [revealedCodes, setRevealedCodes] = useState<Set<string>>(new Set());
   const [resetConfirm, setResetConfirm] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<EditableStudent | null>(null);
+  const [savingStudentId, setSavingStudentId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const fetchStudents = useCallback(async () => {
-    const res = await fetch('/api/teacher/students');
-    const data = await res.json();
-    setStudents(data.students ?? []);
-    setLoading(false);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const [studentsRes, classesRes] = await Promise.all([
+        fetch('/api/teacher/students'),
+        fetch('/api/teacher/classes'),
+      ]);
+
+      const studentsData = await studentsRes.json();
+      const classesData = await classesRes.json();
+
+      if (!studentsRes.ok) {
+        throw new Error(studentsData.error || '학생 정보를 불러오지 못했습니다');
+      }
+
+      if (!classesRes.ok) {
+        throw new Error(classesData.error || '반 정보를 불러오지 못했습니다');
+      }
+
+      const nextClasses = (classesData.classes ?? []) as Class[];
+      const nextStudents = (studentsData.students ?? []) as User[];
+
+      setStudents(nextStudents);
+      setClasses(nextClasses);
+
+      const defaultClassName = nextClasses[0]?.class_name ?? '기본반';
+      setSelectedClassName((prev) => prev || defaultClassName);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    fetchStudents();
-  }, [fetchStudents]);
+    fetchData();
+  }, [fetchData]);
 
   const handleBulkCreate = async () => {
     setError('');
@@ -42,7 +81,11 @@ export default function StudentCreator() {
       const res = await fetch('/api/teacher/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'bulk_create', nicknames }),
+        body: JSON.stringify({
+          action: 'bulk_create',
+          nicknames,
+          className: selectedClassName,
+        }),
       });
 
       const data = await res.json();
@@ -52,7 +95,7 @@ export default function StudentCreator() {
 
       setCreatedStudents(data.students);
       setInput('');
-      fetchStudents();
+      await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다');
     } finally {
@@ -68,12 +111,85 @@ export default function StudentCreator() {
         body: JSON.stringify({ action: 'reset_code', studentId }),
       });
 
-      if (res.ok) {
-        setResetConfirm(null);
-        fetchStudents();
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || '코드 재발급에 실패했습니다');
       }
-    } catch {
-      // Silently handle
+
+      setResetConfirm(null);
+      await fetchData();
+      setRevealedCodes((prev) => new Set(prev).add(studentId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    }
+  };
+
+  const handleDeleteStudent = async (studentId: string) => {
+    setSavingStudentId(studentId);
+    setError('');
+
+    try {
+      const res = await fetch(`/api/teacher/students?studentId=${studentId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '학생 삭제에 실패했습니다');
+      }
+
+      setDeleteConfirm(null);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    } finally {
+      setSavingStudentId(null);
+    }
+  };
+
+  const startEdit = (student: User) => {
+    setEditingStudentId(student.id);
+    setEditDraft({
+      nickname: student.nickname ?? '',
+      className: student.class ?? selectedClassName,
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingStudentId(null);
+    setEditDraft(null);
+  };
+
+  const saveStudent = async (studentId: string) => {
+    if (!editDraft) {
+      return;
+    }
+
+    setSavingStudentId(studentId);
+    setError('');
+
+    try {
+      const res = await fetch('/api/teacher/students', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          nickname: editDraft.nickname,
+          className: editDraft.className,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '학생 정보 저장에 실패했습니다');
+      }
+
+      cancelEdit();
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    } finally {
+      setSavingStudentId(null);
     }
   };
 
@@ -84,7 +200,7 @@ export default function StudentCreator() {
   const copyAllCodes = () => {
     if (!createdStudents) return;
     const text = createdStudents
-      .map((s) => `${s.nickname}: ${s.code}`)
+      .map((student) => `${student.nickname}: ${student.code}`)
       .join('\n');
     navigator.clipboard.writeText(text);
   };
@@ -99,128 +215,264 @@ export default function StudentCreator() {
 
   return (
     <div className="space-y-8">
-      {/* Existing students */}
-      <div>
-        <h3 className="text-base font-bold mb-3">학생 목록</h3>
+      <div className="rounded-3xl border border-border bg-white p-6 shadow-sm">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h3 className="text-base font-bold">학생 계정 관리</h3>
+            <p className="mt-1 text-sm text-muted">
+              반 배정, 이름 수정, 코드 재발급, 삭제까지 한 번에 관리할 수 있습니다.
+            </p>
+          </div>
+          <span className="text-sm text-muted">총 {students.length}명</span>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         {students.length === 0 ? (
-          <div className="text-center py-8 text-muted border border-dashed border-border rounded-xl">
+          <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted">
             아직 학생이 없습니다. 아래에서 학생을 추가해주세요.
           </div>
         ) : (
-          <div className="overflow-x-auto border border-border rounded-xl">
+          <div className="overflow-x-auto rounded-2xl border border-border">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-muted-light border-b border-border">
-                  <th className="text-left px-4 py-3 font-medium text-muted">닉네임</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted">로그인 코드</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted">생성일</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted">작업</th>
+                <tr className="bg-muted-light/80 border-b border-border">
+                  <th className="px-4 py-3 text-left font-medium text-muted">닉네임</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted">반</th>
+                  <th className="px-4 py-3 text-center font-medium text-muted">로그인 코드</th>
+                  <th className="px-4 py-3 text-center font-medium text-muted">생성일</th>
+                  <th className="px-4 py-3 text-center font-medium text-muted">작업</th>
                 </tr>
               </thead>
               <tbody>
-                {students.map((student) => (
-                  <tr key={student.id} className="border-b border-border last:border-b-0">
-                    <td className="px-4 py-3 font-medium">{student.nickname}</td>
-                    <td className="px-4 py-3 text-center">
-                      {revealedCodes.has(student.id) ? (
-                        <span className="font-mono font-bold text-primary">
-                          {student.student_code}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => setRevealedCodes((prev) => new Set(prev).add(student.id))}
-                          className="text-xs text-primary hover:text-primary-dark"
-                        >
-                          [코드 보기]
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center text-muted text-xs">
-                      {new Date(student.created_at).toLocaleDateString('ko-KR')}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {resetConfirm === student.id ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => handleResetCode(student.id)}
-                            className="text-xs px-2 py-1 bg-error text-white rounded"
+                {students.map((student) => {
+                  const isEditing = editingStudentId === student.id && editDraft;
+                  return (
+                    <tr key={student.id} className="border-b border-border last:border-b-0">
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editDraft.nickname}
+                            onChange={(event) => setEditDraft((prev) => prev ? { ...prev, nickname: event.target.value } : prev)}
+                            className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/15"
+                          />
+                        ) : (
+                          <span className="font-medium">{student.nickname ?? '이름 없음'}</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <select
+                            value={editDraft.className}
+                            onChange={(event) => setEditDraft((prev) => prev ? { ...prev, className: event.target.value } : prev)}
+                            className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/15"
                           >
-                            확인
-                          </button>
+                            {classes.length === 0 ? (
+                              <option value="기본반">기본반</option>
+                            ) : (
+                              classes.map((item) => (
+                                <option key={item.id} value={item.class_name}>
+                                  {item.grade}학년 {item.class_name}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                        ) : (
+                          <span className="text-muted">{student.class ?? '미배정'}</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        {revealedCodes.has(student.id) ? (
+                          <span className="font-mono font-bold text-primary">
+                            {student.student_code}
+                          </span>
+                        ) : (
                           <button
-                            onClick={() => setResetConfirm(null)}
-                            className="text-xs px-2 py-1 border border-border rounded"
+                            onClick={() => setRevealedCodes((prev) => new Set(prev).add(student.id))}
+                            className="text-xs text-primary hover:text-primary-dark"
                           >
-                            취소
+                            [코드 보기]
                           </button>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 text-center text-xs text-muted">
+                        {new Date(student.created_at).toLocaleDateString('ko-KR')}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => saveStudent(student.id)}
+                                disabled={savingStudentId === student.id}
+                                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                              >
+                                저장
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="rounded-xl border border-border px-3 py-1.5 text-xs hover:bg-muted-light"
+                              >
+                                취소
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => startEdit(student)}
+                              className="rounded-xl border border-border px-3 py-1.5 text-xs hover:bg-muted-light"
+                            >
+                              수정
+                            </button>
+                          )}
+
+                          {resetConfirm === student.id ? (
+                            <>
+                              <button
+                                onClick={() => handleResetCode(student.id)}
+                                className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs text-white"
+                              >
+                                확인
+                              </button>
+                              <button
+                                onClick={() => setResetConfirm(null)}
+                                className="rounded-xl border border-border px-3 py-1.5 text-xs hover:bg-muted-light"
+                              >
+                                취소
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setResetConfirm(student.id)}
+                              className="rounded-xl border border-amber-200 px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50"
+                            >
+                              코드 재발급
+                            </button>
+                          )}
+
+                          {deleteConfirm === student.id ? (
+                            <>
+                              <button
+                                onClick={() => handleDeleteStudent(student.id)}
+                                disabled={savingStudentId === student.id}
+                                className="rounded-xl bg-error px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                              >
+                                삭제 확인
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="rounded-xl border border-border px-3 py-1.5 text-xs hover:bg-muted-light"
+                              >
+                                취소
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(student.id)}
+                              className="rounded-lg border border-error/30 px-3 py-1.5 text-xs text-error hover:bg-error/5"
+                            >
+                              삭제
+                            </button>
+                          )}
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => setResetConfirm(student.id)}
-                          className="text-xs text-muted hover:text-foreground"
-                        >
-                          코드 재발급
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Bulk create */}
-      <div className="border border-border rounded-xl p-5">
+      <div className="rounded-3xl border border-border bg-white p-6 shadow-sm">
         <h3 className="text-base font-bold mb-3">학생 일괄 등록</h3>
-        <p className="text-sm text-muted mb-3">
-          학생 닉네임을 쉼표(,) 또는 줄바꿈으로 구분하여 입력하세요
+        <p className="text-sm text-muted mb-4">
+          학생 닉네임을 쉼표 또는 줄바꿈으로 구분해서 입력하면 해당 반에 바로 계정을 발급합니다.
         </p>
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="예: 지민, 수아, 서준, 하은&#10;또는 줄바꿈으로 구분"
-          rows={4}
-          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none mb-3"
-        />
 
-        {error && <p className="text-sm text-error mb-3">{error}</p>}
+        <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+          <div>
+            <label htmlFor="student-class" className="mb-2 block text-sm font-medium text-foreground">
+              배정할 반
+            </label>
+            <select
+              id="student-class"
+              value={selectedClassName}
+              onChange={(event) => setSelectedClassName(event.target.value)}
+              className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/15"
+            >
+              {classes.length === 0 ? (
+                <option value="기본반">기본반</option>
+              ) : (
+                classes.map((item) => (
+                  <option key={item.id} value={item.class_name}>
+                    {item.grade}학년 {item.class_name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
 
-        <button
-          onClick={handleBulkCreate}
-          disabled={creating || !input.trim()}
-          className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium disabled:opacity-50"
-        >
-          {creating ? '생성 중...' : '일괄 발급'}
-        </button>
+          <div>
+            <label htmlFor="student-input" className="mb-2 block text-sm font-medium text-foreground">
+              학생 이름
+            </label>
+            <textarea
+              id="student-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="예: 지민, 수아, 서준 또는 줄바꿈으로 구분"
+              rows={5}
+              className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/15 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={handleBulkCreate}
+            disabled={creating || !input.trim()}
+            className="rounded-xl bg-foreground px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-foreground/90 disabled:opacity-50"
+          >
+            {creating ? '생성 중...' : '학생 계정 발급'}
+          </button>
+        </div>
       </div>
 
-      {/* Created students result */}
       {createdStudents && (
-        <div className="border border-success/30 bg-success/5 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-bold text-success">
-              {createdStudents.length}명의 학생이 생성되었습니다
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-base font-bold text-emerald-700">
+              {createdStudents.length}명의 학생 코드가 생성되었습니다
             </h3>
             <button
               onClick={copyAllCodes}
-              className="text-xs px-3 py-1.5 border border-success/30 text-success rounded-lg hover:bg-success/10"
+              className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50"
             >
               전체 복사
             </button>
           </div>
+
           <div className="space-y-2">
-            {createdStudents.map((s, idx) => (
+            {createdStudents.map((student, index) => (
               <div
-                key={idx}
-                className="flex items-center justify-between bg-white px-4 py-2 rounded-lg"
+                key={`${student.nickname}-${index}`}
+                className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
               >
-                <span className="font-medium text-sm">{s.nickname}</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-primary">{s.code}</span>
+                <span className="font-medium text-sm">{student.nickname}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-bold text-primary">{student.code}</span>
                   <button
-                    onClick={() => copyToClipboard(s.code)}
+                    onClick={() => copyToClipboard(student.code)}
                     className="text-xs text-muted hover:text-foreground"
                   >
                     복사

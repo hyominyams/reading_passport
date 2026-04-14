@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { signOutAction } from '@/app/login/actions';
 import type { User as SupabaseUser, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import type { User, UserRole } from '@/types/database';
 import { buildAutoNickname, hasNickname } from '@/lib/profile';
@@ -24,6 +25,22 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
   signOut: async () => {},
 });
+
+async function settleWithTimeout<T>(promise: Promise<T>, timeoutMs = 1500): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timeoutId = window.setTimeout(() => resolve(null), timeoutMs);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch(() => {
+        window.clearTimeout(timeoutId);
+        resolve(null);
+      });
+  });
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -86,12 +103,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfile]);
 
   const signOut = useCallback(async () => {
+    setLoading(true);
+
     try {
-      await supabase.auth.signOut();
+      await Promise.all([
+        settleWithTimeout(supabase.auth.signOut({ scope: 'local' })),
+        settleWithTimeout(signOutAction()),
+      ]);
     } finally {
       setUser(null);
       setProfile(null);
       setLoading(false);
+
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login');
+        return;
+      }
+
       router.replace('/login');
       router.refresh();
     }

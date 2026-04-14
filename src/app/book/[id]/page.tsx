@@ -12,7 +12,7 @@ export default async function BookPage({
 }) {
   const { id } = await params;
   const { lang } = await searchParams;
-  const language = lang === 'en' ? 'en' : 'ko';
+  const language = lang || 'ko';
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -33,21 +33,21 @@ export default function ActivityPageClient({
     {
       icon: '📖',
       title: 'Story Read',
-      stampLabel: '도장 1',
+      stampLabel: 'Step 1',
       stampType: 'read',
       route: `/book/${book.id}/read?lang=${language}`,
     },
     {
       icon: '🌍',
       title: 'Hidden Stories',
-      stampLabel: '도장 2',
+      stampLabel: 'Step 2',
       stampType: 'hidden',
       route: `/book/${book.id}/explore?lang=${language}`,
     },
     {
       icon: '❓',
       title: '질문 만들기',
-      stampLabel: '도장 3',
+      stampLabel: 'Step 3',
       stampType: 'questions',
       route: `/book/${book.id}/questions?lang=${language}`,
     },
@@ -55,8 +55,8 @@ export default function ActivityPageClient({
 
   const myStoryCard: CardConfig = {
     icon: '✏️',
-    title: 'My Story',
-    stampLabel: '도장 4',
+    title: 'My World',
+    stampLabel: 'Step 4',
     stampType: 'mystory',
     route: `/book/${book.id}/mystory?lang=${language}`,
   };
@@ -95,7 +95,7 @@ export default function ActivityPageClient({
         ))}
       </div>
 
-      {/* 4th card: My Story — always visible, locked until 1-3 completed */}
+      {/* 4th card: My World — always visible, locked until 1-3 completed */}
       <div className="w-full max-w-xs">
         <ActivityCard
           icon={myStoryCard.icon}

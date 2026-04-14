@@ -11,6 +11,10 @@ export interface LibraryStoryItem {
   book_id: string;
   likes: number;
   views: number;
+  comment_count?: number;
+  story_title?: string | null;
+  author_nickname?: string | null;
+  thumbnail_url?: string | null;
   book?: {
     id: string;
     title?: string | null;
@@ -31,9 +35,17 @@ export interface LibraryStoryItem {
     final_text: string[] | null;
     character_refs: { name: string; imageUrl: string }[] | null;
     scene_images: string[] | null;
+    cover_image_url?: string | null;
+    cover_design?: {
+      title?: string | null;
+      author?: string | null;
+      image_url?: string | null;
+    } | null;
     translation_text: string[] | null;
+    translated_texts: Record<string, string[]> | null;
     pdf_url_original: string | null;
     pdf_url_translated: string | null;
+    translated_pdf_urls: Record<string, string> | null;
     visibility: string;
     created_at: string;
     author?: { nickname: string | null };

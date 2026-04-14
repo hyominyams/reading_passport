@@ -6,8 +6,8 @@ import Image from 'next/image';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import type { Story } from '@/types/database';
 import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import type { Story } from '@/types/database';
 
 type PageChoice = 'upload' | 'describe' | 'skip';
 
@@ -69,6 +69,11 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
         if (data) {
           const s = data as Story;
           setStory(s);
+
+          if (s.story_status === 'archived') {
+            router.replace(`/book/${bookId}/mystory?lang=${s.language}`);
+            return;
+          }
 
           // Guard: scenes needs story text to exist
           if (!s.final_text || s.final_text.length === 0) {

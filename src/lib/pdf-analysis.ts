@@ -8,17 +8,44 @@ async function loadPdfJs() {
   return (await import('pdfjs-dist/legacy/build/pdf.mjs')) as PdfJsModule;
 }
 
+export function pickPreferredPdfUrlFromMap(
+  pdfUrls: Record<string, string> | null | undefined
+): string | null {
+  if (!pdfUrls) return null;
+  // Prefer Korean, then English, then first available
+  if (pdfUrls.ko?.trim()) return pdfUrls.ko.trim();
+  if (pdfUrls.en?.trim()) return pdfUrls.en.trim();
+  for (const url of Object.values(pdfUrls)) {
+    const trimmed = url?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
 export function pickPreferredPdfUrl(
   pdfUrlKo?: string | null,
   pdfUrlEn?: string | null
 ) {
-  const ko = pdfUrlKo?.trim();
-  if (ko) return ko;
+  const map: Record<string, string> = {};
+  if (pdfUrlKo?.trim()) map.ko = pdfUrlKo.trim();
+  if (pdfUrlEn?.trim()) map.en = pdfUrlEn.trim();
+  return pickPreferredPdfUrlFromMap(map);
+}
 
-  const en = pdfUrlEn?.trim();
-  if (en) return en;
+export function computeLanguagesFromMap(
+  pdfUrls: Record<string, string> | null | undefined
+): string[] {
+  if (!pdfUrls) return ['ko'];
+  const langs = Object.keys(pdfUrls).filter((k) => pdfUrls[k]?.trim());
+  return langs.length > 0 ? langs : ['ko'];
+}
 
-  return null;
+export function getPdfUrlForLanguage(
+  pdfUrls: Record<string, string> | null | undefined,
+  language: string
+): string | null {
+  if (!pdfUrls) return null;
+  return pdfUrls[language]?.trim() || null;
 }
 
 export async function extractPdfTextFromUrl(

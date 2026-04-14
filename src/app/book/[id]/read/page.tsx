@@ -11,8 +11,6 @@ export default async function ReadPage({
 }) {
   const { id } = await params;
   const { lang } = await searchParams;
-  const language = lang === 'en' ? 'en' : 'ko';
-
   const book = await getBookById(id);
 
   if (!book) {
@@ -31,7 +29,10 @@ export default async function ReadPage({
     );
   }
 
-  const pdfUrl = language === 'en' ? book.pdf_url_en : book.pdf_url_ko;
+  const available = book.languages_available ?? ['ko'];
+  const language = (lang && available.includes(lang)) ? lang : available[0] ?? 'ko';
+  const pdfUrls = book.pdf_urls ?? {};
+  const pdfUrl = pdfUrls[language] ?? (language === 'en' ? book.pdf_url_en : book.pdf_url_ko);
 
   return (
     <>

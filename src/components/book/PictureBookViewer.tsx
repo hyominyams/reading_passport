@@ -207,6 +207,10 @@ export default function PictureBookViewer({
       : currentSpread * 2 + 1 <= (pageCount ?? 0)
         ? currentSpread * 2 + 1
         : null;
+  const furthestVisiblePage = isMobile
+    ? currentPage
+    : Math.max(spreadLeft ?? 1, spreadRight ?? 1);
+  const effectiveMaxPageVisited = Math.max(maxPageVisited, furthestVisiblePage);
 
   const canGoNext =
     pageCount !== null &&
@@ -215,20 +219,18 @@ export default function PictureBookViewer({
       : currentSpread < totalSpreadCount - 1);
   const canGoPrev = isMobile ? currentPage > 1 : currentSpread > 0;
 
+  const updateMaxPageVisited = useCallback((candidate: number) => {
+    setMaxPageVisited((prev) => Math.max(prev, candidate));
+  }, []);
+
   /* ── Track max page visited ── */
   useEffect(() => {
-    // On desktop, the right page of the spread is the furthest reached
-    const furthest = isMobile
-      ? currentPage
-      : Math.max(spreadLeft ?? 1, spreadRight ?? 1);
-    setMaxPageVisited((prev) => {
-      const next = Math.max(prev, furthest);
-      if (next !== prev && pageCount && onMaxPageChange) {
-        onMaxPageChange(next, pageCount);
-      }
-      return next;
-    });
-  }, [currentPage, isMobile, spreadLeft, spreadRight, pageCount, onMaxPageChange]);
+    if (!pageCount || !onMaxPageChange) {
+      return;
+    }
+
+    onMaxPageChange(effectiveMaxPageVisited, pageCount);
+  }, [effectiveMaxPageVisited, onMaxPageChange, pageCount]);
 
   /* ── Load PDF document (with cache + range requests) ── */
   useEffect(() => {
@@ -297,12 +299,16 @@ export default function PictureBookViewer({
     if (!canGoNext || pageCount === null) return;
     setDirection(1);
     if (isMobile) {
-      setCurrentPage((p) => Math.min(p + 1, pageCount));
+      const nextPage = Math.min(currentPage + 1, pageCount);
+      updateMaxPageVisited(nextPage);
+      setCurrentPage(nextPage);
     } else {
       const nextSpread = currentSpread + 1;
-      setCurrentPage(nextSpread === 0 ? 1 : nextSpread * 2);
+      const nextPage = nextSpread === 0 ? 1 : nextSpread * 2;
+      updateMaxPageVisited(Math.min(pageCount, nextPage + 1));
+      setCurrentPage(nextPage);
     }
-  }, [canGoNext, pageCount, isMobile, currentSpread]);
+  }, [canGoNext, currentPage, currentSpread, isMobile, pageCount, updateMaxPageVisited]);
 
   const goPrev = useCallback(() => {
     if (!canGoPrev) return;
@@ -318,9 +324,13 @@ export default function PictureBookViewer({
   const goToSpread = useCallback(
     (idx: number) => {
       setDirection(idx > currentSpread ? 1 : -1);
-      setCurrentPage(idx === 0 ? 1 : idx * 2);
+      const nextPage = idx === 0 ? 1 : idx * 2;
+      if (pageCount !== null) {
+        updateMaxPageVisited(idx === 0 ? 1 : Math.min(pageCount, nextPage + 1));
+      }
+      setCurrentPage(nextPage);
     },
-    [currentSpread],
+    [currentSpread, pageCount, updateMaxPageVisited],
   );
 
   /* ── Keyboard ── */
@@ -366,7 +376,7 @@ export default function PictureBookViewer({
           rel="noreferrer"
           className="rounded-full border border-[#d8c5a8] bg-white px-5 py-2 text-sm font-semibold text-[#7d6243] transition hover:bg-[#fffaf1]"
         >
-          새 ��으로 열기
+          새 창으로 열기
         </a>
       </div>
     );
@@ -556,7 +566,7 @@ export default function PictureBookViewer({
             : '화살표 키 또는 스와이프로 넘기세요'}
         </p>
 
-        {pageCount && maxPageVisited >= pageCount ? (
+        {pageCount && effectiveMaxPageVisited >= pageCount ? (
           <motion.button
             type="button"
             onClick={onLastPage}

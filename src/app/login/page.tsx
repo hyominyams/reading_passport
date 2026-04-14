@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { teacherLogin, studentLogin } from './actions';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { createClient } from '@/lib/supabase/client';
 
 type TabType = 'teacher' | 'student';
 
@@ -16,15 +17,30 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [studentCode, setStudentCode] = useState('');
+  const supabase = useMemo(() => createClient(), []);
+
+  const clearClientSession = async () => {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  };
+
+  const completeLogin = (redirectTo: string) => {
+    if (typeof window !== 'undefined') {
+      window.location.replace(redirectTo);
+      return;
+    }
+
+    router.replace(redirectTo);
+    router.refresh();
+  };
 
   const handleTeacherSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
+      await clearClientSession();
       const result = await teacherLogin(email, password);
       if (result.success) {
-        router.push(result.redirectTo || '/teacher');
-        router.refresh();
+        completeLogin(result.redirectTo || '/teacher');
       } else {
         setError(result.error || '로그인에 실패했습니다.');
       }
@@ -39,10 +55,10 @@ export default function LoginPage() {
       return;
     }
     startTransition(async () => {
+      await clearClientSession();
       const result = await studentLogin(studentCode);
       if (result.success) {
-        router.push(result.redirectTo || '/map');
-        router.refresh();
+        completeLogin(result.redirectTo || '/map');
       } else {
         setError(result.error || '로그인에 실패했습니다.');
       }

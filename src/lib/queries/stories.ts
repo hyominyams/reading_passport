@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import type {
   Story, LibraryItem, Visibility, StoryType, Language, CharacterRef,
   GuideAnswers, AiDraftPage, CoverDesign, IllustrationStyle, ProductionStatus,
-  CharacterDesign, CountryFact, StoryTranslationMap, StoryTranslatedPdfMap,
+  CharacterDesign, CountryFact, StoryTranslationMap, StoryTranslatedPdfMap, StoryStatus,
 } from '@/types/database';
 
 export async function createStory(data: {
@@ -11,6 +11,7 @@ export async function createStory(data: {
   country_id: string;
   language: Language;
   story_type: StoryType;
+  story_status?: StoryStatus;
   custom_input?: string | null;
   guide_answers?: GuideAnswers | null;
   current_step?: number;
@@ -25,10 +26,11 @@ export async function createStory(data: {
       country_id: data.country_id,
       language: data.language,
       story_type: data.story_type,
+      story_status: data.story_status ?? 'draft',
       custom_input: data.custom_input ?? null,
       guide_answers: data.guide_answers ?? null,
       current_step: data.current_step ?? 1,
-      chat_log: {},
+      chat_log: [],
       all_student_messages: null,
       gauge_final: 0,
       visibility: 'public' as Visibility,
@@ -113,6 +115,8 @@ export async function updateStory(
     pdf_url_translated: string | null;
     translated_pdf_urls: StoryTranslatedPdfMap | null;
     visibility: Visibility;
+    story_status: StoryStatus;
+    completed_at: string | null;
     // Legacy
     chat_log: Record<string, unknown>;
     all_student_messages: string | null;
@@ -160,6 +164,7 @@ export async function getStudentStories(studentId: string): Promise<Story[]> {
     .from('stories')
     .select('*')
     .eq('student_id', studentId)
+    .neq('story_status', 'archived')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -181,7 +186,8 @@ export async function getStudentStoryForBook(
     .select('*')
     .eq('student_id', studentId)
     .eq('book_id', bookId)
-    .order('created_at', { ascending: false })
+    .eq('story_status', 'draft')
+    .order('started_at', { ascending: false })
     .limit(1)
     .single();
 

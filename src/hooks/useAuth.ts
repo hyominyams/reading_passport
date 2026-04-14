@@ -6,7 +6,7 @@ export function useAuth() {
   const { user, profile, role, loading, refreshProfile, signOut } = useAuthContext();
 
   const isAdmin = role === 'admin';
-  const isTeacher = role === 'teacher' || role === 'admin';
+  const isTeacher = role === 'teacher';
   const isStudent = role === 'student';
   const isAuthenticated = !!user;
   const needsOnboarding = isAuthenticated && profile?.nickname === null;

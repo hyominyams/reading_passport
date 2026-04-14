@@ -98,8 +98,32 @@ export interface CountryFact {
 export type StoryType = 'continue' | 'new_protagonist' | 'extra_backstory' | 'change_ending' | 'custom';
 export type Visibility = 'public' | 'class' | 'private';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-export type Language = 'ko' | 'en';
+export type Language = string;
+
+export interface LanguageMeta {
+  code: string;
+  label: string;
+  flag: string;
+}
+
+export const SUPPORTED_LANGUAGES: LanguageMeta[] = [
+  { code: 'ko', label: '한국어', flag: '🇰🇷' },
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'zh', label: '中文', flag: '🇨🇳' },
+  { code: 'ja', label: '日本語', flag: '🇯🇵' },
+  { code: 'es', label: 'Español', flag: '🇪🇸' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+  { code: 'ar', label: 'العربية', flag: '🌍' },
+  { code: 'sw', label: 'Kiswahili', flag: '🌍' },
+  { code: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
+];
+
+export function getLanguageMeta(code: string): LanguageMeta {
+  return SUPPORTED_LANGUAGES.find((l) => l.code === code) ?? { code, label: code.toUpperCase(), flag: '🌐' };
+}
 export type StampType = 'read' | 'hidden' | 'questions' | 'mystory';
+export type StoryStatus = 'draft' | 'completed' | 'archived';
 
 export interface User {
   id: string;
@@ -123,6 +147,7 @@ export interface Class {
   grade: number;
   class_name: string;
   mystory_required_turns: number;
+  questions_required_count: number;
 }
 
 export interface Book {
@@ -130,8 +155,11 @@ export interface Book {
   country_id: string;
   title: string;
   cover_url: string;
+  /** @deprecated Use pdf_urls map instead */
   pdf_url_ko: string | null;
+  /** @deprecated Use pdf_urls map instead */
   pdf_url_en: string | null;
+  pdf_urls: Record<string, string>;
   languages_available: Language[];
   character_analysis: BookCharacterAnalysis;
   created_by: string;
@@ -199,6 +227,7 @@ export interface Story {
   book_id: string;
   country_id: string;
   language: Language;
+  story_status: StoryStatus;
   story_type: StoryType;
   custom_input: string | null;
   // Legacy fields (kept for old stories)
@@ -228,6 +257,8 @@ export interface Story {
   pdf_url_translated: string | null;
   translated_pdf_urls: StoryTranslatedPdfMap | null;
   visibility: Visibility;
+  started_at: string;
+  completed_at: string | null;
   created_at: string;
 }
 
@@ -257,6 +288,9 @@ export interface LibraryItem {
   book_id: string;
   likes: number;
   views: number;
+  story_title: string | null;
+  author_nickname: string | null;
+  thumbnail_url: string | null;
 }
 
 export interface ApprovalRequest {
@@ -267,6 +301,10 @@ export interface ApprovalRequest {
   status: ApprovalStatus;
   created_at: string;
   reviewed_at: string | null;
+  reviewer_id: string | null;
+  review_note: string | null;
+  content_title: string | null;
+  content_scope: ContentScope | null;
 }
 
 // ── Campaign System ──

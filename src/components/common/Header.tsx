@@ -55,7 +55,7 @@ export default function Header() {
     { href: '/library', label: '도서관' },
     { href: '/campaign', label: '캠페인' },
     ...(role === 'student' ? [{ href: '/passport', label: '여권' }] : []),
-    ...((role === 'teacher' || role === 'admin') ? [{ href: '/teacher', label: '교사 관리' }] : []),
+    ...(role === 'teacher' ? [{ href: '/teacher', label: '교사 관리' }] : []),
     ...(role === 'admin' ? [{ href: '/admin', label: '관리자' }] : []),
     { href: '/mypage', label: '마이페이지' },
   ];

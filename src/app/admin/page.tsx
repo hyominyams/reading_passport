@@ -1,98 +1,72 @@
 'use client';
 
 import { useState } from 'react';
+import AdminOverview from '@/components/admin/AdminOverview';
 import TeacherList from '@/components/admin/TeacherList';
 import ApprovalQueue from '@/components/admin/ApprovalQueue';
 import BookManager from '@/components/admin/BookManager';
+import HiddenContentManager from '@/components/admin/HiddenContentManager';
 import LibraryAdmin from '@/components/admin/LibraryAdmin';
+import FactsManager from '@/components/admin/FactsManager';
 
-type Section = 'teachers' | 'approvals' | 'books' | 'library';
+type Tab = 'overview' | 'teachers' | 'approvals' | 'books' | 'hidden' | 'library' | 'facts';
+
+const tabs: { key: Tab; label: string; icon: string }[] = [
+  { key: 'overview', label: '운영 현황', icon: '📊' },
+  { key: 'teachers', label: '교사 관리', icon: '👩‍🏫' },
+  { key: 'approvals', label: '승인 검토', icon: '✅' },
+  { key: 'books', label: '도서 관리', icon: '📚' },
+  { key: 'hidden', label: 'Hidden Stories', icon: '🔍' },
+  { key: 'library', label: '서재 관리', icon: '🏠' },
+  { key: 'facts', label: '세계 상식', icon: '🌍' },
+];
 
 export default function AdminPage() {
-  const [activeSection, setActiveSection] = useState<Section>('teachers');
-
-  const sections: { key: Section; label: string; icon: string }[] = [
-    { key: 'teachers', label: '교사 관리', icon: '\uD83D\uDC69\u200D\uD83C\uDFEB' },
-    { key: 'approvals', label: '콘텐츠 승인', icon: '\u2705' },
-    { key: 'books', label: '도서/콘텐츠 관리', icon: '\uD83D\uDCDA' },
-    { key: 'library', label: '도서관 관리', icon: '\uD83C\uDFE0' },
-  ];
-
-  const sectionDescriptions: Record<Section, string> = {
-    teachers: '등록된 교사를 조회하고 관리합니다',
-    approvals: '교사들의 콘텐츠 전체 공개 요청을 승인하거나 반려합니다',
-    books: '글로벌 도서를 등록하고 관리합니다',
-    library: '학생 작품 도서관을 관리합니다',
-  };
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   return (
-    <div className="flex min-h-[calc(100vh-56px)]">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-border shrink-0 hidden md:block">
-        <div className="p-4">
-          <h2 className="text-sm font-bold text-muted uppercase tracking-wider mb-4">
-            관리자 메뉴
-          </h2>
-          <nav className="space-y-1">
-            {sections.map((section) => (
-              <button
-                key={section.key}
-                onClick={() => setActiveSection(section.key)}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                  activeSection === section.key
-                    ? 'bg-primary/5 text-primary font-medium'
-                    : 'text-muted hover:bg-muted-light hover:text-foreground'
-                }`}
-              >
-                <span>{section.icon}</span>
-                <span>{section.label}</span>
-              </button>
-            ))}
-          </nav>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <section className="overflow-hidden rounded-[32px] border border-border bg-white shadow-sm">
+        <div className="px-6 py-7 lg:px-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+            <span>🛡️</span>
+            <span>Admin Control Center</span>
+          </div>
+          <h1 className="mt-4 text-2xl font-bold text-foreground sm:text-3xl">
+            교사, 콘텐츠, 서재를 한 곳에서 관리하세요
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
+            교사 관리, 승인 검토, 전역 콘텐츠 운영, 서재 moderation, 세계 상식까지 한 흐름으로 제어할 수 있습니다.
+          </p>
         </div>
-      </aside>
+      </section>
 
-      {/* Mobile tab bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-40">
-        <div className="flex">
-          {sections.map((section) => (
-            <button
-              key={section.key}
-              onClick={() => setActiveSection(section.key)}
-              className={`flex-1 flex flex-col items-center gap-1 py-2 text-xs transition-colors ${
-                activeSection === section.key
-                  ? 'text-primary font-medium'
-                  : 'text-muted'
-              }`}
-            >
-              <span className="text-lg">{section.icon}</span>
-              <span className="truncate px-1">{section.label}</span>
-            </button>
-          ))}
-        </div>
+      <div className="flex gap-2 overflow-x-auto rounded-2xl border border-border bg-white p-2 shadow-sm">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === tab.key
+                ? 'bg-foreground text-white shadow-sm'
+                : 'text-muted hover:bg-muted-light hover:text-foreground'
+            }`}
+          >
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Main content */}
-      <main className="flex-1 p-6 md:p-8 pb-20 md:pb-8">
-        <div className="max-w-5xl mx-auto">
-          {/* Section header */}
-          <div className="mb-6">
-            <h1 className="text-xl font-bold text-foreground">
-              {sections.find((s) => s.key === activeSection)?.icon}{' '}
-              {sections.find((s) => s.key === activeSection)?.label}
-            </h1>
-            <p className="text-sm text-muted mt-1">
-              {sectionDescriptions[activeSection]}
-            </p>
-          </div>
-
-          {/* Section content */}
-          {activeSection === 'teachers' && <TeacherList />}
-          {activeSection === 'approvals' && <ApprovalQueue />}
-          {activeSection === 'books' && <BookManager />}
-          {activeSection === 'library' && <LibraryAdmin />}
-        </div>
-      </main>
-    </div>
+      <section className="rounded-3xl border border-border bg-white p-6 shadow-sm">
+        {activeTab === 'overview' && <AdminOverview />}
+        {activeTab === 'teachers' && <TeacherList />}
+        {activeTab === 'approvals' && <ApprovalQueue />}
+        {activeTab === 'books' && <BookManager />}
+        {activeTab === 'hidden' && <HiddenContentManager />}
+        {activeTab === 'library' && <LibraryAdmin />}
+        {activeTab === 'facts' && <FactsManager />}
+      </section>
+    </main>
   );
 }

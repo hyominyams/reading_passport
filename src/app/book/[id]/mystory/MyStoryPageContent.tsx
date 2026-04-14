@@ -130,7 +130,7 @@ function buildRetryAssistantMessage(result: ValidationResult): string {
 interface MyStoryPageContentProps {
   book: Book;
   bookId: string;
-  language: 'ko' | 'en';
+  language: string;
   userId: string;
   storyId: string;
   initialStoryType: StoryType;

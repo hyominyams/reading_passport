@@ -7,7 +7,7 @@ const stampLabels: Record<StampType, string> = {
   read: '읽기',
   hidden: '숨은이야기',
   questions: '질문만들기',
-  mystory: '나만의 이야기',
+  mystory: '나만의 세계',
 };
 
 const stampColors: Record<StampType, string> = {
@@ -122,31 +122,41 @@ export default async function PassportPage() {
                 <div className="grid grid-cols-4 gap-3">
                   {allStampTypes.map((stampType) => {
                     const earned = data.stamps.includes(stampType);
+                    const color = stampColors[stampType];
                     return (
                       <div key={stampType} className="flex flex-col items-center gap-1">
-                        <div
-                          className={`
-                            w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold
-                            transition-all duration-300
-                            ${earned
-                              ? 'shadow-md'
-                              : 'border-2 border-dashed border-muted/40'
-                            }
-                          `}
-                          style={
-                            earned
-                              ? { backgroundColor: stampColors[stampType] + '20', color: stampColors[stampType] }
-                              : undefined
-                          }
-                        >
-                          {earned ? (
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                              <path d="M5 13l4 4L19 7" stroke={stampColors[stampType]} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          ) : (
-                            <span className="text-muted/40 text-xs">?</span>
-                          )}
-                        </div>
+                        {earned ? (
+                          <svg width="56" height="56" viewBox="0 0 56 56" className="drop-shadow-sm" style={{ transform: 'rotate(-6deg)' }}>
+                            {/* Outer ring */}
+                            <circle cx="28" cy="28" r="26" fill="none" stroke={color} strokeWidth="2.5" opacity="0.8" />
+                            {/* Inner ring */}
+                            <circle cx="28" cy="28" r="22" fill="none" stroke={color} strokeWidth="1" opacity="0.5" />
+                            {/* "WORLD STORY" text along top arc */}
+                            <defs>
+                              <path id={`arc-top-${stampType}`} d="M 8,28 a 20,20 0 1,1 40,0" fill="none" />
+                              <path id={`arc-bot-${stampType}`} d="M 48,28 a 20,20 0 1,1 -40,0" fill="none" />
+                            </defs>
+                            <text fill={color} fontSize="6" fontWeight="700" letterSpacing="1.5" opacity="0.9">
+                              <textPath href={`#arc-top-${stampType}`} startOffset="50%" textAnchor="middle">
+                                WORLD STORY
+                              </textPath>
+                            </text>
+                            {/* Label text along bottom arc */}
+                            <text fill={color} fontSize="5.5" fontWeight="600" opacity="0.9">
+                              <textPath href={`#arc-bot-${stampType}`} startOffset="50%" textAnchor="middle">
+                                {stampLabels[stampType]}
+                              </textPath>
+                            </text>
+                            {/* Center star */}
+                            <text x="28" y="31" textAnchor="middle" fontSize="14" fill={color} opacity="0.85">
+                              ★
+                            </text>
+                          </svg>
+                        ) : (
+                          <div className="w-14 h-14 rounded-full border-2 border-dashed border-muted/30 flex items-center justify-center">
+                            <span className="text-muted/30 text-xs">?</span>
+                          </div>
+                        )}
                         <span className="text-[10px] text-muted font-medium">
                           {stampLabels[stampType]}
                         </span>

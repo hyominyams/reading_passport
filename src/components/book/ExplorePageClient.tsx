@@ -339,7 +339,7 @@ export default function ExplorePageClient({
               <div className="w-32 h-32 rounded-full border-[4px] border-red-700/80 bg-white/95 flex items-center justify-center relative shadow-xl">
                 <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700/50" />
                 <div className="flex flex-col items-center z-10">
-                  <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">★ WORLD DOCENT ★</span>
+                  <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">★ WORLD STORY ★</span>
                   <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">SUCCESS</span>
                   <span className="text-red-700/70 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">APPROVED</span>
                 </div>

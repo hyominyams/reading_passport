@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import type { User, Activity, Book, ChatLog } from '@/types/database';
@@ -10,17 +10,18 @@ import StudentDetail from '@/components/teacher/StudentDetail';
 import ChatHistoryView from '@/components/teacher/ChatHistoryView';
 import ContentManager from '@/components/teacher/ContentManager';
 import StudentCreator from '@/components/teacher/StudentCreator';
-import GalleryGrid from '@/components/teacher/GalleryGrid';
+import TeacherLibraryManager from '@/components/teacher/TeacherLibraryManager';
 import ClassSettingsPanel from '@/components/teacher/ClassSettingsPanel';
+import TeacherCampaignManager from '@/components/teacher/TeacherCampaignManager';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
-type Tab = 'overview' | 'content' | 'students' | 'gallery' | 'settings';
+type Tab = 'overview' | 'resources' | 'students' | 'library' | 'campaign' | 'settings';
 
 // Level for the overview tab drill-down
 type OverviewLevel = 'list' | 'detail' | 'chat';
 
 interface StudentWithActivity extends User {
-  currentActivity?: Activity & { book?: Book };
+  allActivities: (Activity & { book?: Book })[];
   hasFlaggedChat?: boolean;
 }
 
@@ -83,17 +84,17 @@ export default function TeacherPage() {
       const activities = (activitiesData ?? []) as (Activity & { book?: Book })[];
       const flaggedStudentIds = new Set((flaggedChats ?? []).map((c: { student_id: string }) => c.student_id));
 
-      // Map most recent activity per student.
-      const studentActivityMap = new Map<string, Activity & { book?: Book }>();
+      // Map ALL activities per student (not just most recent).
+      const studentActivitiesMap = new Map<string, (Activity & { book?: Book })[]>();
       for (const act of activities) {
-        if (!studentActivityMap.has(act.student_id)) {
-          studentActivityMap.set(act.student_id, act);
-        }
+        const list = studentActivitiesMap.get(act.student_id) ?? [];
+        list.push(act);
+        studentActivitiesMap.set(act.student_id, list);
       }
 
       const enriched: StudentWithActivity[] = studentList.map((s) => ({
         ...s,
-        currentActivity: studentActivityMap.get(s.id),
+        allActivities: studentActivitiesMap.get(s.id) ?? [],
         hasFlaggedChat: flaggedStudentIds.has(s.id),
       }));
 
@@ -128,11 +129,25 @@ export default function TeacherPage() {
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'overview', label: '반 전체 현황', icon: '\uD83D\uDCCA' },
-    { key: 'content', label: 'Hidden Stories 관리', icon: '\uD83C\uDF0D' },
-    { key: 'students', label: '학생 관리', icon: '\uD83D\uDC65' },
-    { key: 'gallery', label: '갤러리', icon: '\uD83D\uDDBC\uFE0F' },
+    { key: 'students', label: '계정 관리', icon: '\uD83D\uDC65' },
+    { key: 'resources', label: '책/자료 관리', icon: '\uD83D\uDCDA' },
+    { key: 'library', label: '도서관 관리', icon: '\uD83C\uDFE0' },
+    { key: 'campaign', label: '캠페인', icon: '\uD83D\uDCE2' },
     { key: 'settings', label: '반 설정', icon: '\u2699\uFE0F' },
   ];
+
+  const stats = useMemo(() => {
+    const total = students.length;
+    const active = students.filter((s) => s.allActivities.length > 0).length;
+    const completedPages = students.reduce(
+      (sum, s) => sum + s.allActivities.filter((a) => (a.stamps_earned?.length ?? 0) >= 4).length,
+      0,
+    );
+    const avgPerStudent = total > 0 ? completedPages / total : 0;
+    const flagged = students.filter((s) => s.hasFlaggedChat).length;
+    const participationRate = total > 0 ? Math.round((active / total) * 100) : 0;
+    return { total, active, completedPages, avgPerStudent, flagged, participationRate };
+  }, [students]);
 
   const renderOverview = () => {
     if (loadingStudents) {
@@ -171,9 +186,95 @@ export default function TeacherPage() {
   };
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Tab navigation */}
-      <div className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <section className="overflow-hidden rounded-[32px] border border-border bg-white shadow-sm">
+        <div className="px-6 py-7 lg:px-8 space-y-6">
+          {/* Header */}
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+              <span>🏫</span>
+              <span>Teacher Dashboard</span>
+            </div>
+            <h1 className="mt-4 text-2xl font-bold text-foreground sm:text-3xl">
+              학생 현황, 계정, 도서와 자료를 한 곳에서 관리하세요
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
+              학생 현황을 확인하고, 계정·도서·캠페인을 효율적으로 관리할 수 있습니다.
+            </p>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {/* 전체 학생 + 참여율 게이지 */}
+            <article className="group rounded-2xl border border-border bg-white p-4 transition-all duration-200 hover:shadow-md hover:scale-[1.02]">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">전체 학생</p>
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-base">👥</span>
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{stats.total}<span className="text-sm font-normal text-muted ml-0.5">명</span></p>
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-[11px] text-muted mb-1">
+                  <span>참여율</span>
+                  <span className="font-medium text-foreground">{stats.participationRate}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted-light overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-amber-400 transition-all duration-500"
+                    style={{ width: `${stats.participationRate}%` }}
+                  />
+                </div>
+              </div>
+            </article>
+
+            {/* 활동 참여 */}
+            <article className="group rounded-2xl border border-border bg-white p-4 transition-all duration-200 hover:shadow-md hover:scale-[1.02]">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">활동 참여</p>
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-base">📘</span>
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{stats.active}<span className="text-sm font-normal text-muted ml-0.5">명</span></p>
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-[11px] text-muted mb-1">
+                  <span>미참여</span>
+                  <span className="font-medium text-foreground">{stats.total - stats.active}명</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted-light overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-400 transition-all duration-500"
+                    style={{ width: `${stats.participationRate}%` }}
+                  />
+                </div>
+              </div>
+            </article>
+
+            {/* 완성 여권 페이지 */}
+            <article className="group rounded-2xl border border-border bg-white p-4 transition-all duration-200 hover:shadow-md hover:scale-[1.02]">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">완성 여권 페이지</p>
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-base">🛂</span>
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{stats.completedPages}<span className="text-sm font-normal text-muted ml-0.5">건</span></p>
+              <p className="mt-2 text-[11px] text-muted">
+                1인당 평균 <span className="font-semibold text-emerald-600">{stats.avgPerStudent.toFixed(1)}</span>건
+              </p>
+            </article>
+
+            {/* 플래그 대화 */}
+            <article className="group rounded-2xl border border-border bg-white p-4 transition-all duration-200 hover:shadow-md hover:scale-[1.02]">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">플래그 대화</p>
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-base">🚩</span>
+              </div>
+              <p className={`mt-2 text-2xl font-semibold ${stats.flagged > 0 ? 'text-error' : 'text-foreground'}`}>{stats.flagged}<span className="text-sm font-normal text-muted ml-0.5">건</span></p>
+              <p className="mt-2 text-[11px] text-muted">
+                {stats.flagged > 0 ? '확인이 필요합니다' : '이상 없음'}
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <div className="flex gap-2 overflow-x-auto rounded-2xl border border-border bg-white p-2 shadow-sm">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -185,10 +286,10 @@ export default function TeacherPage() {
                 setSelectedChat(null);
               }
             }}
-            className={`flex items-center gap-2 px-4 py-3 text-sm whitespace-nowrap border-b-2 transition-colors ${
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === tab.key
-                ? 'border-primary text-primary font-medium'
-                : 'border-transparent text-muted hover:text-foreground'
+                ? 'bg-foreground text-white shadow-sm'
+                : 'text-muted hover:bg-muted-light hover:text-foreground'
             }`}
           >
             <span>{tab.icon}</span>
@@ -197,14 +298,14 @@ export default function TeacherPage() {
         ))}
       </div>
 
-      {/* Tab content */}
-      <div>
+      <section className="rounded-3xl border border-border bg-white p-6 shadow-sm">
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'content' && <ContentManager />}
+        {activeTab === 'resources' && <ContentManager />}
         {activeTab === 'students' && <StudentCreator />}
-        {activeTab === 'gallery' && <GalleryGrid />}
+        {activeTab === 'library' && <TeacherLibraryManager />}
+        {activeTab === 'campaign' && <TeacherCampaignManager />}
         {activeTab === 'settings' && <ClassSettingsPanel />}
-      </div>
+      </section>
     </main>
   );
 }

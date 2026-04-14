@@ -1,58 +1,86 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getPendingApprovals, processApproval } from '@/lib/queries/admin';
+import { requireAdmin } from '@/lib/auth/guards';
+import { createServiceClient } from '@/lib/supabase/service';
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
+  const auth = await requireAdmin();
+  if ('error' in auth) {
+    return auth.error;
   }
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
+  const service = createServiceClient();
+  const { data: approvals, error } = await service
+    .from('approval_requests')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
 
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const approvals = await getPendingApprovals();
-  return NextResponse.json({ approvals });
+  const approvalRows = approvals ?? [];
+  const requesterIds = Array.from(new Set(approvalRows.map((approval) => approval.requester_id)));
+  const bookIds = approvalRows
+    .filter((approval) => approval.content_type === 'book')
+    .map((approval) => approval.content_id);
+  const hiddenContentIds = approvalRows
+    .filter((approval) => approval.content_type === 'hidden_content')
+    .map((approval) => approval.content_id);
+
+  const [requestersResult, booksResult, hiddenContentResult] = await Promise.all([
+    requesterIds.length > 0
+      ? service.from('users').select('id, nickname, email, school, grade, class').in('id', requesterIds)
+      : Promise.resolve({ data: [], error: null }),
+    bookIds.length > 0
+      ? service.from('books').select('id, title, cover_url, country_id, scope, approved').in('id', bookIds)
+      : Promise.resolve({ data: [], error: null }),
+    hiddenContentIds.length > 0
+      ? service.from('hidden_content').select('id, title, url, type, book_id, country_id, scope, approved').in('id', hiddenContentIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const requesterById = new Map((requestersResult.data ?? []).map((requester) => [requester.id, requester]));
+  const bookById = new Map((booksResult.data ?? []).map((book) => [book.id, book]));
+  const hiddenContentById = new Map((hiddenContentResult.data ?? []).map((content) => [content.id, content]));
+
+  return NextResponse.json({
+    approvals: approvalRows.map((approval) => ({
+      ...approval,
+      requester: requesterById.get(approval.requester_id) ?? null,
+      content:
+        approval.content_type === 'book'
+          ? bookById.get(approval.content_id) ?? null
+          : hiddenContentById.get(approval.content_id) ?? null,
+    })),
+  });
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+  const auth = await requireAdmin();
+  if ('error' in auth) {
+    return auth.error;
   }
 
   const body = await request.json();
-  const { requestId, action } = body;
+  const requestId = typeof body.requestId === 'string' ? body.requestId : '';
+  const action = body.action;
+  const reviewNote = typeof body.reviewNote === 'string' ? body.reviewNote.trim() : null;
 
   if (!requestId || !action || !['approved', 'rejected'].includes(action)) {
     return NextResponse.json({ error: '잘못된 요청입니다' }, { status: 400 });
   }
 
-  const result = await processApproval(requestId, action, user.id);
+  const service = createServiceClient();
+  const { error } = await service.rpc('process_admin_approval', {
+    p_request_id: requestId,
+    p_reviewer_id: auth.user.id,
+    p_status: action,
+    p_review_note: reviewNote,
+  });
 
-  if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

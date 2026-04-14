@@ -4,10 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
 import type { Story, CountryFact } from '@/types/database';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
 
 const POLL_INTERVAL = 5000;
 const CAROUSEL_INTERVAL = 5000;
@@ -110,6 +108,16 @@ export default function CreatingPageContent({
           setStatus(s.production_status);
           setProgress(s.production_progress);
 
+          if (s.story_status === 'completed') {
+            router.replace(`/book/${bookId}/mystory/complete?storyId=${storyId}&lang=${s.language}`);
+            return;
+          }
+
+          if (s.story_status === 'archived') {
+            router.replace(`/book/${bookId}/mystory?lang=${s.language}`);
+            return;
+          }
+
           const hasCoverConfig =
             !!s.cover_design?.title || !!s.cover_design?.description || !!s.cover_design?.image_url;
           if (!hasCoverConfig && s.production_status === 'pending') {
@@ -122,7 +130,7 @@ export default function CreatingPageContent({
       }
     };
     fetchStory();
-  }, [storyId]);
+  }, [storyId, bookId, router]);
 
   // Fetch country facts
   useEffect(() => {
@@ -251,28 +259,6 @@ export default function CreatingPageContent({
       .eq('id', storyId);
 
     startProduction();
-  };
-
-  const handleStepSelect = async (targetStep: number) => {
-    if (!storyId || !story) return;
-
-    if (targetStep === 8 && status !== 'completed') {
-      setError(lang === 'en' ? 'The book is still being created.' : '아직 그림책 제작이 끝나지 않았어요.');
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-      await supabase
-        .from('stories')
-        .update({ current_step: Math.max(story.current_step, targetStep) })
-        .eq('id', storyId);
-
-      router.push(getStepRouteWithLang(bookId, targetStep, storyId, story.language));
-    } catch (err) {
-      console.error('Step navigation error:', err);
-      setError(lang === 'en' ? 'Could not move to that step.' : '그 단계로 이동하지 못했어요.');
-    }
   };
 
   const goToPrev = () => {

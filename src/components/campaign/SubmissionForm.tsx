@@ -131,6 +131,12 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
     setError(null);
     startTransition(async () => {
       try {
+        const submissionAssets = assets.map((asset) => {
+          const sanitizedAsset = { ...asset };
+          delete sanitizedAsset.previewUrl;
+          return sanitizedAsset;
+        });
+
         const res = await fetch(`/api/campaign/${campaign.id}/submissions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -138,7 +144,7 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
             title: title.trim(),
             description: description.trim() || null,
             content_type: contentType,
-            assets: assets.map(({ previewUrl, ...rest }) => rest),
+            assets: submissionAssets,
           }),
         });
 

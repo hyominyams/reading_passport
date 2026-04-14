@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import type { Story, CoverDesign, CharacterRef, PictureBookShape } from '@/types/database';
 import { getStepRouteWithLang } from '@/lib/mystory-steps';
 import { getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
 import {
@@ -15,6 +14,7 @@ import {
   normalizePictureBookShape,
   PICTURE_BOOK_SHAPE_OPTIONS,
 } from '@/lib/picture-book-shapes';
+import type { Story, CoverDesign, CharacterRef, PictureBookShape } from '@/types/database';
 
 type CoverImageMode = 'upload' | 'describe' | 'skip';
 
@@ -65,6 +65,11 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
         if (data) {
           const s = data as Story;
           setStory(s);
+
+          if (s.story_status === 'archived') {
+            router.replace(`/book/${bookId}/mystory?lang=${s.language}`);
+            return;
+          }
 
           const hasValidCharacter = Array.isArray(s.character_designs)
             && s.character_designs.some((character) =>
@@ -263,6 +268,8 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
       updatePayload.current_step = Math.max(story.current_step, targetStep);
       if (targetStep >= 7) {
         updatePayload.production_status = 'pending';
+        updatePayload.production_progress = 0;
+        updatePayload.scene_images = null;
       }
     }
 
@@ -281,7 +288,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
 
   // Save and navigate
   const handleSubmit = async () => {
-    if (!storyId || !title.trim()) return;
+    if (!storyId || !story || !title.trim()) return;
     if (coverImageMode === 'describe' && !generatedCoverUrl) {
       setError('표지를 먼저 생성한 뒤 다음 단계로 이동해 주세요.');
       return;
@@ -292,7 +299,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
     try {
       await persistCover(7);
 
-      router.push(`/book/${bookId}/mystory/creating?storyId=${storyId}`);
+      router.push(getStepRouteWithLang(bookId, 7, storyId, story.language));
     } catch (err) {
       console.error('Save error:', err);
       setError('저장에 실패했어요. 다시 시도해 주세요.');

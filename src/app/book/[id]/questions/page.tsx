@@ -1,4 +1,5 @@
 import Header from '@/components/common/Header';
+import { getStudentClassSetting } from '@/lib/classroom';
 import { getBookById, getStudentActivity } from '@/lib/queries/books';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
@@ -13,7 +14,7 @@ export default async function QuestionsPage({
 }) {
   const { id } = await params;
   const { lang } = await searchParams;
-  const language = lang === 'en' ? 'en' : 'ko';
+  const language = lang || 'ko';
 
   const supabase = await createClient();
   const {
@@ -28,6 +29,12 @@ export default async function QuestionsPage({
     getBookById(id),
     getStudentActivity(user.id, id),
   ]);
+
+  const { data: userProfile } = await supabase
+    .from('users')
+    .select('teacher_id, class')
+    .eq('id', user.id)
+    .single();
 
   if (!book) {
     return (
@@ -56,6 +63,12 @@ export default async function QuestionsPage({
     .limit(1)
     .maybeSingle();
 
+  const classSetting = await getStudentClassSetting(supabase, {
+    teacher_id: userProfile?.teacher_id ?? null,
+    class: userProfile?.class ?? null,
+  });
+  const requiredQuestionCount = classSetting?.questions_required_count ?? 7;
+
   return (
     <>
       <Header />
@@ -66,6 +79,7 @@ export default async function QuestionsPage({
           userId={user.id}
           initialActivity={activity}
           existingLog={existingLog}
+          requiredQuestionCount={requiredQuestionCount}
         />
       </main>
     </>

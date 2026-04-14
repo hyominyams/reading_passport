@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ensureTeacherClassRecord } from '@/lib/classroom';
+import { clampRequiredQuestionCount } from '@/lib/question-requirements';
 
 async function getAuthorizedTeacher() {
   const supabase = await createClient();
@@ -16,7 +17,7 @@ async function getAuthorizedTeacher() {
     .eq('id', user.id)
     .single();
 
-  if (!profile || (profile.role !== 'teacher' && profile.role !== 'admin')) {
+  if (!profile || profile.role !== 'teacher') {
     return { supabase, error: NextResponse.json({ error: '권한이 없습니다' }, { status: 403 }) };
   }
 
@@ -59,7 +60,7 @@ export async function GET() {
 
   const { data: classes, error } = await supabase
     .from('classes')
-    .select('id, teacher_id, class_code, school, grade, class_name, mystory_required_turns')
+    .select('id, teacher_id, class_code, school, grade, class_name, mystory_required_turns, questions_required_count')
     .eq('teacher_id', user.id)
     .order('grade', { ascending: true })
     .order('class_name', { ascending: true });
@@ -71,23 +72,88 @@ export async function GET() {
   return NextResponse.json({ classes: classes ?? [] });
 }
 
+export async function POST(request: NextRequest) {
+  const auth = await getAuthorizedTeacher();
+  if ('error' in auth && auth.error) return auth.error;
+
+  const { supabase, profile, user } = auth;
+  const body = await request.json();
+  const className = typeof body.class_name === 'string' ? body.class_name.trim() : '';
+
+  if (!className) {
+    return NextResponse.json({ error: '반 이름을 입력해주세요' }, { status: 400 });
+  }
+
+  const existingClass = await supabase
+    .from('classes')
+    .select('id')
+    .eq('teacher_id', user.id)
+    .eq('class_name', className)
+    .maybeSingle();
+
+  if (existingClass.data?.id) {
+    return NextResponse.json({ error: '이미 같은 이름의 반이 있습니다' }, { status: 409 });
+  }
+
+  try {
+    const record = await ensureTeacherClassRecord(supabase, {
+      id: user.id,
+      class: className,
+      school: profile.school,
+      grade: profile.grade,
+    });
+
+    const { data: createdClass, error } = await supabase
+      .from('classes')
+      .select('id, teacher_id, class_code, school, grade, class_name, mystory_required_turns, questions_required_count')
+      .eq('id', record.id)
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ class: createdClass });
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : '반 생성에 실패했습니다',
+    }, { status: 500 });
+  }
+}
+
 export async function PUT(request: NextRequest) {
   const auth = await getAuthorizedTeacher();
   if ('error' in auth && auth.error) return auth.error;
 
   const { supabase, user } = auth;
   const body = await request.json();
-  const { id, mystory_required_turns } = body as { id?: string; mystory_required_turns?: number };
+  const { id, mystory_required_turns, questions_required_count } = body as {
+    id?: string;
+    mystory_required_turns?: number;
+    questions_required_count?: number;
+  };
 
-  if (!id || typeof mystory_required_turns !== 'number') {
-    return NextResponse.json({ error: '반 ID와 채팅 횟수가 필요합니다' }, { status: 400 });
+  if (!id) {
+    return NextResponse.json({ error: '반 ID가 필요합니다' }, { status: 400 });
   }
 
-  const turns = Math.max(3, Math.min(20, Math.round(mystory_required_turns)));
+  const updateData: Record<string, number> = {};
+
+  if (typeof mystory_required_turns === 'number') {
+    updateData.mystory_required_turns = Math.max(3, Math.min(20, Math.round(mystory_required_turns)));
+  }
+
+  if (typeof questions_required_count === 'number') {
+    updateData.questions_required_count = clampRequiredQuestionCount(questions_required_count);
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: '변경할 설정 값이 없습니다' }, { status: 400 });
+  }
 
   const { error } = await supabase
     .from('classes')
-    .update({ mystory_required_turns: turns })
+    .update(updateData)
     .eq('id', id)
     .eq('teacher_id', user.id);
 
@@ -95,5 +161,5 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, mystory_required_turns: turns });
+  return NextResponse.json({ success: true, ...updateData });
 }

@@ -8,9 +8,9 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import StepProgress from '@/components/story/StepProgress';
 import { createClient } from '@/lib/supabase/client';
-import type { Story, IllustrationStyle, CharacterDesign, CharacterGender } from '@/types/database';
 import { ILLUSTRATION_STYLE_OPTIONS, getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
 import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import type { Story, IllustrationStyle, CharacterDesign, CharacterGender } from '@/types/database';
 
 /* ── Constants ── */
 
@@ -98,6 +98,11 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
         if (data) {
           const s = data as Story;
           setStory(s);
+
+          if (s.story_status === 'archived') {
+            router.replace(`/book/${bookId}/mystory?lang=${s.language}`);
+            return;
+          }
 
           // Guard: character step needs story text first
           if (!s.final_text || s.final_text.length === 0) {

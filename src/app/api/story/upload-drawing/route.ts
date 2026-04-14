@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     const publicUrl = await storeGeneratedImageBuffer({
       fileBuffer: buffer,
       mimeType: file.type,
-      folder: 'student-drawings',
+      folder: `student-drawings/${storyId}`,
     });
 
     return NextResponse.json({ url: publicUrl });

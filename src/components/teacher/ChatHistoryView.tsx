@@ -48,7 +48,7 @@ export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHi
           <span>돌아가기</span>
         </button>
 
-        <div className="border border-border rounded-xl p-4 mb-6">
+        <div className="border border-border rounded-2xl p-4 mb-6">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="font-bold text-lg">{studentName}의 질문</h2>
             <div className="flex items-center gap-3 text-sm text-muted">
@@ -63,7 +63,7 @@ export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHi
             const questions = grouped[cat.title];
             if (!questions?.length) return null;
             return (
-              <div key={cat.title} className="border border-border rounded-xl p-4">
+              <div key={cat.title} className="border border-border rounded-2xl p-4">
                 <h3 className="font-bold text-sm text-foreground flex items-center gap-2 mb-3">
                   <span>{cat.icon}</span>
                   <span>{cat.title}</span>
@@ -99,7 +99,7 @@ export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHi
         <span>돌아가기</span>
       </button>
 
-      <div className="border border-border rounded-xl p-4 mb-4">
+      <div className="border border-border rounded-2xl p-4 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="font-bold text-lg">
             {studentName} {'\u00D7'} {characterName}
@@ -111,7 +111,7 @@ export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHi
         </div>
 
         {chatLog.flagged && (
-          <div className="mt-3 p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error flex items-center gap-2">
+          <div className="mt-3 p-3 bg-error/10 border border-error/20 rounded-2xl text-sm text-error flex items-center gap-2">
             <span>{'\u26A0\uFE0F'}</span>
             <span>이 대화는 부적절한 내용으로 플래그 처리되었습니다</span>
           </div>
@@ -134,7 +134,7 @@ export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHi
                 <div
                   className={`max-w-[75%] rounded-2xl px-4 py-3 ${
                     isStudent
-                      ? 'bg-primary text-white rounded-br-md'
+                      ? 'bg-foreground text-white rounded-br-md'
                       : 'bg-muted-light text-foreground rounded-bl-md'
                   }`}
                 >

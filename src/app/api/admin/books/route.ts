@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { pickPreferredPdfUrl } from '@/lib/pdf-analysis';
+import { requireAdmin } from '@/lib/auth/guards';
+import { pickPreferredPdfUrlFromMap } from '@/lib/pdf-analysis';
 import { getAllBooks, createBook, updateBook, deleteBook } from '@/lib/queries/admin';
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+  const auth = await requireAdmin();
+  if ('error' in auth) {
+    return auth.error;
   }
 
   const books = await getAllBooks();
@@ -26,27 +14,28 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+  const auth = await requireAdmin();
+  if ('error' in auth) {
+    return auth.error;
   }
 
   const body = await request.json();
-  const { country_id, title, cover_url, pdf_url_ko, pdf_url_en, character_analysis } = body;
+  const { country_id, title, cover_url, pdf_urls, character_analysis } = body;
+
+  // Build pdf_urls map (accept both new pdf_urls and legacy fields)
+  const pdfUrls: Record<string, string> = {};
+  if (pdf_urls && typeof pdf_urls === 'object') {
+    for (const [k, v] of Object.entries(pdf_urls)) {
+      if (typeof v === 'string' && v.trim()) pdfUrls[k] = v.trim();
+    }
+  }
+  if (!Object.keys(pdfUrls).length) {
+    if (typeof body.pdf_url_ko === 'string' && body.pdf_url_ko.trim()) pdfUrls.ko = body.pdf_url_ko.trim();
+    if (typeof body.pdf_url_en === 'string' && body.pdf_url_en.trim()) pdfUrls.en = body.pdf_url_en.trim();
+  }
+
   const normalizedCoverUrl = cover_url?.trim() || null;
-  const preferredPdfUrl = pickPreferredPdfUrl(pdf_url_ko, pdf_url_en);
+  const preferredPdfUrl = pickPreferredPdfUrlFromMap(pdfUrls);
   const resolvedCoverUrl = normalizedCoverUrl || preferredPdfUrl;
 
   if (!country_id || !title || !resolvedCoverUrl) {
@@ -57,13 +46,12 @@ export async function POST(request: NextRequest) {
     country_id,
     title,
     cover_url: resolvedCoverUrl,
-    pdf_url_ko: pdf_url_ko || null,
-    pdf_url_en: pdf_url_en || null,
+    pdf_urls: pdfUrls,
     character_analysis:
       character_analysis && typeof character_analysis === 'object'
         ? character_analysis
         : undefined,
-    created_by: user.id,
+    created_by: auth.user.id,
     base_url: request.nextUrl.origin,
   });
 
@@ -75,37 +63,32 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+  const auth = await requireAdmin();
+  if ('error' in auth) {
+    return auth.error;
   }
 
   const body = await request.json();
-  const { id, cover_url, pdf_url_ko, pdf_url_en, ...restUpdateData } = body;
+  const { id, cover_url, pdf_urls, ...restUpdateData } = body;
 
   if (!id) {
     return NextResponse.json({ error: '도서 ID가 필요합니다' }, { status: 400 });
   }
 
+  // Build pdf_urls map
+  const pdfUrls: Record<string, string> = {};
+  if (pdf_urls && typeof pdf_urls === 'object') {
+    for (const [k, v] of Object.entries(pdf_urls)) {
+      if (typeof v === 'string' && v.trim()) pdfUrls[k] = v.trim();
+    }
+  }
+
   const normalizedCoverUrl = typeof cover_url === 'string' ? cover_url.trim() : cover_url;
-  const preferredPdfUrl = pickPreferredPdfUrl(pdf_url_ko, pdf_url_en);
+  const preferredPdfUrl = pickPreferredPdfUrlFromMap(pdfUrls);
   const updateData = {
     ...restUpdateData,
+    pdf_urls: pdfUrls,
     ...(cover_url !== undefined ? { cover_url: normalizedCoverUrl || preferredPdfUrl || '' } : {}),
-    ...(pdf_url_ko !== undefined ? { pdf_url_ko: pdf_url_ko || null } : {}),
-    ...(pdf_url_en !== undefined ? { pdf_url_en: pdf_url_en || null } : {}),
     base_url: request.nextUrl.origin,
   };
 
@@ -119,21 +102,9 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+  const auth = await requireAdmin();
+  if ('error' in auth) {
+    return auth.error;
   }
 
   const id = request.nextUrl.searchParams.get('id');

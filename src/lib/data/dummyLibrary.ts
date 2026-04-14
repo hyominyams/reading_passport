@@ -160,8 +160,6 @@ export function generateDummyLibraryItems(): LibraryStoryItem[] {
       const storyId = makeId();
       const libId = makeId();
       const pageSet = buildPages(s.title, items.length);
-      const coverUrl = countryCoverList[items.length % countryCoverList.length];
-
       const sceneImgs = pageSet.map(
         (_, pi) => countryCoverList[(items.length + pi) % countryCoverList.length]
       );
@@ -194,8 +192,10 @@ export function generateDummyLibraryItems(): LibraryStoryItem[] {
           character_refs: null,
           scene_images: sceneImgs,
           translation_text: null,
+          translated_texts: null,
           pdf_url_original: null,
           pdf_url_translated: null,
+          translated_pdf_urls: null,
           visibility: 'public',
           created_at: new Date().toISOString(),
           author: { nickname: s.author },

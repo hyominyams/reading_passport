@@ -1,26 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
-import { generateAndStoreBookCover } from '@/lib/books/generate-cover';
-import type { User, Book, ApprovalRequest, HiddenContent, Story, LibraryItem, Language } from '@/types/database';
+import { computeLanguagesFromMap, pickPreferredPdfUrlFromMap } from '@/lib/pdf-analysis';
+import type { User, Book, ApprovalRequest, HiddenContent, Story, LibraryItem } from '@/types/database';
 
-function computeLanguagesAvailable(
-  pdfUrlKo?: string | null,
-  pdfUrlEn?: string | null
-): Language[] {
-  const languages: Language[] = [];
-
-  if (pdfUrlKo) {
-    languages.push('ko');
-  }
-  if (pdfUrlEn) {
-    languages.push('en');
-  }
-
-  // Keep Korean as the fallback so new books remain readable even before PDF URLs are finalized.
-  if (languages.length === 0) {
-    languages.push('ko');
-  }
-
-  return languages;
+async function generateBookCover(options: {
+  bookId: string;
+  pdfUrls?: Record<string, string> | null;
+  pdfUrlKo?: string | null;
+  pdfUrlEn?: string | null;
+  baseUrl?: string;
+}) {
+  const coverModule = await import('@/lib/books/generate-cover');
+  return coverModule.generateAndStoreBookCover(options);
 }
 
 export async function getAllTeachers(): Promise<User[]> {
@@ -127,7 +117,10 @@ export async function createBook(data: {
   country_id: string;
   title: string;
   cover_url: string;
+  pdf_urls?: Record<string, string>;
+  /** @deprecated */
   pdf_url_ko?: string | null;
+  /** @deprecated */
   pdf_url_en?: string | null;
   character_analysis?: Record<string, unknown>;
   created_by: string;
@@ -135,15 +128,23 @@ export async function createBook(data: {
 }): Promise<{ success: boolean; bookId?: string; error?: string }> {
   const supabase = await createClient();
 
+  // Build canonical pdf_urls map
+  const pdfUrls: Record<string, string> = { ...(data.pdf_urls ?? {}) };
+  if (!Object.keys(pdfUrls).length) {
+    if (data.pdf_url_ko?.trim()) pdfUrls.ko = data.pdf_url_ko.trim();
+    if (data.pdf_url_en?.trim()) pdfUrls.en = data.pdf_url_en.trim();
+  }
+
   const { data: result, error } = await supabase
     .from('books')
     .insert({
       country_id: data.country_id,
       title: data.title,
       cover_url: data.cover_url,
-      pdf_url_ko: data.pdf_url_ko ?? null,
-      pdf_url_en: data.pdf_url_en ?? null,
-      languages_available: computeLanguagesAvailable(data.pdf_url_ko, data.pdf_url_en),
+      pdf_urls: pdfUrls,
+      pdf_url_ko: pdfUrls.ko ?? null,
+      pdf_url_en: pdfUrls.en ?? null,
+      languages_available: computeLanguagesFromMap(pdfUrls),
       character_analysis: data.character_analysis ?? {},
       created_by: data.created_by,
       scope: 'global',
@@ -159,10 +160,9 @@ export async function createBook(data: {
 
   if (result?.id) {
     try {
-      const generatedCoverUrl = await generateAndStoreBookCover({
+      const generatedCoverUrl = await generateBookCover({
         bookId: result.id,
-        pdfUrlKo: data.pdf_url_ko ?? null,
-        pdfUrlEn: data.pdf_url_en ?? null,
+        pdfUrls,
         baseUrl: data.base_url,
       });
 
@@ -190,7 +190,10 @@ export async function updateBook(
     title: string;
     country_id: string;
     cover_url: string;
+    pdf_urls: Record<string, string>;
+    /** @deprecated */
     pdf_url_ko: string | null;
+    /** @deprecated */
     pdf_url_en: string | null;
     approved: boolean;
     character_analysis: Record<string, unknown>;
@@ -201,7 +204,7 @@ export async function updateBook(
 
   const { data: currentBook, error: fetchError } = await supabase
     .from('books')
-    .select('cover_url, pdf_url_ko, pdf_url_en')
+    .select('cover_url, pdf_urls, pdf_url_ko, pdf_url_en')
     .eq('id', bookId)
     .single();
 
@@ -210,17 +213,32 @@ export async function updateBook(
     return { success: false, error: fetchError?.message ?? '도서를 찾을 수 없습니다' };
   }
 
-  const nextPdfUrlKo = data.pdf_url_ko !== undefined ? data.pdf_url_ko : currentBook.pdf_url_ko;
-  const nextPdfUrlEn = data.pdf_url_en !== undefined ? data.pdf_url_en : currentBook.pdf_url_en;
-  const nextLanguages = computeLanguagesAvailable(nextPdfUrlKo, nextPdfUrlEn);
-  const { base_url, ...bookUpdateData } = data;
+  // Build next pdf_urls map
+  let nextPdfUrls: Record<string, string>;
+  if (data.pdf_urls !== undefined) {
+    nextPdfUrls = { ...data.pdf_urls };
+  } else {
+    nextPdfUrls = { ...((currentBook.pdf_urls as Record<string, string>) ?? {}) };
+    if (data.pdf_url_ko !== undefined) {
+      if (data.pdf_url_ko) nextPdfUrls.ko = data.pdf_url_ko;
+      else delete nextPdfUrls.ko;
+    }
+    if (data.pdf_url_en !== undefined) {
+      if (data.pdf_url_en) nextPdfUrls.en = data.pdf_url_en;
+      else delete nextPdfUrls.en;
+    }
+  }
+
+  const nextLanguages = computeLanguagesFromMap(nextPdfUrls);
+  const { base_url, pdf_urls: _pdfUrlsParam, pdf_url_ko: _ko, pdf_url_en: _en, ...bookUpdateData } = data;
 
   const { error } = await supabase
     .from('books')
     .update({
       ...bookUpdateData,
-      pdf_url_ko: nextPdfUrlKo,
-      pdf_url_en: nextPdfUrlEn,
+      pdf_urls: nextPdfUrls,
+      pdf_url_ko: nextPdfUrls.ko ?? null,
+      pdf_url_en: nextPdfUrls.en ?? null,
       languages_available: nextLanguages,
     })
     .eq('id', bookId);
@@ -230,21 +248,19 @@ export async function updateBook(
     return { success: false, error: error.message };
   }
 
-  const pdfUrlChanged =
-    nextPdfUrlKo !== currentBook.pdf_url_ko || nextPdfUrlEn !== currentBook.pdf_url_en;
+  const oldPdfUrl = pickPreferredPdfUrlFromMap((currentBook.pdf_urls as Record<string, string>) ?? {});
+  const newPdfUrl = pickPreferredPdfUrlFromMap(nextPdfUrls);
+  const pdfUrlChanged = oldPdfUrl !== newPdfUrl;
 
   const shouldRegenerateCover =
     pdfUrlChanged ||
-    !currentBook.cover_url ||
-    currentBook.cover_url === nextPdfUrlKo ||
-    currentBook.cover_url === nextPdfUrlEn;
+    !currentBook.cover_url;
 
   if (shouldRegenerateCover) {
     try {
-      const generatedCoverUrl = await generateAndStoreBookCover({
+      const generatedCoverUrl = await generateBookCover({
         bookId,
-        pdfUrlKo: nextPdfUrlKo,
-        pdfUrlEn: nextPdfUrlEn,
+        pdfUrls: nextPdfUrls,
         baseUrl: base_url,
       });
 

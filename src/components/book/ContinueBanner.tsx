@@ -26,7 +26,7 @@ const NEXT_ACTIVITY_LABEL: Record<StampType, string> = {
   read: 'Story Read',
   hidden: 'Hidden Stories',
   questions: 'Make Questions',
-  mystory: 'My Story',
+  mystory: 'My World',
 };
 
 const NEXT_ACTIVITY_ROUTE: Record<StampType, string> = {
