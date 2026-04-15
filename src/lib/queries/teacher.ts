@@ -121,6 +121,10 @@ export async function bulkCreateStudents(
     return { success: false, error: '학생 닉네임을 입력해주세요' };
   }
 
+  if (cleanNicknames.length > 30) {
+    return { success: false, error: '한 번에 최대 30명까지 등록할 수 있습니다' };
+  }
+
   try {
     const existingCodes = await loadExistingStudentCodes();
     const students: { nickname: string; code: string }[] = [];

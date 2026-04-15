@@ -58,6 +58,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '학생 닉네임을 입력해주세요' }, { status: 400 });
     }
 
+    if (nicknames.length > 30) {
+      return NextResponse.json({ error: '한 번에 최대 30명까지 등록할 수 있습니다' }, { status: 400 });
+    }
+
     const result = await bulkCreateStudents(
       user.id,
       nicknames,
