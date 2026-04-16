@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/lib/supabase/client';
+import BackToActivity from '@/components/book/BackToActivity';
 import type { Book, Activity, ChatLog } from '@/types/database';
 import { buildQuestionRequirements } from '@/lib/question-requirements';
 
@@ -420,13 +421,8 @@ export default function QuestionsPageContent({
 
           <FeedbackCards feedback={validation} />
 
-          <div className="flex gap-3 pb-8">
-            <button
-              onClick={() => router.push(`/book/${book.id}/activity?lang=${language}`)}
-              className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-secondary text-white font-bold text-sm"
-            >
-              활동 페이지로 돌아가기
-            </button>
+          <div className="flex justify-center pb-8">
+            <BackToActivity bookId={book.id} language={language} />
           </div>
         </motion.div>
       </div>
@@ -436,8 +432,8 @@ export default function QuestionsPageContent({
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <span>❓</span> 질문 만들기
           </h1>
@@ -445,9 +441,9 @@ export default function QuestionsPageContent({
             {book.title} — 책에 대한 질문을 만들어 보세요
           </p>
         </div>
-        <button onClick={() => router.back()} className="text-sm text-muted hover:text-foreground transition-colors">
-          돌아가기
-        </button>
+        <div className="shrink-0 pt-1">
+          <BackToActivity bookId={book.id} language={language} />
+        </div>
       </div>
 
       {/* Progress */}

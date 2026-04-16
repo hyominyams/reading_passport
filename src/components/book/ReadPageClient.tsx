@@ -20,6 +20,7 @@ import EmotionPicker from '@/components/book/EmotionPicker';
 import StampAnimation from '@/components/book/StampAnimation';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
+import BackToActivity from '@/components/book/BackToActivity';
 import type { Book, Activity, Language } from '@/types/database';
 
 interface ReadPageClientProps {
@@ -136,14 +137,19 @@ export default function ReadPageClient({
 
   return (
     <div className="flex flex-col items-center gap-6">
-      {/* Page title */}
-      <div className="text-center">
-        <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-1">
-          {book.title}
-        </h1>
-        <p className="text-sm text-muted">
-          {language === 'en' ? 'English' : '한국어'}로 읽기
-        </p>
+      {/* Back + Title */}
+      <div className="flex w-full items-start gap-3">
+        <div className="shrink-0 pt-1">
+          <BackToActivity bookId={book.id} language={language} />
+        </div>
+        <div className="min-w-0 flex-1 text-center pr-[88px]">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-1 truncate">
+            {book.title}
+          </h1>
+          <p className="text-sm text-muted">
+            {language === 'en' ? 'English' : '한국어'}로 읽기
+          </p>
+        </div>
       </div>
 
       <AnimatePresence mode="wait">

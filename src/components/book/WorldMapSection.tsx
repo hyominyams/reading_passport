@@ -18,7 +18,7 @@ interface WorldMapSectionProps {
 /* ── Pin coordinates (calibrated to world_map.png pixel data) ── */
 const PIN_COORDS: Record<string, { x: number; y: number }> = {
   colombia: { x: 294, y: 330 },
-  peru:     { x: 289, y: 371 },
+  rwanda:   { x: 580, y: 330 },
   kenya:    { x: 592, y: 309 },
   tanzania: { x: 592, y: 338 },
   nepal:    { x: 736, y: 248 },
@@ -26,7 +26,7 @@ const PIN_COORDS: Record<string, { x: number; y: number }> = {
 };
 
 /* ── Flight route order (west → east) ── */
-const ROUTE_ORDER = ['peru', 'colombia', 'kenya', 'tanzania', 'nepal', 'cambodia'];
+const ROUTE_ORDER = ['colombia', 'rwanda', 'kenya', 'tanzania', 'nepal', 'cambodia'];
 
 /* ── Map image dimensions (viewBox matched to image aspect ratio) ── */
 const MAP_VIEWBOX = { w: 1000, h: 546 };

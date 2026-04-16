@@ -41,12 +41,12 @@ export const countries: Country[] = [
     description: '히말라야의 나라',
   },
   {
-    id: 'peru',
-    name: '페루',
-    flag: '🇵🇪',
-    region: 'south-america',
-    image_url: '/images/countries/peru.jpg',
-    description: '잉카 문명의 나라',
+    id: 'rwanda',
+    name: '르완다',
+    flag: '🇷🇼',
+    region: 'africa',
+    image_url: '/images/countries/rwanda.jpg',
+    description: '천 개의 언덕 나라',
   },
   {
     id: 'kenya',

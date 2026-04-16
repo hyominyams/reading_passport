@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/lib/supabase/client';
 import { DETAIL_STEP_META, getStepRouteWithLang } from '@/lib/mystory-steps';
+import BackToActivity from '@/components/book/BackToActivity';
 import type { Language, StoryStatus, StoryType } from '@/types/database';
 
 /* ── Types ── */
@@ -168,17 +169,24 @@ export default function MyStoryEntryHub({
 
       {/* ── A. Compact Header ── */}
       <motion.div {...fadeUp(0)}>
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center rounded-full border border-border bg-muted-light px-3 py-1 text-xs font-heading font-semibold tracking-[0.15em] text-muted">
-            STEP 4
-          </span>
-          <h1 className="text-xl font-heading font-bold text-foreground sm:text-2xl">
-            My World
-          </h1>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center rounded-full border border-border bg-muted-light px-3 py-1 text-xs font-heading font-semibold tracking-[0.15em] text-muted">
+                STEP 4
+              </span>
+              <h1 className="text-xl font-heading font-bold text-foreground sm:text-2xl">
+                My World
+              </h1>
+            </div>
+            <p className="mt-1.5 text-sm text-muted">
+              이야기를 이어서 쓰거나, 새로 시작하거나, 완성본을 확인할 수 있어요.
+            </p>
+          </div>
+          <div className="shrink-0 pt-1">
+            <BackToActivity bookId={bookId} language={language} />
+          </div>
         </div>
-        <p className="mt-1.5 text-sm text-muted">
-          이야기를 이어서 쓰거나, 새로 시작하거나, 완성본을 확인할 수 있어요.
-        </p>
       </motion.div>
 
       {/* ── B. Draft Hero Card / Empty State ── */}

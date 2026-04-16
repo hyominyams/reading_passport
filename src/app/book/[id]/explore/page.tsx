@@ -7,10 +7,14 @@ import ExplorePageClient from '@/components/book/ExplorePageClient';
 
 export default async function ExplorePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }) {
   const { id } = await params;
+  const { lang } = await searchParams;
+  const language = lang || 'ko';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -52,6 +56,7 @@ export default async function ExplorePage({
       <Header />
       <ExplorePageClient
         book={book}
+        language={language}
         initialContents={contents}
         initialCompleted={explorationCompleted}
       />

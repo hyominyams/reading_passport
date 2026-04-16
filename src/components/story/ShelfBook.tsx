@@ -9,7 +9,7 @@ const SPINE_COLORS: Record<string, string> = {
   tanzania: '#2D5016',
   cambodia: '#8B0000',
   nepal: '#1E3A5F',
-  peru: '#B8860B',
+  rwanda: '#1A6B3C',
   kenya: '#D2691E',
 };
 

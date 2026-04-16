@@ -15,7 +15,7 @@ const COUNTRY_SLIDES = [
   { name: '탄자니아', flag: '🇹🇿', desc: '킬리만자로의 나라', image: 'https://images.unsplash.com/photo-1525535816528-974e4b19eb51?w=800&h=500&fit=crop' },
   { name: '캄보디아', flag: '🇰🇭', desc: '앙코르와트의 나라', image: 'https://images.unsplash.com/photo-1504639650150-bf773680d8c3?w=800&h=500&fit=crop' },
   { name: '네팔', flag: '🇳🇵', desc: '히말라야의 나라', image: 'https://images.unsplash.com/photo-1668966780359-78fe21493d9b?w=800&h=500&fit=crop' },
-  { name: '페루', flag: '🇵🇪', desc: '잉카 문명의 나라', image: 'https://images.unsplash.com/photo-1497106636505-e4fd6e16d74c?w=800&h=500&fit=crop' },
+  { name: '르완다', flag: '🇷🇼', desc: '천 개의 언덕 나라', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=500&fit=crop' },
   { name: '케냐', flag: '🇰🇪', desc: '사파리의 나라', image: 'https://images.unsplash.com/photo-1554490752-6a232eca5e60?w=800&h=500&fit=crop' },
 ];
 
@@ -616,7 +616,7 @@ export default function HomePage() {
                   { flag: '🇹🇿', name: 'TANZANIA', sub: '2026.03.19', color: '#2563eb', rotation: 5, top: '8%', left: '52%', shape: 'circle' as const },
                   { flag: '🇰🇭', name: 'CAMBODIA', sub: '2026.04.02', color: '#16a34a', rotation: -3, top: '32%', left: '10%', shape: 'rect' as const },
                   { flag: '🇳🇵', name: 'NEPAL', sub: '2026.04.05', color: '#7c3aed', rotation: 12, top: '36%', left: '55%', shape: 'circle' as const },
-                  { flag: '🇵🇪', name: 'PERU', sub: '2026.04.08', color: '#ea580c', rotation: -6, top: '62%', left: '8%', shape: 'circle' as const },
+                  { flag: '🇷🇼', name: 'RWANDA', sub: '2026.04.08', color: '#ea580c', rotation: -6, top: '62%', left: '8%', shape: 'circle' as const },
                   { flag: '🇰🇪', name: 'KENYA', sub: '2026.04.10', color: '#0891b2', rotation: 8, top: '66%', left: '50%', shape: 'rect' as const },
                 ].map((stamp, i) => (
                   <motion.div
@@ -700,7 +700,7 @@ export default function HomePage() {
           { src: 'https://images.unsplash.com/photo-1525535816528-974e4b19eb51?w=400&h=400&fit=crop', alt: '탄자니아' },
           { src: 'https://images.unsplash.com/photo-1504639650150-bf773680d8c3?w=400&h=400&fit=crop', alt: '캄보디아' },
           { src: 'https://images.unsplash.com/photo-1668966780359-78fe21493d9b?w=400&h=400&fit=crop', alt: '네팔' },
-          { src: 'https://images.unsplash.com/photo-1497106636505-e4fd6e16d74c?w=400&h=400&fit=crop', alt: '페루' },
+          { src: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=400&h=400&fit=crop', alt: '르완다' },
           { src: 'https://images.unsplash.com/photo-1554490752-6a232eca5e60?w=400&h=400&fit=crop', alt: '케냐' },
         ]}
         orbitRadius={18}

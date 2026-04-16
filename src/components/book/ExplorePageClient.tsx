@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ContentCard from '@/components/chat/ContentCard';
 import ContentViewer from '@/components/chat/ContentViewer';
 import ExplorationProgress from '@/components/chat/ExplorationProgress';
+import BackToActivity from '@/components/book/BackToActivity';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import type { HiddenContent, Activity, Book, ContentType } from '@/types/database';
@@ -24,12 +25,14 @@ function getRequiredSeconds(type: string): number {
 
 interface ExplorePageClientProps {
   book: Book;
+  language: string;
   initialContents: HiddenContent[];
   initialCompleted: boolean;
 }
 
 export default function ExplorePageClient({
   book,
+  language,
   initialContents,
   initialCompleted,
 }: ExplorePageClientProps) {
@@ -204,8 +207,8 @@ export default function ExplorePageClient({
 
   return (
     <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <span>🔍</span> 숨겨진 이야기
           </h1>
@@ -213,12 +216,9 @@ export default function ExplorePageClient({
             이 책에 관련된 다양한 콘텐츠를 탐험해 보세요
           </p>
         </div>
-        <button
-          onClick={() => router.back()}
-          className="text-sm text-muted hover:text-foreground transition-colors"
-        >
-          돌아가기
-        </button>
+        <div className="shrink-0 pt-1">
+          <BackToActivity bookId={book.id} language={language} />
+        </div>
       </div>
 
       {totalCount > 0 && (

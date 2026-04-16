@@ -12,7 +12,7 @@ const ALLOWED_MIME_TYPES = [
 
 const UPLOAD_CONFIG: Record<string, { folder: string; maxBytes: number }> = {
   'book-cover': { folder: 'books/covers', maxBytes: 5 * 1024 * 1024 },
-  'book-pdf': { folder: 'books/pdfs', maxBytes: 10 * 1024 * 1024 },
+  'book-pdf': { folder: 'books/pdfs', maxBytes: 25 * 1024 * 1024 },
   'hidden-content': { folder: 'hidden-content', maxBytes: 10 * 1024 * 1024 },
 };
 

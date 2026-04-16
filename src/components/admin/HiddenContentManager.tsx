@@ -6,6 +6,7 @@ import {
   FileText,
   Link2,
   PlayCircle,
+  Upload,
 } from 'lucide-react';
 import type { ContentType } from '@/types/database';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -69,6 +70,8 @@ export default function HiddenContentManager() {
   const [editingItem, setEditingItem] = useState<HiddenContentRow | null>(null);
   const [form, setForm] = useState<HiddenContentFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
   const tone = adminSectionMap.hidden.tone;
 
   const fetchData = async () => {
@@ -139,6 +142,7 @@ export default function HiddenContentManager() {
 
   const openCreateForm = () => {
     setEditingItem(null);
+    setUploadedFileName('');
     setForm({
       ...emptyForm,
       bookId: books[0]?.id ?? '',
@@ -150,6 +154,7 @@ export default function HiddenContentManager() {
 
   const openEditForm = (item: HiddenContentRow) => {
     setEditingItem(item);
+    setUploadedFileName('');
     setForm({
       bookId: item.book_id,
       countryId: item.country_id,
@@ -160,6 +165,27 @@ export default function HiddenContentManager() {
     });
     setShowForm(true);
     setError('');
+  };
+
+  const allowFileUpload = form.type === 'pdf' || form.type === 'image';
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('kind', 'hidden-content');
+      fd.append('file', file);
+      const res = await fetch('/api/teacher/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '파일 업로드에 실패했습니다');
+      setForm((prev) => ({ ...prev, url: data.asset.publicUrl }));
+      setUploadedFileName(file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '파일 업로드에 실패했습니다');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -463,12 +489,51 @@ export default function HiddenContentManager() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-900">URL</label>
-                <input
-                  type="text"
-                  value={form.url}
-                  onChange={(event) => setForm((prev) => ({ ...prev, url: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-200"
-                />
+                {uploadedFileName ? (
+                  <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <span className="truncate text-sm font-medium text-emerald-800">{uploadedFileName}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setForm((prev) => ({ ...prev, url: '' })); setUploadedFileName(''); }}
+                      className="ml-auto shrink-0 text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={form.url}
+                    onChange={(event) => setForm((prev) => ({ ...prev, url: event.target.value }))}
+                    placeholder={allowFileUpload ? '파일 업로드 후 자동 입력되거나 외부 URL을 직접 넣을 수 있어요' : 'https://...'}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-200"
+                  />
+                )}
+                {allowFileUpload && (
+                  <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3">
+                    <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
+                      <span className="text-slate-500">
+                        {form.type === 'pdf' ? 'PDF 파일을 직접 업로드할 수 있습니다.' : '이미지 파일을 직접 업로드할 수 있습니다.'}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm">
+                        <Upload className="h-3.5 w-3.5" /> 파일 선택
+                      </span>
+                      <input
+                        type="file"
+                        accept={form.type === 'pdf' ? 'application/pdf' : 'image/*'}
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) void handleFileUpload(file);
+                        }}
+                      />
+                    </label>
+                    {uploading && (
+                      <p className="mt-2 text-xs text-slate-500">파일을 업로드하는 중...</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -492,10 +557,10 @@ export default function HiddenContentManager() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || uploading}
                   className="flex-1 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {saving ? '저장 중...' : editingItem ? '수정' : '등록'}
+                  {saving ? '저장 중...' : uploading ? '업로드 중...' : editingItem ? '수정' : '등록'}
                 </button>
               </div>
             </form>

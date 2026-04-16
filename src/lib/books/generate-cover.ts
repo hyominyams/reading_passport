@@ -1,5 +1,4 @@
 import { createRequire } from 'node:module';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { pickPreferredPdfUrlFromMap } from '@/lib/pdf-analysis';
 import { storeGeneratedImageBuffer } from '@/lib/storage/generated-images';
 
@@ -9,6 +8,10 @@ const require = createRequire(import.meta.url);
 
 function getCanvasModule() {
   return require('@napi-rs/canvas') as typeof import('@napi-rs/canvas');
+}
+
+async function loadPdfJs() {
+  return (await import('pdfjs-dist/legacy/build/pdf.mjs')) as typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 }
 
 function resolvePdfUrl(pdfUrl: string, baseUrl?: string) {
@@ -32,6 +35,7 @@ async function renderPdfFirstPage(pdfUrl: string, baseUrl?: string) {
   }
 
   const buffer = await response.arrayBuffer();
+  const pdfjs = await loadPdfJs();
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(buffer),
     useWorkerFetch: false,
