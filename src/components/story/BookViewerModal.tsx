@@ -1,8 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getTranslationLanguageLabel } from '@/lib/story-translations';
 
 /* ─── Types ─── */
@@ -33,21 +34,6 @@ interface BookViewerModalProps {
   isLiked?: boolean;
   onLike?: () => void;
   commentCount?: number;
-}
-
-/* ─── Mobile detection (SSR-safe) ─── */
-
-const MQ = '(max-width: 639px)';
-function subscribeMedia(cb: () => void) {
-  const mql = window.matchMedia(MQ);
-  mql.addEventListener('change', cb);
-  return () => mql.removeEventListener('change', cb);
-}
-function getIsMobile() {
-  return window.matchMedia(MQ).matches;
-}
-function getIsMobileServer() {
-  return false;
 }
 
 /* ─── Animation variants ─── */
@@ -137,7 +123,7 @@ export default function BookViewerModal({
   const touchStartX = useRef(0);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  const isMobile = useSyncExternalStore(subscribeMedia, getIsMobile, getIsMobileServer);
+  const isMobile = useMediaQuery('(max-width: 639px)');
 
   const isLastPage = currentPage === pages.length - 1;
   const normalizedTranslatedPagesByLanguage =

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import type { LibraryStoryItem } from '@/components/story/LibraryGrid';
@@ -36,6 +36,11 @@ export default function LibraryPage() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedReadCompleted, setSelectedReadCompleted] = useState(false);
   const likeRequestVersionsRef = useRef(new Map<string, number>());
+  const supabase = useMemo(() => createClient(), []);
+  const countryDataById = useMemo(
+    () => new Map(countries.map((country) => [country.id, country] as const)),
+    []
+  );
 
   useEffect(() => {
     let active = true;
@@ -89,7 +94,7 @@ export default function LibraryPage() {
         setLikedStories(new Set());
         return;
       }
-      const supabase = createClient();
+
       const { data, error } = await supabase
         .from('story_likes')
         .select('story_id')
@@ -112,7 +117,7 @@ export default function LibraryPage() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [supabase, user]);
 
   // Weekly rotating hero: pick from top-liked stories based on week number
   const heroItem = useMemo(() => {
@@ -132,7 +137,7 @@ export default function LibraryPage() {
 
     for (const item of items) {
       const countryId = item.country_id;
-      const countryData = countries.find((c) => c.id === countryId);
+      const countryData = countryDataById.get(countryId);
 
       if (!grouped.has(countryId)) {
         grouped.set(countryId, {
@@ -148,7 +153,7 @@ export default function LibraryPage() {
 
     return Array.from(grouped.values())
       .sort((a, b) => b.items.length - a.items.length);
-  }, [items]);
+  }, [countryDataById, items]);
 
   const commentLockMessage = useMemo(() => {
     if (!user) {
@@ -175,7 +180,7 @@ export default function LibraryPage() {
     && selectedItem.story.student_id !== user.id
     && selectedReadCompleted;
 
-  const handleLike = async (storyId: string) => {
+  const handleLike = useCallback(async (storyId: string) => {
     if (!user) return;
 
     const isLiked = likedStories.has(storyId);
@@ -214,7 +219,6 @@ export default function LibraryPage() {
       return;
     }
 
-    const supabase = createClient();
     const requestVersion = (likeRequestVersionsRef.current.get(storyId) ?? 0) + 1;
     likeRequestVersionsRef.current.set(storyId, requestVersion);
 
@@ -247,14 +251,14 @@ export default function LibraryPage() {
         applyLikeState(isLiked, -likeDelta);
       }
     }
-  };
+  }, [likedStories, supabase, user]);
 
-  const fetchComments = async (storyId: string) => {
+  const fetchComments = useCallback(async (storyId: string) => {
     if (isDummyId(storyId)) {
       setComments([]);
       return;
     }
-    const supabase = createClient();
+
     const { data } = await supabase
       .from('story_comments')
       .select('*, user:users(nickname, role)')
@@ -274,9 +278,9 @@ export default function LibraryPage() {
     } else {
       setComments([]);
     }
-  };
+  }, [supabase]);
 
-  const handleSubmitComment = async () => {
+  const handleSubmitComment = useCallback(async () => {
     if (!user || !selectedItem || !commentText.trim() || !canComment) return;
     setSubmittingComment(true);
 
@@ -293,7 +297,6 @@ export default function LibraryPage() {
         ]);
         setCommentText('');
       } else {
-        const supabase = createClient();
         await supabase
           .from('story_comments')
           .insert({
@@ -319,9 +322,9 @@ export default function LibraryPage() {
     }
 
     setSubmittingComment(false);
-  };
+  }, [canComment, commentText, fetchComments, profile?.nickname, selectedItem, supabase, user]);
 
-  const handleItemClick = async (item: LibraryStoryItem) => {
+  const handleItemClick = useCallback(async (item: LibraryStoryItem) => {
     setViewerSession((prev) => prev + 1);
     setSelectedItem(item);
     setComments([]);
@@ -342,7 +345,6 @@ export default function LibraryPage() {
       return;
     }
 
-    const supabase = createClient();
     if (user) {
       try {
         const response = await fetch(`/api/library/read-progress?storyId=${encodeURIComponent(item.story_id)}`);
@@ -378,9 +380,9 @@ export default function LibraryPage() {
           : libraryItem
       )
     );
-  };
+  }, [fetchComments, supabase, user]);
 
-  const handleReadingComplete = async (totalPages: number) => {
+  const handleReadingComplete = useCallback(async (totalPages: number) => {
     if (!user || !selectedItem) return;
 
     if (isDummyId(selectedItem.story_id)) {
@@ -419,7 +421,7 @@ export default function LibraryPage() {
 
     setErrorMessage(null);
     setSelectedReadCompleted(true);
-  };
+  }, [selectedItem, user]);
 
   if ((authLoading && !user) || loading) {
     return (

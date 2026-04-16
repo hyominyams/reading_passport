@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import LibraryCard from './LibraryCard';
 import type { LibraryStoryItem } from './LibraryGrid';
@@ -24,7 +24,7 @@ interface LibraryCountrySectionProps {
   variant?: 'default' | 'alt';
 }
 
-export default function LibraryCountrySection({
+function LibraryCountrySection({
   countryName,
   countryFlag,
   items,
@@ -175,3 +175,9 @@ export default function LibraryCountrySection({
     </motion.section>
   );
 }
+
+const MemoizedLibraryCountrySection = memo(LibraryCountrySection);
+
+MemoizedLibraryCountrySection.displayName = 'LibraryCountrySection';
+
+export default MemoizedLibraryCountrySection;

@@ -37,7 +37,7 @@ interface Avatar {
 export interface OrbitingAvatarsCTAProps {
   title: React.ReactNode;
   description: React.ReactNode;
-  buttonText: string;
+  buttonText: React.ReactNode;
   buttonProps?: ButtonProps;
   avatars: Avatar[];
   className?: string;

@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import type { LibraryStoryItem } from './LibraryGrid';
 
@@ -9,7 +10,7 @@ interface LibraryHeroProps {
   onItemClick: (item: LibraryStoryItem) => void;
 }
 
-export default function LibraryHero({ item, onItemClick }: LibraryHeroProps) {
+function LibraryHero({ item, onItemClick }: LibraryHeroProps) {
   const coverImage =
     item.story.scene_images?.[0] || item.book?.cover_url || null;
   const authorName = item.story.author?.nickname || '작성자';
@@ -94,3 +95,9 @@ export default function LibraryHero({ item, onItemClick }: LibraryHeroProps) {
     </section>
   );
 }
+
+const MemoizedLibraryHero = memo(LibraryHero);
+
+MemoizedLibraryHero.displayName = 'LibraryHero';
+
+export default MemoizedLibraryHero;

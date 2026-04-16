@@ -5,9 +5,9 @@ import {
   useEffect,
   useCallback,
   useRef,
-  useSyncExternalStore,
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getPdfJs, createLoadParams } from '@/lib/pdfjs-loader';
 import type { PdfDocument } from '@/lib/pdfjs-loader';
 import { getCachedDocument, setCachedDocument } from '@/lib/pdf-document-cache';
@@ -19,21 +19,6 @@ interface PictureBookViewerProps {
   onLastPage: () => void;
   /** Callback reporting the maximum page number the reader has visited */
   onMaxPageChange?: (maxPage: number, totalPages: number) => void;
-}
-
-/* ─── Mobile detection (SSR-safe) ─── */
-
-const MQ = '(max-width: 639px)';
-function subscribeMedia(cb: () => void) {
-  const mql = window.matchMedia(MQ);
-  mql.addEventListener('change', cb);
-  return () => mql.removeEventListener('change', cb);
-}
-function getIsMobile() {
-  return window.matchMedia(MQ).matches;
-}
-function getIsMobileServer() {
-  return false;
 }
 
 /* ─── Animation variants ─── */
@@ -178,11 +163,7 @@ export default function PictureBookViewer({
   onLastPage,
   onMaxPageChange,
 }: PictureBookViewerProps) {
-  const isMobile = useSyncExternalStore(
-    subscribeMedia,
-    getIsMobile,
-    getIsMobileServer,
-  );
+  const isMobile = useMediaQuery('(max-width: 639px)');
 
   const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
