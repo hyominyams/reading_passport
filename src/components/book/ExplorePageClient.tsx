@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContentCard from '@/components/chat/ContentCard';
 import ContentViewer from '@/components/chat/ContentViewer';
@@ -36,7 +35,6 @@ export default function ExplorePageClient({
   initialContents,
   initialCompleted,
 }: ExplorePageClientProps) {
-  const router = useRouter();
   const { user } = useAuth();
 
   const [contents] = useState<HiddenContent[]>(initialContents);

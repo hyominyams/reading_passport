@@ -230,7 +230,12 @@ export async function updateBook(
   }
 
   const nextLanguages = computeLanguagesFromMap(nextPdfUrls);
-  const { base_url, pdf_urls: _pdfUrlsParam, pdf_url_ko: _ko, pdf_url_en: _en, ...bookUpdateData } = data;
+  const baseUrl = data.base_url;
+  const bookUpdateData = { ...data };
+  delete bookUpdateData.base_url;
+  delete bookUpdateData.pdf_urls;
+  delete bookUpdateData.pdf_url_ko;
+  delete bookUpdateData.pdf_url_en;
 
   const { error } = await supabase
     .from('books')
@@ -261,7 +266,7 @@ export async function updateBook(
       const generatedCoverUrl = await generateBookCover({
         bookId,
         pdfUrls: nextPdfUrls,
-        baseUrl: base_url,
+        baseUrl,
       });
 
       if (generatedCoverUrl && generatedCoverUrl !== currentBook.cover_url) {

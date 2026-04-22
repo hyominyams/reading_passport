@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -539,11 +540,16 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
               />
               {coverPreviewUrl ? (
                 <div className="relative">
-                  <img
-                    src={coverPreviewUrl}
-                    alt="표지 미리보기"
-                    className="w-full max-h-80 object-contain rounded-xl border border-border bg-white"
-                  />
+                  <div className="relative h-80 w-full overflow-hidden rounded-xl border border-border bg-white">
+                    <Image
+                      src={coverPreviewUrl}
+                      alt="표지 미리보기"
+                      fill
+                      unoptimized
+                      sizes="(max-width: 768px) 100vw, 768px"
+                      className="object-contain"
+                    />
+                  </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="mt-2 text-xs text-secondary hover:text-secondary-dark font-medium transition-colors"
@@ -614,11 +620,16 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
 
               {coverPreviewUrl && (
                 <div className="mt-4">
-                  <img
-                    src={coverPreviewUrl}
-                    alt="생성된 표지 미리보기"
-                    className="w-full max-h-80 object-contain rounded-xl border border-border bg-white"
-                  />
+                  <div className="relative h-80 w-full overflow-hidden rounded-xl border border-border bg-white">
+                    <Image
+                      src={coverPreviewUrl}
+                      alt="생성된 표지 미리보기"
+                      fill
+                      unoptimized
+                      sizes="(max-width: 768px) 100vw, 768px"
+                      className="object-contain"
+                    />
+                  </div>
                 </div>
               )}
             </motion.div>

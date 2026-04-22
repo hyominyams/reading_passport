@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FileText, Plus, Trash2, Upload } from 'lucide-react';
 import type { ApprovalStatus, Book, Class, HiddenContent } from '@/types/database';
-import { SUPPORTED_LANGUAGES, getLanguageMeta } from '@/types/database';
+import { SUPPORTED_LANGUAGES } from '@/types/database';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import BookCoverImage from '@/components/book/BookCoverImage';
 import ContentForm from './ContentForm';
