@@ -59,6 +59,7 @@ export default async function ExplorePage({
         language={language}
         initialContents={contents}
         initialCompleted={explorationCompleted}
+        initialActivity={activity}
       />
     </>
   );

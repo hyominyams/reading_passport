@@ -191,9 +191,19 @@ export interface Activity {
   language: Language;
   emotion: string | null;
   one_line: string | null;
+  read_question_seed: string | null;
+  explore_challenges: ExploreChallengeNote[] | null;
   completed_tabs: string[];
   stamps_earned: StampType[];
   created_at: string;
+}
+
+export interface ExploreChallengeNote {
+  content_id: string;
+  content_title: string;
+  summary: string;
+  curiosity: string;
+  completed_at: string;
 }
 
 export interface ChatMessage {

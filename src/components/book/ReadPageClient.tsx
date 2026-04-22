@@ -27,6 +27,7 @@ interface ReadPageClientProps {
   book: Book;
   pdfUrl: string | null;
   language: string;
+  initialActivity: Activity | null;
 }
 
 type ReadPhase = 'reading' | 'emotion' | 'stamp';
@@ -35,6 +36,7 @@ export default function ReadPageClient({
   book,
   pdfUrl,
   language,
+  initialActivity,
 }: ReadPageClientProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -47,7 +49,7 @@ export default function ReadPageClient({
   }, []);
 
   const handleEmotionSubmit = useCallback(
-    async (emotion: string, oneLine: string) => {
+    async (emotion: string, oneLine: string, questionSeed: string) => {
       if (!user) return;
       setIsSubmitting(true);
 
@@ -76,6 +78,7 @@ export default function ReadPageClient({
             .update({
               emotion,
               one_line: oneLine,
+              read_question_seed: questionSeed || null,
               language: language as Language,
               completed_tabs: completedTabs,
               stamps_earned: stampsEarned,
@@ -89,6 +92,7 @@ export default function ReadPageClient({
             language: language as Language,
             emotion,
             one_line: oneLine,
+            read_question_seed: questionSeed || null,
             completed_tabs: ['read'],
             stamps_earned: ['read'],
           });
@@ -180,6 +184,9 @@ export default function ReadPageClient({
             <EmotionPicker
               onSubmit={handleEmotionSubmit}
               isSubmitting={isSubmitting}
+              initialEmotion={initialActivity?.emotion}
+              initialOneLine={initialActivity?.one_line}
+              initialQuestionSeed={initialActivity?.read_question_seed}
             />
           </motion.div>
         )}

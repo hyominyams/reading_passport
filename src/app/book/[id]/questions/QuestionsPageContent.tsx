@@ -201,6 +201,10 @@ export default function QuestionsPageContent({
   const stampAlreadyEarned = initialActivity?.stamps_earned?.includes('questions') ?? false;
   const isRecreating = false;
   const isReadOnly = stampAlreadyEarned && !isRecreating;
+  const readQuestionSeed = initialActivity?.read_question_seed?.trim() ?? '';
+  const exploreChallenges = initialActivity?.explore_challenges ?? [];
+  const questionSeedCount = (readQuestionSeed ? 1 : 0) + exploreChallenges.length;
+  const hasQuestionSeeds = Boolean(readQuestionSeed) || exploreChallenges.length > 0;
 
   const filledPerCategory = CATEGORIES.map((category) =>
     (questions[category.key] ?? []).filter((question) => question.trim().length > 0).length
@@ -597,6 +601,61 @@ export default function QuestionsPageContent({
           </div>
           <span className="text-sm text-muted">{totalFilled}/{requiredTotal} 질문 작성</span>
         </div>
+      )}
+
+      {hasQuestionSeeds && (
+        <section className="rounded-[24px] border border-[#dcc8ad] bg-[#fffaf1] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-black tracking-[0.18em] text-[#8a5d2f]">QUESTION SEEDS</p>
+              <h2 className="mt-2 text-lg font-bold text-foreground">
+                질문 씨앗
+              </h2>
+              <p className="mt-1 text-sm text-[#6d573d]">
+                읽기와 탐색 단계에서 모은 생각을 질문으로 이어갑니다
+              </p>
+            </div>
+            <span className="rounded-full border border-[#dfcfb7] bg-white px-3 py-1 text-[11px] font-semibold text-[#8a5d2f]">
+              {questionSeedCount}개 단서
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {readQuestionSeed && (
+              <div className="rounded-2xl border border-[#e4d4be] bg-white px-4 py-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="rounded-full bg-[#fbf2e1] px-2.5 py-1 text-[11px] font-semibold text-[#8a5d2f]">
+                    읽기
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">더 알고 싶은 점</span>
+                </div>
+                <p className="text-sm text-[#4f3d28]">{readQuestionSeed}</p>
+              </div>
+            )}
+
+            {exploreChallenges.length > 0 && (
+              <div className="space-y-3">
+                {exploreChallenges.map((note) => (
+                  <div
+                    key={note.content_id}
+                    className="rounded-2xl border border-[#e4d4be] bg-white px-4 py-4"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="rounded-full bg-[#fbf2e1] px-2.5 py-1 text-[11px] font-semibold text-[#8a5d2f]">
+                        탐색
+                      </span>
+                      <span className="text-sm font-semibold text-foreground">{note.content_title}</span>
+                    </div>
+                    <p className="text-xs font-semibold tracking-[0.12em] text-[#8a5d2f]">자료 한 줄 정리</p>
+                    <p className="mt-1 text-sm text-[#4f3d28]">{note.summary}</p>
+                    <p className="mt-3 text-xs font-semibold tracking-[0.12em] text-[#8a5d2f]">새로 생긴 궁금증</p>
+                    <p className="mt-1 text-sm text-[#4f3d28]">{note.curiosity}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {stampAlreadyEarned && !isRecreating && (

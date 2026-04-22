@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface ExplorationProgressProps {
   viewed: number;
   total: number;
+  challenged: number;
   canComplete: boolean;
   completed: boolean;
   onComplete: () => void;
@@ -14,6 +15,7 @@ interface ExplorationProgressProps {
 export default function ExplorationProgress({
   viewed,
   total,
+  challenged,
   canComplete,
   completed,
   onComplete,
@@ -25,9 +27,14 @@ export default function ExplorationProgress({
     <div className="bg-white border border-border rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-foreground">탐험 진행도</h3>
-        <span className="text-xs text-muted">
-          {viewed}/{total} 확인함
-        </span>
+        <div className="text-right">
+          <span className="block text-xs text-muted">
+            읽음 {viewed}/{total}
+          </span>
+          <span className="block text-xs text-muted">
+            기록 {challenged}/{total}
+          </span>
+        </div>
       </div>
 
       <div className="w-full h-2 bg-muted-light rounded-full overflow-hidden">
@@ -61,7 +68,7 @@ export default function ExplorationProgress({
           </motion.button>
         ) : (
           <p className="text-xs text-muted text-center">
-            모든 콘텐츠를 충분히 읽으면 스탬프를 받을 수 있어요
+            모든 자료를 읽고 챌린지를 남기면 스탬프를 받을 수 있어요
           </p>
         )}
       </AnimatePresence>
