@@ -1,14 +1,20 @@
 'use client';
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/lib/supabase/client';
 import BackToActivity from '@/components/book/BackToActivity';
 import type { Book, Activity, ChatLog } from '@/types/database';
 import { buildQuestionRequirements } from '@/lib/question-requirements';
+import {
+  normalizeQuestionValidation,
+  type QuestionCategoryKey,
+  type QuestionFeedbackItem,
+  type QuestionThinkingType,
+  type QuestionValidationResult,
+} from '@/lib/question-validation';
 
-type CategoryKey = 'content' | 'character' | 'world' | 'inference';
+type CategoryKey = QuestionCategoryKey;
 
 interface CategoryConfig {
   key: CategoryKey;
@@ -18,39 +24,11 @@ interface CategoryConfig {
   max: number;
 }
 
-const CATEGORIES: CategoryConfig[] = [
-  { key: 'content', icon: '📖', title: '내용이해', helper: '이야기에 있던 일을 묻는 질문을 만들어 보세요', max: 3 },
-  { key: 'character', icon: '👤', title: '인물이해', helper: '등장인물의 마음, 성격, 관계, 변화를 묻는 질문을 만들어 보세요', max: 3 },
-  { key: 'world', icon: '🌍', title: '배경이해', helper: '시간, 장소, 문화적 배경과 이야기의 연결을 묻는 질문을 만들어 보세요', max: 3 },
-  { key: 'inference', icon: '💡', title: '추론', helper: '글에 직접 쓰이지 않은 것을 상상하거나 생각해 보는 질문을 만들어 보세요', max: 2 },
-];
-
-const EXAMPLE_PLACEHOLDERS: Record<string, string> = {
-  content: '예) 주인공은 왜 여행을 떠났나요?',
-  character: '예) 주인공의 마음은 어떻게 변했나요?',
-  world: '예) 이 이야기의 배경이 되는 나라는 어떤 곳인가요?',
-  inference: '예) 주인공이 다른 선택을 했다면 어떻게 됐을까?',
-};
-
 interface QuestionsData {
   content: string[];
   character: string[];
   world: string[];
   inference: string[];
-}
-
-interface CategoryValidation {
-  valid: boolean;
-  feedback: string;
-  invalidIndices: number[];
-}
-
-interface ValidationResult {
-  content: CategoryValidation;
-  character: CategoryValidation;
-  world: CategoryValidation;
-  inference: CategoryValidation;
-  overall: boolean;
 }
 
 interface QuestionsPageContentProps {
@@ -62,6 +40,78 @@ interface QuestionsPageContentProps {
   requiredQuestionCount: number;
 }
 
+const CATEGORIES: CategoryConfig[] = [
+  { key: 'content', icon: '📖', title: '내용이해', helper: '이야기에 있던 일을 묻는 질문을 만들어 보세요', max: 3 },
+  { key: 'character', icon: '👤', title: '인물이해', helper: '등장인물의 마음, 성격, 관계, 변화를 묻는 질문을 만들어 보세요', max: 3 },
+  { key: 'world', icon: '🌍', title: '배경이해', helper: '시간, 장소, 문화적 배경과 이야기의 연결을 묻는 질문을 만들어 보세요', max: 3 },
+  { key: 'inference', icon: '💡', title: '추론', helper: '글에 직접 쓰이지 않은 것을 상상하거나 생각해 보는 질문을 만들어 보세요', max: 2 },
+];
+
+const EXAMPLE_PLACEHOLDERS: Record<CategoryKey, string> = {
+  content: '예) 주인공은 왜 여행을 떠났나요?',
+  character: '예) 주인공의 마음은 어떻게 변했나요?',
+  world: '예) 이 이야기의 배경이 되는 나라는 어떤 곳인가요?',
+  inference: '예) 주인공이 다른 선택을 했다면 어떻게 됐을까?',
+};
+
+const THINKING_TYPE_LABELS: Record<QuestionThinkingType, string> = {
+  fact: '보이는 것',
+  inference: '짐작',
+  feeling: '생각/느낌',
+  application: '바꾸면?',
+  unknown: '질문 다듬기',
+};
+
+const THINKING_TYPE_BADGE_CLASS: Record<QuestionThinkingType, string> = {
+  fact: 'bg-sky-100 text-sky-700',
+  inference: 'bg-violet-100 text-violet-700',
+  feeling: 'bg-rose-100 text-rose-700',
+  application: 'bg-amber-100 text-amber-700',
+  unknown: 'bg-slate-100 text-slate-700',
+};
+
+function clearValidationForQuestion(
+  current: QuestionValidationResult,
+  category: CategoryKey,
+  index: number,
+): QuestionValidationResult {
+  const updatedCategory = current[category];
+  const invalidIndices = updatedCategory.invalidIndices.filter((item) => item !== index);
+  const questionFeedback = updatedCategory.questionFeedback.filter((item) => item.index !== index);
+
+  const next = {
+    ...current,
+    [category]: {
+      ...updatedCategory,
+      valid: invalidIndices.length === 0,
+      invalidIndices,
+      questionFeedback,
+      feedback: invalidIndices.length === 0
+        ? '수정한 질문은 다시 제출하면 확인해 줄게.'
+        : updatedCategory.feedback,
+    },
+  };
+
+  const overall = CATEGORIES.every((item) => next[item.key].valid);
+
+  return {
+    ...next,
+    overall,
+    overallFeedback: overall
+      ? '수정한 질문을 다시 확인할 준비가 됐어.'
+      : '좋은 질문 씨앗이 보여. 힌트를 보고 한 문장씩 더 또렷하게 바꿔 보자.',
+  };
+}
+
+function buildQuestionFeedbackLookup(feedback: QuestionValidationResult | null) {
+  return CATEGORIES.reduce((acc, category) => {
+    acc[category.key] = new Map(
+      (feedback?.[category.key].questionFeedback ?? []).map((item) => [item.index, item]),
+    );
+    return acc;
+  }, {} as Record<CategoryKey, Map<number, QuestionFeedbackItem>>);
+}
+
 export default function QuestionsPageContent({
   book,
   language,
@@ -70,7 +120,6 @@ export default function QuestionsPageContent({
   existingLog,
   requiredQuestionCount,
 }: QuestionsPageContentProps) {
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const logIdRef = useRef<string | null>(existingLog?.id ?? null);
@@ -98,7 +147,7 @@ export default function QuestionsPageContent({
     if (!existingLog?.messages) return buildInitialQuestions();
 
     const dataMsg = existingLog.messages.find(
-      (m) => m.role === 'system' && m.content.startsWith('{')
+      (message) => message.role === 'system' && message.content.startsWith('{')
     );
     if (dataMsg) {
       try {
@@ -108,25 +157,31 @@ export default function QuestionsPageContent({
           while (result.length < min) result.push('');
           return result;
         };
+
         return {
           content: pad(parsed.content, requiredByCategory.content),
           character: pad(parsed.character, requiredByCategory.character),
           world: pad(parsed.world, requiredByCategory.world),
           inference: pad(parsed.inference, requiredByCategory.inference),
         };
-      } catch { /* fall through */ }
+      } catch {
+        return buildInitialQuestions();
+      }
     }
+
     return buildInitialQuestions();
   }, [buildInitialQuestions, existingLog, requiredByCategory]);
 
-  const parseExistingFeedback = useCallback((): ValidationResult | null => {
+  const parseExistingFeedback = useCallback((): QuestionValidationResult | null => {
     if (!existingLog?.messages) return null;
+
     const feedbackMsg = [...existingLog.messages]
       .reverse()
-      .find((m) => m.role === 'assistant' && m.content.startsWith('{'));
+      .find((message) => message.role === 'assistant' && message.content.startsWith('{'));
     if (!feedbackMsg) return null;
+
     try {
-      return JSON.parse(feedbackMsg.content) as ValidationResult;
+      return normalizeQuestionValidation(JSON.parse(feedbackMsg.content));
     } catch {
       return null;
     }
@@ -134,12 +189,12 @@ export default function QuestionsPageContent({
 
   const [questions, setQuestions] = useState<QuestionsData>(parseExistingQuestions);
   const [validating, setValidating] = useState(false);
-  const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const [validation, setValidation] = useState<QuestionValidationResult | null>(null);
   const [showStampAnimation, setShowStampAnimation] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [dirtyAfterValidation, setDirtyAfterValidation] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [savedFeedback, setSavedFeedback] = useState<ValidationResult | null>(parseExistingFeedback);
+  const [savedFeedback, setSavedFeedback] = useState<QuestionValidationResult | null>(parseExistingFeedback);
   const [showSavedFeedback, setShowSavedFeedback] = useState(false);
   const [showFeedbackScreen, setShowFeedbackScreen] = useState(false);
 
@@ -147,25 +202,35 @@ export default function QuestionsPageContent({
   const isRecreating = false;
   const isReadOnly = stampAlreadyEarned && !isRecreating;
 
-  // Count filled questions per category
-  const filledPerCategory = CATEGORIES.map((cat) =>
-    (questions[cat.key] ?? []).filter((q) => q.trim().length > 0).length
+  const filledPerCategory = CATEGORIES.map((category) =>
+    (questions[category.key] ?? []).filter((question) => question.trim().length > 0).length
   );
-  const totalFilled = filledPerCategory.reduce((a, b) => a + b, 0);
-  const allMinMet = CATEGORIES.every((cat, idx) => filledPerCategory[idx] >= requiredByCategory[cat.key]);
+  const totalFilled = filledPerCategory.reduce((sum, count) => sum + count, 0);
+  const allMinMet = CATEGORIES.every(
+    (category, index) => filledPerCategory[index] >= requiredByCategory[category.key]
+  );
+  const canSubmit = allMinMet
+    && (!stampAlreadyEarned || isRecreating)
+    && (!validation || validation.overall || dirtyAfterValidation);
 
-  const canSubmit = allMinMet && (!stampAlreadyEarned || isRecreating) && (!validation || validation.overall || dirtyAfterValidation);
+  const questionFeedbackLookup = useMemo(
+    () => buildQuestionFeedbackLookup(validation),
+    [validation]
+  );
 
-  // Auto-save
   const saveQuestions = useCallback(
     async (data: QuestionsData) => {
       try {
         const chatMessages = [
           { role: 'system', content: JSON.stringify(data), timestamp: new Date().toISOString() },
-          ...CATEGORIES.flatMap((cat) =>
-            data[cat.key]
-              .filter((q) => q.trim().length > 0)
-              .map((q) => ({ role: 'user', content: `[${cat.title}] ${q}`, timestamp: new Date().toISOString() }))
+          ...CATEGORIES.flatMap((category) =>
+            data[category.key]
+              .filter((question) => question.trim().length > 0)
+              .map((question) => ({
+                role: 'user',
+                content: `[${category.title}] ${question}`,
+                timestamp: new Date().toISOString(),
+              }))
           ),
         ];
 
@@ -175,13 +240,21 @@ export default function QuestionsPageContent({
           const { data: inserted } = await supabase
             .from('chat_logs')
             .insert({
-              student_id: userId, book_id: book.id,
-              character_id: null, character_name: null,
-              chat_type: 'questions', messages: chatMessages,
-              language, flagged: false,
+              student_id: userId,
+              book_id: book.id,
+              character_id: null,
+              character_name: null,
+              chat_type: 'questions',
+              messages: chatMessages,
+              language,
+              flagged: false,
             })
-            .select('id').single();
-          if (inserted) logIdRef.current = inserted.id;
+            .select('id')
+            .single();
+
+          if (inserted) {
+            logIdRef.current = inserted.id;
+          }
         }
       } catch (err) {
         console.error('Error saving questions:', err);
@@ -204,7 +277,6 @@ export default function QuestionsPageContent({
     [saveQuestions]
   );
 
-  // Flush pending save on unmount so questions persist when navigating away
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
@@ -218,41 +290,58 @@ export default function QuestionsPageContent({
 
   const handleQuestionChange = (category: CategoryKey, index: number, value: string) => {
     if (isReadOnly) return;
+
     setQuestions((prev) => {
       const updated = { ...prev, [category]: [...prev[category]] };
       updated[category][index] = value;
       debouncedSave(updated);
       return updated;
     });
-    if (validation && !validation.overall) {
+
+    if (validation) {
+      setValidation((prev) => (prev ? clearValidationForQuestion(prev, category, index) : prev));
       setDirtyAfterValidation(true);
     }
   };
 
   const handleAddQuestion = (category: CategoryKey) => {
     if (isReadOnly) return;
-    const cat = CATEGORIES.find(c => c.key === category);
-    if (!cat) return;
+
+    const categoryConfig = CATEGORIES.find((item) => item.key === category);
+    if (!categoryConfig) return;
+
     setQuestions((prev) => {
-      if (prev[category].length >= cat.max) return prev;
+      if (prev[category].length >= categoryConfig.max) return prev;
       const updated = { ...prev, [category]: [...prev[category], ''] };
       debouncedSave(updated);
       return updated;
     });
+
+    if (validation) {
+      setValidation(null);
+      setDirtyAfterValidation(true);
+    }
   };
 
   const handleRemoveQuestion = (category: CategoryKey, index: number) => {
     if (isReadOnly) return;
+
     setQuestions((prev) => {
       if (prev[category].length <= requiredByCategory[category]) return prev;
-      const updated = { ...prev, [category]: prev[category].filter((_, i) => i !== index) };
+      const updated = { ...prev, [category]: prev[category].filter((_, itemIndex) => itemIndex !== index) };
       debouncedSave(updated);
       return updated;
     });
+
+    if (validation) {
+      setValidation(null);
+      setDirtyAfterValidation(true);
+    }
   };
 
-  const saveFeedbackToLog = async (result: ValidationResult) => {
+  const saveFeedbackToLog = async (result: QuestionValidationResult) => {
     if (!logIdRef.current) return;
+
     try {
       const { data: currentLog } = await supabase
         .from('chat_logs')
@@ -280,6 +369,7 @@ export default function QuestionsPageContent({
 
   const handleSubmit = async () => {
     if (!canSubmit || validating || completing) return;
+
     setValidating(true);
     setValidation(null);
     setDirtyAfterValidation(false);
@@ -305,55 +395,44 @@ export default function QuestionsPageContent({
       clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error('Validation request failed');
-      const result = await res.json() as ValidationResult;
+
+      const result = normalizeQuestionValidation(await res.json());
       setValidation(result);
 
       if (!result.overall) {
-        setQuestions((prev) => {
-          const updated = { ...prev };
-          for (const cat of CATEGORIES) {
-            const catResult = result[cat.key];
-            if (catResult?.invalidIndices?.length) {
-              updated[cat.key] = [...prev[cat.key]];
-              for (const idx of catResult.invalidIndices) {
-                if (idx < updated[cat.key].length) {
-                  updated[cat.key][idx] = '';
-                }
-              }
-            }
-          }
-          debouncedSave(updated);
-          return updated;
-        });
         setValidating(false);
         return;
       }
 
-      // Validation passed
       setCompleting(true);
 
-      // Save feedback to chat_log
       await saveFeedbackToLog(result);
       setSavedFeedback(result);
 
-      // Award stamp only if not already earned
       if (!stampAlreadyEarned) {
         const { data: existing } = await supabase
-          .from('activities').select('*')
-          .eq('student_id', userId).eq('book_id', book.id).maybeSingle();
+          .from('activities')
+          .select('*')
+          .eq('student_id', userId)
+          .eq('book_id', book.id)
+          .maybeSingle();
 
         if (existing) {
-          const act = existing as Activity;
-          if (!(act.stamps_earned as string[]).includes('questions')) {
+          const activity = existing as Activity;
+          if (!(activity.stamps_earned as string[]).includes('questions')) {
             await supabase.from('activities').update({
-              completed_tabs: [...act.completed_tabs, 'questions'],
-              stamps_earned: [...(act.stamps_earned as string[]), 'questions'],
-            }).eq('id', act.id);
+              completed_tabs: [...activity.completed_tabs, 'questions'],
+              stamps_earned: [...(activity.stamps_earned as string[]), 'questions'],
+            }).eq('id', activity.id);
           }
         } else {
           await supabase.from('activities').insert({
-            student_id: userId, book_id: book.id, country_id: book.country_id,
-            language, completed_tabs: ['questions'], stamps_earned: ['questions'],
+            student_id: userId,
+            book_id: book.id,
+            country_id: book.country_id,
+            language,
+            completed_tabs: ['questions'],
+            stamps_earned: ['questions'],
           });
         }
 
@@ -365,7 +444,6 @@ export default function QuestionsPageContent({
           setCompleting(false);
         }, 2500);
       } else {
-        // Re-create mode: skip stamp, go straight to feedback
         setShowFeedbackScreen(true);
         setValidating(false);
         setCompleting(false);
@@ -378,31 +456,84 @@ export default function QuestionsPageContent({
     }
   };
 
-  // Feedback card component used in both success screen and saved feedback panel
-  const FeedbackCards = ({ feedback }: { feedback: ValidationResult }) => (
-    <div className="space-y-3">
-      {CATEGORIES.map((cat) => {
-        const catResult = feedback[cat.key];
-        if (!catResult?.feedback) return null;
+  const FeedbackCards = ({ feedback }: { feedback: QuestionValidationResult }) => (
+    <div className="space-y-4">
+      <div className={`rounded-2xl border px-4 py-4 ${
+        feedback.overall
+          ? 'border-blue-100 bg-blue-50/60'
+          : 'border-amber-200 bg-amber-50'
+      }`}>
+        <p className="text-sm font-semibold text-foreground">{feedback.overallFeedback}</p>
+        <p className="mt-1 text-xs text-muted">{feedback.nextStep}</p>
+      </div>
+
+      {CATEGORIES.map((category) => {
+        const categoryResult = feedback[category.key];
+        if (!categoryResult.feedback && categoryResult.questionFeedback.length === 0) return null;
+
         return (
-          <div key={cat.key} className={`border rounded-xl p-4 ${
-            catResult.valid
-              ? 'bg-blue-50/50 border-blue-100'
+          <div key={category.key} className={`border rounded-xl p-4 ${
+            categoryResult.valid
+              ? 'bg-blue-50/40 border-blue-100'
               : 'bg-red-50 border-red-200'
           }`}>
             <div className="flex items-center gap-2 mb-1">
-              <span>{cat.icon}</span>
-              <span className="font-bold text-sm text-foreground">{cat.title}</span>
-              {catResult.valid && <span className="text-success ml-auto text-sm">✓</span>}
+              <span>{category.icon}</span>
+              <span className="font-bold text-sm text-foreground">{category.title}</span>
+              <span className={`ml-auto rounded-full px-2 py-1 text-[11px] font-semibold ${
+                categoryResult.valid
+                  ? 'bg-white text-blue-700 border border-blue-100'
+                  : 'bg-white text-red-600 border border-red-100'
+              }`}>
+                {categoryResult.valid ? '좋은 질문' : '다듬어 보기'}
+              </span>
             </div>
-            <p className="text-sm text-muted">{catResult.feedback}</p>
+
+            {categoryResult.feedback && (
+              <p className="text-sm text-muted">{categoryResult.feedback}</p>
+            )}
+
+            {categoryResult.questionFeedback.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {categoryResult.questionFeedback.map((item) => (
+                  <div
+                    key={`${category.key}-${item.index}`}
+                    className="rounded-xl border border-white/80 bg-white/80 px-3 py-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                        {item.index + 1}번 질문
+                      </span>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${THINKING_TYPE_BADGE_CLASS[item.thinkingType]}`}>
+                        {THINKING_TYPE_LABELS[item.thinkingType]}
+                      </span>
+                    </div>
+
+                    {item.question && (
+                      <p className="mt-2 text-sm font-medium text-foreground">{item.question}</p>
+                    )}
+                    {item.praise && (
+                      <p className="mt-2 text-xs text-slate-700">좋은 점: {item.praise}</p>
+                    )}
+                    {item.problem && (
+                      <p className="mt-1 text-xs text-red-600">더 또렷하게: {item.problem}</p>
+                    )}
+                    {item.hint && (
+                      <p className="mt-1 text-xs text-muted">힌트: {item.hint}</p>
+                    )}
+                    {item.example && (
+                      <p className="mt-1 text-xs text-foreground">예시: {item.example}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
     </div>
   );
 
-  // --- Feedback screen after successful submission ---
   if (showFeedbackScreen && validation) {
     return (
       <div className="flex flex-col gap-6">
@@ -416,7 +547,7 @@ export default function QuestionsPageContent({
             <h2 className="text-xl font-bold text-foreground mb-1">
               {stampAlreadyEarned ? '질문을 다시 만들었어요!' : '질문 만들기 스탬프 획득!'}
             </h2>
-            <p className="text-sm text-muted">AI 선생님의 피드백이에요</p>
+            <p className="text-sm text-muted">AI 선생님이 질문마다 피드백을 남겼어요</p>
           </div>
 
           <FeedbackCards feedback={validation} />
@@ -431,14 +562,13 @@ export default function QuestionsPageContent({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <span>❓</span> 질문 만들기
           </h1>
           <p className="text-sm text-muted mt-1">
-            {book.title} — 책에 대한 질문을 만들어 보세요
+            {book.title} - 책에 대한 질문을 만들어 보세요
           </p>
         </div>
         <div className="shrink-0 pt-1">
@@ -446,16 +576,21 @@ export default function QuestionsPageContent({
         </div>
       </div>
 
-      {/* Progress */}
       {!isReadOnly && (
         <div className="flex items-center gap-2 px-4 py-3 bg-card border border-border rounded-xl">
           <span className="text-sm font-medium text-foreground">진행 상황</span>
           <div className="flex-1 flex gap-1.5">
-            {CATEGORIES.map((cat, idx) => {
-              const pct = (filledPerCategory[idx] / requiredByCategory[cat.key]) * 100;
+            {CATEGORIES.map((category, index) => {
+              const pct = (filledPerCategory[index] / requiredByCategory[category.key]) * 100;
               return (
-                <div key={cat.key} className={`h-2 rounded-full bg-border overflow-hidden ${cat.key === 'inference' ? 'w-12' : 'flex-1'}`}>
-                  <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%` }} />
+                <div
+                  key={category.key}
+                  className={`h-2 rounded-full bg-border overflow-hidden ${category.key === 'inference' ? 'w-12' : 'flex-1'}`}
+                >
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(pct, 100)}%` }}
+                  />
                 </div>
               );
             })}
@@ -464,35 +599,33 @@ export default function QuestionsPageContent({
         </div>
       )}
 
-      {/* Already earned banner + feedback toggle */}
       {stampAlreadyEarned && !isRecreating && (
         <div className="space-y-3">
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 px-5 py-4"
+            className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4"
           >
-            {/* Sparkle decorations */}
             <div className="pointer-events-none absolute inset-0">
               <motion.div
                 animate={{ opacity: [0.3, 0.8, 0.3], scale: [0.8, 1.2, 0.8] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute top-2 right-8 w-2 h-2 bg-yellow-400 rounded-full"
+                className="absolute top-2 right-8 h-2 w-2 rounded-full bg-yellow-400"
               />
               <motion.div
                 animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.3, 1] }}
                 transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-                className="absolute top-4 right-20 w-1.5 h-1.5 bg-emerald-400 rounded-full"
+                className="absolute top-4 right-20 h-1.5 w-1.5 rounded-full bg-emerald-400"
               />
               <motion.div
                 animate={{ opacity: [0.4, 0.9, 0.4], scale: [0.9, 1.1, 0.9] }}
                 transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-                className="absolute bottom-3 right-14 w-1.5 h-1.5 bg-yellow-300 rounded-full"
+                className="absolute bottom-3 right-14 h-1.5 w-1.5 rounded-full bg-yellow-300"
               />
               <motion.div
                 animate={{ opacity: [0.3, 0.7, 0.3], scale: [1, 1.2, 1] }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
-                className="absolute top-3 left-[60%] w-1 h-1 bg-teal-400 rounded-full"
+                className="absolute top-3 left-[60%] h-1 w-1 rounded-full bg-teal-400"
               />
             </div>
 
@@ -511,8 +644,7 @@ export default function QuestionsPageContent({
               {savedFeedback && (
                 <button
                   onClick={() => setShowSavedFeedback(!showSavedFeedback)}
-                  className="shrink-0 text-xs px-3 py-1.5 bg-white/80 border border-emerald-200 text-emerald-700 rounded-lg
-                    hover:bg-white hover:shadow-sm transition-all font-medium backdrop-blur-sm"
+                  className="shrink-0 text-xs px-3 py-1.5 bg-white/80 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-white hover:shadow-sm transition-all font-medium backdrop-blur-sm"
                 >
                   {showSavedFeedback ? '피드백 숨기기' : 'AI 피드백 보기'}
                 </button>
@@ -535,88 +667,121 @@ export default function QuestionsPageContent({
         </div>
       )}
 
-      {/* Validation feedback (when failed) */}
       {validation && !validation.overall && (
-        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
-          <p className="text-sm font-medium text-red-700">일부 질문을 수정해야 해요:</p>
-          {CATEGORIES.map((cat) => {
-            const catResult = validation[cat.key];
-            if (catResult.valid || !catResult.feedback) return null;
-            return (
-              <p key={cat.key} className="text-sm text-red-600">
-                <span className="font-medium">{cat.icon} {cat.title}:</span> {catResult.feedback}
-              </p>
-            );
-          })}
-          <p className="text-xs text-red-500 mt-1">빨간색으로 표시된 질문을 다시 작성한 후 제출해 주세요.</p>
+        <div className="px-4 py-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+          <p className="text-sm font-medium text-amber-800">{validation.overallFeedback}</p>
+          <div className="space-y-1">
+            {CATEGORIES.map((category) => {
+              const categoryResult = validation[category.key];
+              if (categoryResult.valid || !categoryResult.feedback) return null;
+
+              return (
+                <p key={category.key} className="text-sm text-amber-700">
+                  <span className="font-medium">{category.icon} {category.title}:</span> {categoryResult.feedback}
+                </p>
+              );
+            })}
+          </div>
+          <p className="text-xs text-amber-700/80">질문은 지우지 않았어요. 힌트를 보고 같은 자리에서 다듬어 보세요.</p>
+          <p className="text-xs text-amber-700/80">{validation.nextStep}</p>
         </div>
       )}
 
-      {/* Question categories */}
-      {CATEGORIES.map((cat, catIndex) => {
-        const catValidation = validation?.[cat.key];
-        const invalidSet = new Set(catValidation?.invalidIndices ?? []);
+      {CATEGORIES.map((category, categoryIndex) => {
+        const categoryValidation = validation?.[category.key];
+        const invalidSet = new Set(categoryValidation?.invalidIndices ?? []);
 
         return (
           <motion.div
-            key={cat.key}
+            key={category.key}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: catIndex * 0.1, duration: 0.3 }}
+            transition={{ delay: categoryIndex * 0.1, duration: 0.3 }}
             className="bg-card border border-border rounded-2xl p-5"
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-2xl">{cat.icon}</span>
-              <h2 className="text-lg font-bold text-foreground">{cat.title}</h2>
+              <span className="text-2xl">{category.icon}</span>
+              <h2 className="text-lg font-bold text-foreground">{category.title}</h2>
               <span className="rounded-full bg-muted-light px-2 py-1 text-[11px] font-medium text-muted">
-                필수 {requiredByCategory[cat.key]}개
+                필수 {requiredByCategory[category.key]}개
               </span>
               <span className="ml-auto text-xs text-muted">
-                {filledPerCategory[catIndex]}/{(questions[cat.key] ?? []).length}
+                {filledPerCategory[categoryIndex]}/{(questions[category.key] ?? []).length}
               </span>
             </div>
-            <p className="text-sm text-muted mb-4">{cat.helper}</p>
+            <p className="text-sm text-muted mb-4">{category.helper}</p>
 
             <div className="space-y-3">
-              {(questions[cat.key] ?? []).map((q, qIndex) => {
-                const isInvalid = invalidSet.has(qIndex);
+              {(questions[category.key] ?? []).map((question, questionIndex) => {
+                const isInvalid = invalidSet.has(questionIndex);
+                const questionFeedback = questionFeedbackLookup[category.key].get(questionIndex);
+                const showInlineCoach = Boolean(questionFeedback && !questionFeedback.valid && !isReadOnly);
+
                 return (
-                  <div key={qIndex} className="flex items-start gap-2">
+                  <div key={questionIndex} className="flex items-start gap-2">
                     <span className="mt-2.5 text-xs text-muted font-medium w-5 shrink-0 text-center">
-                      {qIndex + 1}
+                      {questionIndex + 1}
                     </span>
-                    <input
-                      type="text"
-                      value={q}
-                      onChange={(e) => handleQuestionChange(cat.key, qIndex, e.target.value)}
-                      readOnly={isReadOnly}
-                      placeholder={qIndex === 0 ? EXAMPLE_PLACEHOLDERS[cat.key] : `${cat.title}에 대한 질문을 입력하세요...`}
-                      className={`flex-1 px-3 py-2 border rounded-lg text-sm text-foreground placeholder:text-muted/60
-                        focus:outline-none transition-all
-                        ${isReadOnly
-                          ? 'bg-gray-50 border-border cursor-default'
-                          : isInvalid
-                            ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-400 bg-red-50'
-                            : 'bg-white border-border focus:ring-2 focus:ring-primary/30 focus:border-primary'}`}
-                    />
-                    {!isReadOnly && (questions[cat.key] ?? []).length > requiredByCategory[cat.key] && (
-                      <button
-                        onClick={() => handleRemoveQuestion(cat.key, qIndex)}
-                        className="mt-1.5 p-1 text-muted hover:text-red-500 transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
+                    <div className="flex-1">
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="text"
+                          value={question}
+                          onChange={(e) => handleQuestionChange(category.key, questionIndex, e.target.value)}
+                          readOnly={isReadOnly}
+                          placeholder={questionIndex === 0
+                            ? EXAMPLE_PLACEHOLDERS[category.key]
+                            : `${category.title}에 대한 질문을 입력하세요...`}
+                          className={`flex-1 px-3 py-2 border rounded-lg text-sm text-foreground placeholder:text-muted/60 focus:outline-none transition-all ${
+                            isReadOnly
+                              ? 'bg-gray-50 border-border cursor-default'
+                              : isInvalid
+                                ? 'border-amber-400 focus:ring-2 focus:ring-amber-200 focus:border-amber-400 bg-amber-50'
+                                : 'bg-white border-border focus:ring-2 focus:ring-primary/30 focus:border-primary'
+                          }`}
+                        />
+                        {!isReadOnly && (questions[category.key] ?? []).length > requiredByCategory[category.key] && (
+                          <button
+                            onClick={() => handleRemoveQuestion(category.key, questionIndex)}
+                            className="mt-1.5 p-1 text-muted hover:text-red-500 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+
+                      {showInlineCoach && questionFeedback && (
+                        <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${THINKING_TYPE_BADGE_CLASS[questionFeedback.thinkingType]}`}>
+                              {THINKING_TYPE_LABELS[questionFeedback.thinkingType]}
+                            </span>
+                          </div>
+                          {questionFeedback.praise && (
+                            <p className="mt-2 text-xs text-slate-700">좋은 점: {questionFeedback.praise}</p>
+                          )}
+                          {questionFeedback.problem && (
+                            <p className="mt-1 text-xs text-amber-900">더 또렷하게: {questionFeedback.problem}</p>
+                          )}
+                          {questionFeedback.hint && (
+                            <p className="mt-1 text-xs text-amber-800/90">힌트: {questionFeedback.hint}</p>
+                          )}
+                          {questionFeedback.example && (
+                            <p className="mt-1 text-xs text-foreground">예시: {questionFeedback.example}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            {!isReadOnly && (questions[cat.key] ?? []).length < cat.max && (
+            {!isReadOnly && (questions[category.key] ?? []).length < category.max && (
               <button
-                onClick={() => handleAddQuestion(cat.key)}
+                onClick={() => handleAddQuestion(category.key)}
                 className="mt-3 text-sm text-primary font-medium hover:text-primary/80 transition-colors flex items-center gap-1"
               >
                 <span>+</span><span>질문 추가</span>
@@ -626,14 +791,12 @@ export default function QuestionsPageContent({
         );
       })}
 
-      {/* Error message */}
       {errorMessage && (
         <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium">
           {errorMessage}
         </div>
       )}
 
-      {/* Submit or Recreate */}
       <div className="pb-8">
         {(!stampAlreadyEarned || isRecreating) ? (
           <>
@@ -650,15 +813,22 @@ export default function QuestionsPageContent({
                 disabled={!canSubmit || completing}
                 whileHover={canSubmit ? { scale: 1.02 } : {}}
                 whileTap={canSubmit ? { scale: 0.98 } : {}}
-                className={`w-full py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-2
-                  transition-all ${canSubmit
-                    ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                className={`w-full py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-2 transition-all ${
+                  canSubmit
+                    ? 'bg-primary text-white shadow-lg'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
               >
                 {completing ? (
-                  <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /><span>저장 중...</span></>
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    <span>저장 중...</span>
+                  </>
                 ) : (
-                  <><span>✅</span><span>완료하기</span></>
+                  <>
+                    <span>✅</span>
+                    <span>완료하기</span>
+                  </>
                 )}
               </motion.button>
             )}
@@ -675,8 +845,7 @@ export default function QuestionsPageContent({
             <button
               type="button"
               disabled
-              className="w-full py-3.5 rounded-2xl font-semibold text-sm bg-gray-200 text-gray-500 cursor-not-allowed
-                flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-2xl font-semibold text-sm bg-gray-200 text-gray-500 cursor-not-allowed flex items-center justify-center gap-2"
             >
               <span>제출완료</span>
             </button>
@@ -684,11 +853,12 @@ export default function QuestionsPageContent({
         )}
       </div>
 
-      {/* Stamp Animation — passport style */}
       <AnimatePresence>
         {showStampAnimation && (
           <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 pointer-events-none"
           >
             <motion.div
@@ -701,13 +871,14 @@ export default function QuestionsPageContent({
               <div className="w-32 h-32 rounded-full border-[4px] border-red-700/80 bg-white/95 flex items-center justify-center relative shadow-xl">
                 <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700/50" />
                 <div className="flex flex-col items-center z-10">
-                  <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">★ WORLD STORY ★</span>
+                  <span className="text-red-700/80 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">WORLD STORY</span>
                   <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">SUCCESS</span>
                   <span className="text-red-700/70 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">APPROVED</span>
                 </div>
               </div>
               <motion.div
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
                 className="text-center rotate-[14deg]"
               >
