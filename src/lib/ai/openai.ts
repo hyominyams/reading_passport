@@ -49,6 +49,7 @@ export async function chatCompletion(
     maxTokens?: number;
     jsonMode?: boolean;
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+    timeoutMs?: number;
   }
 ) {
   const response = await openai.chat.completions.create({
@@ -57,7 +58,7 @@ export async function chatCompletion(
     max_completion_tokens: options?.maxTokens ?? 1024,
     ...(options?.reasoningEffort && { reasoning_effort: options.reasoningEffort }),
     ...(options?.jsonMode && { response_format: { type: 'json_object' as const } }),
-  }, { timeout: 20_000 });
+  }, { timeout: options?.timeoutMs ?? 20_000 });
 
   const content = extractMessageContent(response.choices[0]?.message);
 

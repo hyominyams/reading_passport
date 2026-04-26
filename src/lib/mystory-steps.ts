@@ -1,6 +1,7 @@
 /**
- * MyStory 8-step routing helper.
- * Maps current_step to the appropriate route.
+ * My World routing helper.
+ * `current_step` keeps the legacy DB values, while the UI displays the
+ * 7 student-facing My World steps from DETAIL_STEP_SEQUENCE.
  */
 
 export const STEP_ROUTES: Record<number, string> = {
@@ -10,12 +11,12 @@ export const STEP_ROUTES: Record<number, string> = {
   4: '/scenes',     // /book/[id]/mystory/scenes
   5: '/characters', // /book/[id]/mystory/characters
   6: '/style',      // /book/[id]/mystory/style
-  7: '/finish',     // /book/[id]/mystory/finish
+  7: '/creating',   // /book/[id]/mystory/creating
   8: '/complete',   // /book/[id]/mystory/complete
 };
 
-export const TOTAL_STEPS = 8;
 export const DETAIL_STEP_SEQUENCE = [1, 3, 4, 5, 6, 7, 8] as const;
+export const DETAIL_STEP_TOTAL = DETAIL_STEP_SEQUENCE.length;
 export const DETAIL_STEP_META: Array<{ step: (typeof DETAIL_STEP_SEQUENCE)[number]; label: string }> = [
   { step: 1, label: '이야기 채팅' },
   { step: 3, label: '이야기 바꿔 쓰기' },
@@ -39,6 +40,19 @@ export function getStepRouteWithLang(
 ): string {
   const base = getStepRoute(bookId, step, storyId);
   return lang ? `${base}&lang=${lang}` : base;
+}
+
+export function getDetailStepIndex(step: number): number {
+  const currentIndex = DETAIL_STEP_SEQUENCE.indexOf(step as (typeof DETAIL_STEP_SEQUENCE)[number]);
+  return currentIndex >= 0 ? currentIndex + 1 : 1;
+}
+
+export function getDetailStepLabel(step: number): string {
+  return DETAIL_STEP_META.find((item) => item.step === step)?.label ?? '이야기 채팅';
+}
+
+export function getDetailStepProgressLabel(step: number): string {
+  return `My World ${getDetailStepIndex(step)}/${DETAIL_STEP_TOTAL} · ${getDetailStepLabel(step)}`;
 }
 
 export function getAdjacentDetailSteps(step: number): { previousStep: number | null; nextStep: number | null } {

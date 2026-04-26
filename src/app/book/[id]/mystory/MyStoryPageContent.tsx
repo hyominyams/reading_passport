@@ -7,6 +7,7 @@ import StoryTypeSelector from '@/components/story/StoryTypeSelector';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import ChatInput from '@/components/chat/ChatInput';
 import { createClient } from '@/lib/supabase/client';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import type { Book, StoryType } from '@/types/database';
 
 /* ── Types ── */
@@ -160,6 +161,7 @@ export default function MyStoryPageContent({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
+  const pendingChatLogRef = useRef<ChatMessage[] | null>(null);
 
   // Determine initial state
   const hasChatHistory = initialChatLog != null && initialChatLog.length > 0;
@@ -231,12 +233,21 @@ export default function MyStoryPageContent({
   const saveChatLog = useCallback(
     (msgs: ChatMessage[]) => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingChatLogRef.current = msgs;
       saveTimerRef.current = setTimeout(async () => {
         try {
-          await supabase
+          const { error: saveError } = await supabase
             .from('stories')
             .update({ chat_log: msgs })
             .eq('id', storyId);
+
+          if (saveError) {
+            throw saveError;
+          }
+
+          if (pendingChatLogRef.current === msgs) {
+            pendingChatLogRef.current = null;
+          }
         } catch (err) {
           console.error('Failed to save chat log:', err);
         }
@@ -248,9 +259,17 @@ export default function MyStoryPageContent({
   // Flush pending save on unmount
   useEffect(() => {
     return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+
+      const pendingMessages = pendingChatLogRef.current;
+      if (pendingMessages && pendingMessages.length > 1) {
+        const payload = JSON.stringify({ storyId, chatLog: pendingMessages });
+        navigator.sendBeacon('/api/story/save-chat', payload);
+      }
     };
-  }, []);
+  }, [storyId]);
 
   /* ── Flag check: run after each student message ── */
   const checkForInappropriateContent = useCallback(
@@ -539,7 +558,7 @@ export default function MyStoryPageContent({
     setResponding(false);
   };
 
-  /* ── Submit: generate draft and go to Step 3 ── */
+  /* ── Submit: generate draft and go to My World 2/7 ── */
   const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);
@@ -550,13 +569,17 @@ export default function MyStoryPageContent({
         .map((m) => m.content)
         .join('\n\n');
 
-      await supabase
+      const { error: saveStoryError } = await supabase
         .from('stories')
         .update({
           chat_log: messages,
           all_student_messages: allStudentMessages,
         })
         .eq('id', storyId);
+
+      if (saveStoryError) {
+        throw saveStoryError;
+      }
 
       const draftRes = await fetch('/api/story/generate-draft', {
         method: 'POST',
@@ -570,7 +593,17 @@ export default function MyStoryPageContent({
         }),
       });
 
-      const draftData = await draftRes.json();
+      const draftData = (await draftRes.json().catch(() => ({}))) as {
+        pages?: unknown;
+        error?: string;
+      };
+
+      if (!draftRes.ok) {
+        setError(draftData.error || '초안 생성에 실패했어요. 다시 시도해 주세요.');
+        setSubmitting(false);
+        return;
+      }
+
       const generatedPages = normalizeGeneratedPages(draftData.pages);
 
       if (generatedPages.length === 0) {
@@ -579,12 +612,16 @@ export default function MyStoryPageContent({
         return;
       }
 
-      await supabase
+      const { error: draftSaveError } = await supabase
         .from('stories')
         .update({ ai_draft: generatedPages, current_step: 3 })
         .eq('id', storyId);
 
-      router.push(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${language}`);
+      if (draftSaveError) {
+        throw draftSaveError;
+      }
+
+      router.push(getStepRouteWithLang(bookId, 3, storyId, language));
     } catch (err) {
       console.error('Submit error:', err);
       setError('오류가 발생했어요. 다시 시도해 주세요.');
@@ -597,11 +634,17 @@ export default function MyStoryPageContent({
 
     if (targetStep === 3) {
       if (hasExistingDraft) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('stories')
           .update({ current_step: Math.max(initialCurrentStep, 3) })
           .eq('id', storyId);
-        router.push(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${language}`);
+
+        if (updateError) {
+          setError('저장에 실패했어요. 다시 시도해 주세요.');
+          return;
+        }
+
+        router.push(getStepRouteWithLang(bookId, 3, storyId, language));
         return;
       }
 
@@ -618,11 +661,17 @@ export default function MyStoryPageContent({
 
   const handleValidatedAction = async () => {
     if (hasExistingDraft) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('stories')
         .update({ current_step: Math.max(initialCurrentStep, 3) })
         .eq('id', storyId);
-      router.push(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${language}`);
+
+      if (updateError) {
+        setError('저장에 실패했어요. 다시 시도해 주세요.');
+        return;
+      }
+
+      router.push(getStepRouteWithLang(bookId, 3, storyId, language));
       return;
     }
 
@@ -699,6 +748,9 @@ export default function MyStoryPageContent({
             exit={{ opacity: 0, y: -20 }}
             className="flex-1 px-4 py-8"
           >
+            <p className="mx-auto mb-4 max-w-3xl text-center text-sm text-muted">
+              {getDetailStepProgressLabel(1)}
+            </p>
             <StoryTypeSelector onSelect={handleTypeSelect} />
           </motion.div>
         ) : (
@@ -727,6 +779,9 @@ export default function MyStoryPageContent({
                     : TYPE_LABELS[storyType]}
                 </span>
               </div>
+              <p className="mb-2 text-xs font-medium text-muted">
+                {getDetailStepProgressLabel(1)}
+              </p>
               <div className="flex items-center justify-between">
                 <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
                   <span className="text-xl">{TORI_AVATAR}</span> 이야기 램프 토리

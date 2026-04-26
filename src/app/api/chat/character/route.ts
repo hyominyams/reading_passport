@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 import openai from '@/lib/ai/openai';
+import { getLatestCompletedBookAnalysis } from '@/lib/queries/book-analyses';
+import { createClient } from '@/lib/supabase/server';
 
 interface CharacterInfo {
   name: string;
   age?: string;
-  personality?: string;
+  personality?: string | string[];
   speech_style?: string;
   background?: string;
   core_emotion?: string;
@@ -40,11 +42,11 @@ function buildSystemPrompt(
   return `당신은 그림책 속 등장인물 ${character.name}입니다.
 초등학생과 자연스럽고 따뜻하게 대화합니다.
 
-[캐릭터 정보]
-이름: ${character.name}
-나이: ${character.age ?? '알 수 없음'}
-성격: ${character.personality ?? ''}
-말투: ${character.speech_style ?? ''}
+	[캐릭터 정보]
+	이름: ${character.name}
+	나이: ${character.age ?? '알 수 없음'}
+	성격: ${Array.isArray(character.personality) ? character.personality.join(', ') : character.personality ?? ''}
+	말투: ${character.speech_style ?? ''}
 배경: ${character.background ?? ''}
 핵심 감정: ${character.core_emotion ?? ''}
 주요 장면: ${character.key_moments ?? ''}
@@ -250,18 +252,38 @@ export async function POST(request: NextRequest) {
       characterId,
       messages,
       language = 'ko',
-      characterAnalysis,
     } = body as {
       bookId: string;
       characterId: string;
       messages: { role: string; content: string }[];
       language: string;
-      characterAnalysis: CharacterAnalysis;
     };
 
-    if (!bookId || !characterId || !Array.isArray(messages) || !characterAnalysis) {
+    if (!bookId || !characterId || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: '필수 파라미터가 누락되었습니다.' }), {
         status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return new Response(JSON.stringify({ error: '인증이 필요합니다.' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const analysisRecord = await getLatestCompletedBookAnalysis(supabase, bookId);
+    const characterAnalysis = analysisRecord?.analysis_json as CharacterAnalysis | undefined;
+
+    if (!characterAnalysis) {
+      return new Response(JSON.stringify({ error: '도서 분석이 아직 준비되지 않았습니다.' }), {
+        status: 409,
         headers: { 'Content-Type': 'application/json' },
       });
     }

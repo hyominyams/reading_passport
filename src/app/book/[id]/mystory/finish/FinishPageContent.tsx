@@ -7,8 +7,9 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import VisibilitySelector from '@/components/story/VisibilitySelector';
 import { createClient } from '@/lib/supabase/client';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import { normalizePictureBookShape, getPictureBookShapeOption } from '@/lib/picture-book-shapes';
+import { normalizeStoryVisibility } from '@/lib/story-visibility';
 import {
   getTranslationLanguageLabel,
   hasMeaningfulTranslatedPages,
@@ -18,7 +19,6 @@ import {
 import {
   STORYBOOK_FONTS,
   getRecommendedFont,
-  generateFontFaceCSS,
   type StorybookFont,
 } from '@/lib/storybook-fonts';
 import type { Story, StoryTranslationMap, Visibility } from '@/types/database';
@@ -146,17 +146,6 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
     [sourceLanguage],
   );
 
-  // ── Font loading ──
-  useEffect(() => {
-    const styleId = 'storybook-fonts-style';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = generateFontFaceCSS();
-      document.head.appendChild(style);
-    }
-  }, []);
-
   // ── Fetch story ──
   useEffect(() => {
     const fetchStory = async () => {
@@ -173,7 +162,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
           }
 
           setStory(s);
-          setVisibility(s.visibility);
+          setVisibility(normalizeStoryVisibility(s.visibility));
           setEditedTexts(s.final_text ?? []);
           setTranslatedTexts(
             normalizeTranslatedTextsMap(s.translated_texts, s.translation_text, s.language),
@@ -573,7 +562,9 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
         {/* Step indicator */}
         <div className="px-4 pt-6 pb-2">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">Step 6/7</span>
+            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">
+              {getDetailStepProgressLabel(7)}
+            </span>
             <span>그림책 제작</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">만들어진 그림책을 확인해 보세요</h1>
@@ -625,14 +616,14 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
 
           {/* Font picker dropdown */}
           {showFontPicker && (
-            <div className="mt-2 pb-1 grid grid-cols-3 gap-1.5">
+            <div className="mt-2 pb-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {STORYBOOK_FONTS.map(font => (
                 <button
                   key={font.key}
                   onClick={() => { setSelectedFont(font); setShowFontPicker(false); }}
                   className={`p-2 rounded-lg border text-center transition-all ${selectedFont?.key === font.key ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
                 >
-                  <span className="block text-sm text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>가나다</span>
+                  <span className="block text-lg leading-tight text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>가나다라</span>
                   <span className="text-[10px] text-gray-500">{font.label}</span>
                 </button>
               ))}
@@ -675,7 +666,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                           <img src={coverImage} alt="표지" className="w-full h-full object-cover" />
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50" style={{ aspectRatio: cssAspectRatio }}>
+                        <div className="flex items-center justify-center bg-indigo-50" style={{ aspectRatio: cssAspectRatio }}>
                           <div className="text-center px-6">
                             <h2 className="text-xl font-bold text-gray-900">{coverTitle}</h2>
                             <p className="text-gray-500 text-sm mt-1">글/그림: {coverAuthor}</p>
@@ -825,7 +816,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                   onClick={() => { setSelectedFont(font); setOpenAccordion(null); }}
                   className={`p-3 rounded-xl border text-center transition-all ${selectedFont?.key === font.key ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
                 >
-                  <span className="block text-base mb-0.5 text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>가나다라</span>
+                  <span className="block text-xl mb-0.5 leading-tight text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>이야기 글꼴</span>
                   <span className="text-xs text-gray-500">{font.label}</span>
                 </button>
               ))}

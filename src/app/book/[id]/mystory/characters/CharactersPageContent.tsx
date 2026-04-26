@@ -9,7 +9,7 @@ import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import StepProgress from '@/components/story/StepProgress';
 import { createClient } from '@/lib/supabase/client';
 import { ILLUSTRATION_STYLE_OPTIONS, getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import type { Story, IllustrationStyle, CharacterDesign, CharacterGender } from '@/types/database';
 
 /* ── Constants ── */
@@ -106,7 +106,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
 
           // Guard: character step needs story text first
           if (!s.final_text || s.final_text.length === 0) {
-            router.replace(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${s.language}`);
+            router.replace(getStepRouteWithLang(bookId, 3, storyId, s.language));
             return;
           }
 
@@ -220,24 +220,26 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
       throw new Error('최소 1명의 주인공 이름을 입력해 주세요.');
     }
 
-    const supabase = createClient();
-    const { data: updatedStory, error: updateError } = await supabase
-      .from('stories')
-      .update({
-        character_designs: normalizedCharacters,
-        illustration_style: selectedStyle,
-        current_step: Math.max(story.current_step, targetStep),
-      })
-      .eq('id', storyId)
-      .select('id, current_step, language, character_designs')
-      .single();
+    const response = await fetch('/api/story/save-characters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storyId,
+        characters: normalizedCharacters,
+        selectedStyle,
+        targetStep,
+      }),
+    });
 
-    if (updateError) {
-      throw updateError;
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result.story) {
+      throw new Error(result.error || '주인공 저장에 실패했어요.');
     }
 
-    const persistedCharacters = Array.isArray(updatedStory?.character_designs)
-      ? updatedStory.character_designs.filter((character: CharacterDesign) =>
+    const updatedStory = result.story as Pick<Story, 'id' | 'current_step' | 'language' | 'character_designs'>;
+    const persistedCharacters = Array.isArray(updatedStory.character_designs)
+      ? updatedStory.character_designs.filter((character) =>
           typeof character?.name === 'string' && character.name.trim().length > 0
         )
       : [];
@@ -314,7 +316,8 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
   return (
     <>
       <MyStoryStepSidebar currentStep={5} busy={saving || generatingIndex !== null} onStepSelect={handleStepSelect} />
-      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto">
+      <div className="flex-1 flex justify-center">
+      <main className="flex-1 px-4 py-6 max-w-3xl">
       {/* Step Progress */}
       <StepProgress currentStep={5} />
 
@@ -324,12 +327,36 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-8"
       >
-        <p className="text-sm text-muted mb-1">Step 4/7</p>
+        <p className="text-sm text-muted mb-1">{getDetailStepProgressLabel(5)}</p>
         <h1 className="text-2xl font-bold text-foreground">주인공 설정</h1>
         <p className="text-sm text-muted mt-2">
           이야기에 등장할 주인공을 만들어 보세요
         </p>
       </motion.div>
+
+      {/* Mobile/tablet CTA — desktop uses sidebar */}
+      <button
+        type="button"
+        onClick={() => window.open('/guide/character-tips', '_blank')}
+        className="lg:hidden mb-6 w-full flex items-center gap-3 px-4 py-3 rounded-2xl
+          border border-amber-200 bg-amber-50 hover:bg-amber-100 active:bg-amber-100
+          transition-colors text-left"
+      >
+        <span className="flex-shrink-0 w-10 h-10 rounded-full bg-white border border-amber-200 flex items-center justify-center text-xl shadow-sm">
+          🪄
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-bold text-amber-900">
+            주인공을 잘 만드는 법, 알고 싶어?
+          </span>
+          <span className="block text-xs text-amber-700 mt-0.5">
+            캐릭터 디자인 꿀팁 보러 가기
+          </span>
+        </span>
+        <span className="flex-shrink-0 px-3 py-1.5 rounded-full bg-amber-400 text-white text-xs font-bold whitespace-nowrap">
+          배우러 가기 →
+        </span>
+      </button>
 
       {/* Error banner */}
       {error && (
@@ -350,7 +377,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
         className="mb-10"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-bold text-foreground mb-1">
               그림 스타일 선택
             </h2>
@@ -361,7 +388,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
           <button
             type="button"
             onClick={() => setShowStyleGallery((prev) => !prev)}
-            className="mt-2 shrink-0 rounded-xl border border-border bg-white px-3 py-2 text-xs font-medium text-foreground hover:bg-gray-50"
+            className="mt-2 inline-flex w-24 shrink-0 items-center justify-center rounded-xl border border-border bg-white px-3 py-2 text-xs font-medium text-foreground hover:bg-gray-50"
           >
             {showStyleGallery ? '접기' : '스타일 보기'}
           </button>
@@ -374,7 +401,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
         >
           <p className="text-xs font-medium text-secondary mb-2">선택한 스타일</p>
           <div className="flex items-center gap-3">
-            <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-secondary/20 bg-white">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-secondary/20 bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={getIllustrationStyleOption(selectedStyle).exampleImagePath}
@@ -382,7 +409,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
                 className="h-full w-full object-cover"
               />
             </div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-foreground">
                 {getIllustrationStyleOption(selectedStyle).icon} {getIllustrationStyleOption(selectedStyle).label}
               </p>
@@ -390,7 +417,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
                 {getIllustrationStyleOption(selectedStyle).description}
               </p>
             </div>
-            <span className="text-xs font-medium text-secondary">
+            <span className="w-10 shrink-0 text-center text-xs font-medium text-secondary">
               {showStyleGallery ? '접기' : '열기'}
             </span>
           </div>
@@ -582,6 +609,38 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
         </div>
       )}
       </main>
+
+      {/* Right-side CTA — desktop only */}
+      <aside className="hidden lg:block w-52 shrink-0 pt-32 pr-4">
+        <div className="sticky top-28">
+          <div className="flex flex-col items-center text-center">
+            {/* Wizard character */}
+            <div className="w-16 h-16 rounded-full bg-amber-100 border-2 border-amber-200 flex items-center justify-center text-3xl shadow-sm mb-3">
+              🪄
+            </div>
+
+            {/* Speech bubble */}
+            <div className="relative bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm mb-3">
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-gray-200 rotate-45" />
+              <p className="text-xs text-gray-600 leading-relaxed font-medium">
+                주인공을 잘 만드는 법을<br />알고 싶지 않아?
+              </p>
+            </div>
+
+            {/* CTA button */}
+            <button
+              type="button"
+              onClick={() => window.open('/guide/character-tips', '_blank')}
+              className="px-4 py-2 rounded-full bg-amber-400 hover:bg-amber-500
+                text-white text-xs font-bold shadow-sm
+                hover:shadow-md transition-all hover:scale-105 active:scale-95"
+            >
+              배우러 가기
+            </button>
+          </div>
+        </div>
+      </aside>
+      </div>
     </>
   );
 }

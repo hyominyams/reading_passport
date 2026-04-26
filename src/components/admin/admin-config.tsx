@@ -115,7 +115,7 @@ export const adminSections: AdminSectionMeta[] = [
     shortLabel: '도서',
     eyebrow: 'Catalog Control',
     hint: '글로벌 도서 CRUD',
-    description: '국가별 도서 등록, PDF 연결, 표지와 캐릭터 분석 상태를 관리합니다.',
+    description: '국가별 도서 등록, PDF 연결, 표지와 도서 분석 상태를 관리합니다.',
     icon: BookOpenText,
     requirements: ['도서 등록/수정/삭제', 'PDF/표지 상태 확인', '분석 상태 점검'],
     tone: {
@@ -153,11 +153,11 @@ export const adminSections: AdminSectionMeta[] = [
     key: 'library',
     label: '서재 운영',
     shortLabel: '서재',
-    eyebrow: 'Gallery Moderation',
-    hint: '작품 노출과 공개 범위 moderation',
-    description: '학생 작품의 서재 반영 여부와 공개 범위를 운영 관점에서 조정합니다.',
+    eyebrow: 'Gallery',
+    hint: '작품 노출과 공개 범위 관리',
+    description: '학생 작품의 서재 반영 여부와 공개 범위를 관리합니다.',
     icon: LibraryBig,
-    requirements: ['작품 노출 제어', '공개 범위 moderation', '인기/조회 기반 정렬'],
+    requirements: ['작품 노출 제어', '공개 범위 관리', '인기/조회 기반 정렬'],
     tone: {
       border: 'border-rose-200/80',
       badge: 'border-rose-200 bg-rose-50 text-rose-700',
@@ -222,7 +222,7 @@ export const adminCoreChecklist: AdminCoreCheckItem[] = [
   },
   {
     id: 'library-moderation',
-    title: '서재 moderation',
+    title: '서재 관리',
     description: '노출 여부와 공개 범위 관리',
     sections: ['library'],
   },

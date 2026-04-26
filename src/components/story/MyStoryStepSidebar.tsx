@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DETAIL_STEP_META } from '@/lib/mystory-steps';
+import { DETAIL_STEP_META, DETAIL_STEP_TOTAL, getDetailStepProgressLabel } from '@/lib/mystory-steps';
 
 interface MyStoryStepSidebarProps {
   currentStep: number;
@@ -29,7 +29,7 @@ export default function MyStoryStepSidebar({
         className="fixed right-4 top-24 z-40 inline-flex items-center gap-2 rounded-full border border-border bg-white/95 px-4 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur"
       >
         <span>{open ? '✕' : '☰'}</span>
-        <span>세부 단계</span>
+        <span>{getDetailStepProgressLabel(currentStep)}</span>
       </button>
 
       <aside
@@ -38,9 +38,9 @@ export default function MyStoryStepSidebar({
         }`}
       >
         <div className="mb-3">
-          <p className="text-sm font-bold text-foreground">내 이야기 쓰기 단계</p>
+          <p className="text-sm font-bold text-foreground">My World 단계</p>
           <p className="mt-1 text-xs text-muted">
-            이전 단계와 다음 단계로 이동할 수 있어요. 이동 전에 현재 내용은 저장됩니다.
+            지금까지 만든 내용을 이어서 완성해요.
           </p>
         </div>
 
@@ -73,7 +73,12 @@ export default function MyStoryStepSidebar({
                 >
                   {index + 1}
                 </span>
-                <span className="flex-1 text-sm font-medium">{item.label}</span>
+                <span className="flex-1">
+                  <span className="block text-xs opacity-70">
+                    {index + 1}/{DETAIL_STEP_TOTAL}
+                  </span>
+                  <span className="block text-sm font-medium">{item.label}</span>
+                </span>
                 {isCurrent && <span className="text-xs text-white/80">현재</span>}
               </button>
             );

@@ -1,4 +1,4 @@
-export type QuestionCategoryKey = 'content' | 'character' | 'world' | 'inference';
+export type QuestionCategoryKey = 'content' | 'character' | 'world';
 
 export type QuestionThinkingType =
   | 'fact'
@@ -41,13 +41,12 @@ export interface QuestionValidationResult {
   content: CategoryValidation;
   character: CategoryValidation;
   world: CategoryValidation;
-  inference: CategoryValidation;
   overall: boolean;
   overallFeedback: string;
   nextStep: string;
 }
 
-const CATEGORY_KEYS: QuestionCategoryKey[] = ['content', 'character', 'world', 'inference'];
+const CATEGORY_KEYS: QuestionCategoryKey[] = ['content', 'character', 'world'];
 const THINKING_TYPES = new Set<QuestionThinkingType>([
   'fact',
   'inference',
@@ -151,26 +150,27 @@ function normalizeCategory(value: unknown): CategoryValidation {
 
 export function normalizeQuestionValidation(value: unknown): QuestionValidationResult {
   const raw = (value ?? {}) as Record<string, unknown>;
-  const normalized = Object.fromEntries(
-    CATEGORY_KEYS.map((key) => [key, normalizeCategory(raw[key])])
-  ) as Record<QuestionCategoryKey, CategoryValidation>;
+  const normalized = {
+    content: normalizeCategory(raw.content),
+    character: normalizeCategory(raw.character),
+    world: normalizeCategory(raw.world),
+  } satisfies Record<QuestionCategoryKey, CategoryValidation>;
   const overall = CATEGORY_KEYS.every((key) => normalized[key].valid);
 
   return {
     content: normalized.content,
     character: normalized.character,
     world: normalized.world,
-    inference: normalized.inference,
     overall,
     overallFeedback: typeof raw.overallFeedback === 'string'
       ? raw.overallFeedback
       : overall
         ? '질문이 책을 읽은 흔적을 잘 보여 주고 있어.'
-        : '좋은 질문 씨앗이 보여. 힌트를 보고 한 문장씩 더 또렷하게 바꿔 보자.',
+        : '표시된 질문만 조금 더 또렷하게 고치면 제출할 수 있어요.',
     nextStep: typeof raw.nextStep === 'string'
       ? raw.nextStep
       : overall
         ? '마음에 드는 질문을 하나 골라 친구와 더 이야기해 봐도 좋아.'
-        : '장면, 인물, 이유 가운데 하나를 더 넣어 다시 제출해 보자.',
+        : '고쳐 볼 질문의 조언을 보고 다시 확인해 주세요.',
   };
 }

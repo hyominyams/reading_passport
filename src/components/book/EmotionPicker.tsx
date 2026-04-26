@@ -23,6 +23,7 @@ interface EmotionPickerProps {
   initialEmotion?: string | null;
   initialOneLine?: string | null;
   initialQuestionSeed?: string | null;
+  errorMessage?: string | null;
 }
 
 export default function EmotionPicker({
@@ -31,6 +32,7 @@ export default function EmotionPicker({
   initialEmotion,
   initialOneLine,
   initialQuestionSeed,
+  errorMessage,
 }: EmotionPickerProps) {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(initialEmotion ?? null);
   const [oneLine, setOneLine] = useState(initialOneLine ?? '');
@@ -196,6 +198,11 @@ export default function EmotionPicker({
       >
         {isSubmitting ? '저장 중...' : '저장하기'}
       </motion.button>
+      {errorMessage && (
+        <p className="mt-3 text-center text-sm font-medium text-red-600" role="alert">
+          {errorMessage}
+        </p>
+      )}
     </motion.div>
   );
 }

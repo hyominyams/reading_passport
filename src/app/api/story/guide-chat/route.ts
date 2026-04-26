@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { chatCompletion } from '@/lib/ai/openai';
-import { buildBookAnalysisPromptContext, parseBookCharacterAnalysis } from '@/lib/book-analysis';
-import { createServiceClient } from '@/lib/supabase/service';
-import type { BookCharacterAnalysis } from '@/types/database';
+import { buildBookAnalysisPromptContext } from '@/lib/book-analysis';
+import { getLatestCompletedBookAnalysis } from '@/lib/queries/book-analyses';
+import { createClient } from '@/lib/supabase/server';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -273,6 +273,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return Response.json({ error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const latestUserMessage = [...messages]
       .reverse()
       .find((message) => message.role === 'user')?.content ?? '';
@@ -285,16 +294,10 @@ export async function POST(request: NextRequest) {
     let bookContext: BookContext | null = null;
     if (book_id) {
       try {
-        const serviceClient = createServiceClient();
-        const { data: bookData } = await serviceClient
-          .from('books')
-          .select('character_analysis')
-          .eq('id', book_id)
-          .single();
+        const analysisRecord = await getLatestCompletedBookAnalysis(supabase, book_id);
 
-        if (bookData?.character_analysis) {
-          const analysis = parseBookCharacterAnalysis(bookData.character_analysis as BookCharacterAnalysis);
-          const analysisText = buildBookAnalysisPromptContext(analysis);
+        if (analysisRecord) {
+          const analysisText = buildBookAnalysisPromptContext(analysisRecord.analysis_json);
 
           if (analysisText) {
             bookContext = { analysisText };

@@ -10,9 +10,9 @@ import ChatBubble from '@/components/chat/ChatBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { parseBookCharacterAnalysis } from '@/lib/book-analysis';
+import { parseBookAnalysis } from '@/lib/book-analysis';
 import { createClient } from '@/lib/supabase/client';
-import type { Book, ChatLog, ChatMessage, Activity } from '@/types/database';
+import type { Book, BookAnalysis, ChatLog, ChatMessage, Activity } from '@/types/database';
 
 interface LocalMessage {
   role: 'user' | 'assistant';
@@ -32,6 +32,7 @@ export default function ChatPage() {
 
   // Book and character data
   const [book, setBook] = useState<Book | null>(null);
+  const [bookAnalysis, setBookAnalysis] = useState<BookAnalysis | null>(null);
   const [characters, setCharacters] = useState<CharacterData[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterData | null>(null);
 
@@ -84,8 +85,23 @@ export default function ChatPage() {
         const b = bookData as Book;
         setBook(b);
 
-        // Parse characters from character_analysis
-        const analysis = parseBookCharacterAnalysis(b.character_analysis);
+        const { data: analysisData } = await supabase
+          .from('book_analyses')
+          .select('analysis_json')
+          .eq('book_id', bookId)
+          .eq('analysis_type', 'full_book')
+          .eq('status', 'completed')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const analysis = parseBookAnalysis(
+          analysisData && typeof analysisData === 'object'
+            ? (analysisData as { analysis_json?: unknown }).analysis_json
+            : null
+        );
+        setBookAnalysis(analysis);
+
         if (analysis.characters.length > 0) {
           const chars: CharacterData[] = analysis.characters.map((character, idx) => ({
             id: String(idx),
@@ -100,7 +116,13 @@ export default function ChatPage() {
             profile_prompt: character.profile_prompt,
           }));
           setCharacters(chars);
+        } else {
+          setCharacters([]);
         }
+      } else {
+        setBook(null);
+        setBookAnalysis(null);
+        setCharacters([]);
       }
 
       // Fetch chat logs
@@ -160,7 +182,7 @@ export default function ChatPage() {
 
   // Send message
   const handleSendMessage = async (text: string) => {
-    if (!book || !selectedCharacter || isStreaming) return;
+    if (!book || !bookAnalysis || !selectedCharacter || isStreaming) return;
 
     const newUserMessage: LocalMessage = { role: 'user', content: text };
     const updatedMessages = [...messages, newUserMessage];
@@ -180,7 +202,6 @@ export default function ChatPage() {
               content: m.content,
             })),
             language,
-            characterAnalysis: book.character_analysis,
           }),
         });
 
@@ -510,10 +531,10 @@ export default function ChatPage() {
               <div className="text-center">
                 <span className="text-4xl block mb-4">🎭</span>
                 <p className="text-muted text-sm">
-                  아직 캐릭터 분석이 완료되지 않았어요
+                  아직 도서 분석이 완료되지 않았어요
                 </p>
                 <p className="text-xs text-muted mt-1">
-                  선생님이 캐릭터를 등록하면 대화를 시작할 수 있어요
+                  도서 분석이 끝나면 대화를 시작할 수 있어요
                 </p>
               </div>
             </div>

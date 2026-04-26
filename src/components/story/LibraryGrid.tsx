@@ -34,6 +34,7 @@ export interface LibraryStoryItem {
     ai_draft: string[] | null;
     final_text: string[] | null;
     character_refs: { name: string; imageUrl: string }[] | null;
+    uploaded_images?: string[] | null;
     scene_images: string[] | null;
     cover_image_url?: string | null;
     cover_design?: {

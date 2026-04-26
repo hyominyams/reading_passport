@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { country_id, title, cover_url, pdf_urls, character_analysis } = body;
+  const { country_id, title, cover_url, pdf_urls } = body;
 
   // Build pdf_urls map (accept both new pdf_urls and legacy fields)
   const pdfUrls: Record<string, string> = {};
@@ -47,10 +47,6 @@ export async function POST(request: NextRequest) {
     title,
     cover_url: resolvedCoverUrl,
     pdf_urls: pdfUrls,
-    character_analysis:
-      character_analysis && typeof character_analysis === 'object'
-        ? character_analysis
-        : undefined,
     created_by: auth.user.id,
     base_url: request.nextUrl.origin,
   });

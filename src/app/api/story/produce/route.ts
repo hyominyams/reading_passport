@@ -1,14 +1,26 @@
-import { NextRequest } from 'next/server';
+import { after, NextRequest } from 'next/server';
 import { chatCompletion } from '@/lib/ai/openai';
-import { generateGeminiImage } from '@/lib/ai/gemini';
+import { generateOpenAIImage } from '@/lib/ai/openai-image';
 import { getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
 import { getPictureBookShapeOption, normalizePictureBookShape } from '@/lib/picture-book-shapes';
 import { storeGeneratedImage } from '@/lib/storage/generated-images';
+import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { applyProductionWatchdog } from '@/lib/story-production-watchdog';
 import type { Story, CharacterRef, IllustrationStyle } from '@/types/database';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for long-running image generation
+
+const PRODUCTION_IMAGE_CONCURRENCY = 5;
+
+type SupabaseServiceClient = ReturnType<typeof createServiceClient>;
+
+type ImageTask = {
+  index: number;
+  studentText: string;
+  sceneDescription: string;
+};
 
 function pickMatchedReferenceImages(
   text: string,
@@ -24,14 +36,23 @@ function pickMatchedReferenceImages(
 }
 
 /**
- * Convert student's story text into an image generation prompt using GPT-5-nano.
- * The student's written text is narrative, so we extract the visual scene from it.
+ * Convert the student's visual direction into an image generation prompt.
+ * sceneDescription is the student's direct visual instruction and has priority.
  */
 async function convertTextToImagePrompt(
-  studentText: string,
-  illustrationStyle: IllustrationStyle,
-  pictureBookPromptLabel: string,
-  pictureBookAspectRatio: '4:3' | '3:4' | '1:1'
+  {
+    studentText,
+    sceneDescription,
+    illustrationStyle,
+    pictureBookPromptLabel,
+    pictureBookAspectRatio,
+  }: {
+    studentText: string;
+    sceneDescription: string;
+    illustrationStyle: IllustrationStyle;
+    pictureBookPromptLabel: string;
+    pictureBookAspectRatio: '4:3' | '3:4' | '1:1';
+  }
 ): Promise<string> {
   const styleOption = getIllustrationStyleOption(illustrationStyle);
   const styleLabel = styleOption.promptLabel;
@@ -40,27 +61,28 @@ async function convertTextToImagePrompt(
     [
       {
         role: 'system',
-        content: `You are an expert at converting children's story text into image generation prompts.
-Given a page of text from a student-written children's story, produce a concise English image generation prompt that captures the visual scene described or implied by the text.
+        content: `You are an expert at converting children's picture-book planning notes into image generation prompts.
+The student may provide both a scene description and page story text. The scene description is the student's direct visual instruction and is authoritative when present. Use the story text only as supporting context for character, setting, mood, and cause/effect.
 
 Rules:
-1. Extract the visual scene from the narrative text — identify characters, setting, actions, mood.
-2. The prompt must describe the visual scene clearly and specifically, even if the text is abstract or emotional.
+1. If a student scene description is present, preserve it as the main visual plan.
+2. Extract supporting visual details from the page story text - characters, setting, actions, mood.
 3. The prompt must clearly specify this visual style: ${styleOption.label}
 4. Include these style keywords: ${styleLabel}
 5. The output prompt must strongly preserve that chosen style.
-6. Keep it under 200 words.
+6. Keep it under 220 words.
 7. Focus on visual elements: characters, setting, actions, mood, lighting, colors.
 8. Do NOT include any written text, letters, words, captions, dialogue, speech bubbles, signs, logos, or typography in the prompt.
 9. The illustration should be appropriate for elementary school students.
 10. Compose the illustration for this picture book format: ${pictureBookPromptLabel} (${pictureBookAspectRatio}).
 11. If the text is dialogue-heavy, focus on the characters' expressions and the scene around them.
+12. In Korean story context, when "다리" appears with words like "고치다", "흔들리는", "건너다", or village/rain context, interpret it as a bridge, not a body part, unless the scene description clearly says otherwise.
 
 Output ONLY the English image prompt, nothing else.`,
       },
       {
         role: 'user',
-        content: `Student's story text:\n${studentText}`,
+        content: `Student-written scene description:\n${sceneDescription || '(not provided)'}\n\nStudent's page story text:\n${studentText}`,
       },
     ],
     {
@@ -70,6 +92,11 @@ Output ONLY the English image prompt, nothing else.`,
   );
 
   return result.trim();
+}
+
+function getPageText(values: Array<string | null | undefined> | null | undefined, index: number) {
+  const value = values?.[index];
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function buildReferenceImages(story: Story, coverImageUrl: string | null) {
@@ -143,10 +170,12 @@ function calculateProductionProgress(
 async function generateSceneImageForPage({
   story,
   studentText,
+  sceneDescription,
   coverImageUrl,
 }: {
   story: Story;
   studentText: string;
+  sceneDescription: string;
   coverImageUrl: string | null;
 }) {
   const illustrationStyle = normalizeIllustrationStyle(story.illustration_style);
@@ -157,23 +186,34 @@ async function generateSceneImageForPage({
   const characterReferenceImages = referenceImages.filter(
     (ref) => ref.name !== 'cover design style reference'
   );
-  const { matchedNames } = pickMatchedReferenceImages(studentText, characterReferenceImages);
-
-  const imagePrompt = await convertTextToImagePrompt(
-    studentText,
-    illustrationStyle,
-    pictureBookShapeOption.promptLabel,
-    pictureBookShapeOption.aspectRatio
+  const visualTextForMatching = `${sceneDescription}\n${studentText}`;
+  const { matchedNames } = pickMatchedReferenceImages(
+    visualTextForMatching,
+    characterReferenceImages
   );
 
-  const fullPrompt =
-    `Children's book illustration: ${imagePrompt}. Picture book format: ${pictureBookShapeOption.label}. Match a ${pictureBookShapeOption.aspectRatio} composition and keep the layout natural for a ${pictureBookShapeOption.promptLabel}. Selected style: ${styleOption.label}. Style keywords: ${styleOption.promptLabel}.${coverImageUrl ? ' Use the attached cover design image ONLY as a reference for the overall artistic style and color palette. Do not copy its composition, characters, scene, objects, or layout.' : ''}${matchedNames.length > 0 ? ` The named characters in this scene are ${matchedNames.join(', ')}. Use the attached character reference images for those same names to keep them visually consistent.` : ''} Style: warm, friendly, appropriate for elementary school students. Do not include any written text, letters, words, captions, speech bubbles, signs, logos, or typography in the image.`;
+  const imagePrompt = await convertTextToImagePrompt({
+    studentText,
+    sceneDescription,
+    illustrationStyle,
+    pictureBookPromptLabel: pictureBookShapeOption.promptLabel,
+    pictureBookAspectRatio: pictureBookShapeOption.aspectRatio,
+  });
 
-  const generatedImage = await generateGeminiImage({
+  const studentSceneInstruction = sceneDescription
+    ? ` Student-written scene description to follow exactly as the primary visual direction: "${sceneDescription}".`
+    : '';
+  const pageContextInstruction = studentText
+    ? ` Story page context: "${studentText}".`
+    : '';
+
+  const fullPrompt =
+    `Children's book illustration.${studentSceneInstruction}${pageContextInstruction} Final English visual prompt: ${imagePrompt}. Picture book format: ${pictureBookShapeOption.label}. Match a ${pictureBookShapeOption.aspectRatio} composition and keep the layout natural for a ${pictureBookShapeOption.promptLabel}. Selected style: ${styleOption.label}. Style keywords: ${styleOption.promptLabel}.${coverImageUrl ? ' Use the attached cover design image ONLY as a reference for the overall artistic style and color palette. Do not copy its composition, characters, scene, objects, or layout.' : ''}${matchedNames.length > 0 ? ` The named characters in this scene are ${matchedNames.join(', ')}. Use the attached character reference images for those same names to keep them visually consistent.` : ''} Style: warm, friendly, appropriate for elementary school students. Do not include any written text, letters, words, captions, speech bubbles, signs, logos, or typography in the image.`;
+
+  const generatedImage = await generateOpenAIImage({
     prompt: fullPrompt,
     referenceImages,
     aspectRatio: pictureBookShapeOption.aspectRatio,
-    imageSize: '1K',
   });
 
   return storeGeneratedImage({
@@ -181,6 +221,159 @@ async function generateSceneImageForPage({
     mimeType: generatedImage.mimeType,
     folder: 'scene-images',
   });
+}
+
+async function runProductionJob({
+  supabase,
+  story,
+  storyId,
+  finalText,
+  uploadedImages,
+  sceneImages,
+  imageTasks,
+  coverImageUrl,
+  isSinglePageRegeneration,
+  pageIndex,
+}: {
+  supabase: SupabaseServiceClient;
+  story: Story;
+  storyId: string;
+  finalText: string[];
+  uploadedImages: Array<string | null | undefined>;
+  sceneImages: Array<string | null>;
+  imageTasks: ImageTask[];
+  coverImageUrl: string | null;
+  isSinglePageRegeneration: boolean;
+  pageIndex: number | null;
+}) {
+  const totalImages = imageTasks.length;
+
+  try {
+    let nextTaskIndex = 0;
+    let generationError: unknown = null;
+    let progressPersistError: unknown = null;
+    let progressPersistChain = Promise.resolve();
+
+    const queueProgressPersist = () => {
+      const sceneImagesSnapshot = [...sceneImages];
+      const progressInfo = calculateProductionProgress(
+        finalText,
+        uploadedImages,
+        sceneImagesSnapshot
+      );
+
+      progressPersistChain = progressPersistChain
+        .then(async () => {
+          const { error: progressUpdateError } = await supabase
+            .from('stories')
+            .update({
+              production_progress: progressInfo.progress,
+              scene_images: sceneImagesSnapshot as unknown as string[],
+              cover_image_url: coverImageUrl,
+              production_status: progressInfo.progress >= 100 ? 'completed' : 'processing',
+              production_heartbeat_at: new Date().toISOString(),
+              production_error_message: null,
+            })
+            .eq('id', storyId);
+
+          if (progressUpdateError) {
+            throw progressUpdateError;
+          }
+        })
+        .catch((error) => {
+          progressPersistError ??= error;
+        });
+    };
+
+    const workerCount = Math.min(PRODUCTION_IMAGE_CONCURRENCY, totalImages);
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (!generationError) {
+        const task = imageTasks[nextTaskIndex];
+        nextTaskIndex += 1;
+
+        if (!task) {
+          return;
+        }
+
+        try {
+          const imageUrl = await generateSceneImageForPage({
+            story,
+            studentText: task.studentText,
+            sceneDescription: task.sceneDescription,
+            coverImageUrl,
+          });
+
+          sceneImages[task.index] = imageUrl;
+          queueProgressPersist();
+        } catch (error) {
+          generationError ??= error;
+          return;
+        }
+      }
+    });
+
+    await Promise.all(workers);
+    await progressPersistChain;
+
+    if (generationError) {
+      throw generationError;
+    }
+
+    if (progressPersistError) {
+      throw progressPersistError;
+    }
+
+    const progressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
+    const { error: finalUpdateError } = await supabase
+      .from('stories')
+      .update({
+        production_status: progressInfo.progress >= 100 ? 'completed' : 'pending',
+        production_progress: progressInfo.progress,
+        production_heartbeat_at: new Date().toISOString(),
+        production_error_message: null,
+        current_step: Math.max(story.current_step, 7),
+        scene_images: sceneImages as unknown as string[],
+        cover_image_url: coverImageUrl,
+      })
+      .eq('id', storyId);
+
+    if (finalUpdateError) {
+      throw finalUpdateError;
+    }
+
+    return {
+      message: isSinglePageRegeneration
+        ? 'Page image regenerated'
+        : 'Production completed',
+      total: progressInfo.total,
+      completed: progressInfo.completed,
+      progress: progressInfo.progress,
+      concurrency: workerCount,
+      page_index: pageIndex,
+      image_url: isSinglePageRegeneration && pageIndex !== null ? sceneImages[pageIndex] : null,
+      scene_images: sceneImages,
+    };
+  } catch (genError) {
+    console.error('Image generation error during production:', genError);
+    const progressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
+
+    await supabase
+      .from('stories')
+      .update({
+        production_status: 'failed',
+        production_progress: progressInfo.progress,
+        production_heartbeat_at: new Date().toISOString(),
+        production_error_message:
+          genError instanceof Error
+            ? genError.message
+            : 'Image generation failed during production',
+        scene_images: sceneImages as unknown as string[],
+        cover_image_url: coverImageUrl,
+      })
+      .eq('id', storyId);
+
+    throw genError;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -204,6 +397,15 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'storyId is required' }, { status: 400 });
     }
 
+    const authClient = await createClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = createServiceClient();
 
     // Load the story
@@ -217,17 +419,36 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Story not found' }, { status: 404 });
     }
 
-    const story = storyData as Story;
+    let story = storyData as Story;
+
+    if (story.student_id !== user.id) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    story = await applyProductionWatchdog(supabase, story);
 
     if (story.production_status === 'processing') {
-      return Response.json({ message: 'Production already in progress' });
+      return Response.json(
+        {
+          message: 'Production already in progress',
+          status: story.production_status,
+          progress: story.production_progress,
+          error_message: story.production_error_message,
+        },
+        { status: 202 }
+      );
     }
     if (
       story.production_status === 'completed'
       && !isSinglePageRegeneration
       && !forceRegenerate
     ) {
-      return Response.json({ message: 'Production already completed' });
+      return Response.json({
+        message: 'Production already completed',
+        status: story.production_status,
+        progress: story.production_progress,
+        error_message: story.production_error_message,
+      });
     }
 
     const finalText = story.final_text ?? [];
@@ -236,7 +457,7 @@ export async function POST(request: NextRequest) {
       (story.scene_images ?? []) as Array<string | null>,
       finalText.length
     );
-    const imageTasks: Array<{ index: number; studentText: string }> = [];
+    const imageTasks: ImageTask[] = [];
 
     if (isSinglePageRegeneration) {
       if (pageIndex < 0 || pageIndex >= finalText.length) {
@@ -261,10 +482,13 @@ export async function POST(request: NextRequest) {
       imageTasks.push({
         index: pageIndex,
         studentText,
+        sceneDescription: getPageText(story.scene_descriptions, pageIndex),
       });
     } else {
       for (let i = 0; i < finalText.length; i += 1) {
-        if (!finalText[i]?.trim() || uploadedImages[i]) {
+        const studentText = getPageText(finalText, i);
+
+        if (!studentText || uploadedImages[i]) {
           continue;
         }
 
@@ -274,7 +498,8 @@ export async function POST(request: NextRequest) {
 
         imageTasks.push({
           index: i,
-          studentText: finalText[i],
+          studentText,
+          sceneDescription: getPageText(story.scene_descriptions, i),
         });
       }
     }
@@ -288,6 +513,8 @@ export async function POST(request: NextRequest) {
         .update({
           production_status: progressInfo.progress >= 100 ? 'completed' : 'pending',
           production_progress: progressInfo.progress,
+          production_heartbeat_at: new Date().toISOString(),
+          production_error_message: null,
           current_step: Math.max(story.current_step, 7),
           scene_images: sceneImages as unknown as string[],
         })
@@ -302,74 +529,77 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    await supabase
+    const coverImageUrl = story.cover_image_url ?? story.cover_design?.image_url ?? null;
+    const initialProgressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
+    const nowIso = new Date().toISOString();
+
+    const { error: processingUpdateError } = await supabase
       .from('stories')
       .update({
         production_status: 'processing',
-        production_progress: 0,
+        production_progress: initialProgressInfo.progress,
+        production_started_at: nowIso,
+        production_heartbeat_at: nowIso,
+        production_error_message: null,
       })
       .eq('id', storyId);
 
-    const coverImageUrl = story.cover_image_url ?? story.cover_design?.image_url ?? null;
+    if (processingUpdateError) {
+      return Response.json(
+        { error: 'Failed to update production status' },
+        { status: 500 }
+      );
+    }
+
+    if (!isSinglePageRegeneration) {
+      after(async () => {
+        try {
+          await runProductionJob({
+            supabase,
+            story,
+            storyId,
+            finalText,
+            uploadedImages,
+            sceneImages,
+            imageTasks,
+            coverImageUrl,
+            isSinglePageRegeneration,
+            pageIndex,
+          });
+        } catch (backgroundError) {
+          console.error('Background production failed:', backgroundError);
+        }
+      });
+
+      return Response.json(
+        {
+          message: 'Production started',
+          status: 'processing',
+          total: initialProgressInfo.total,
+          completed: initialProgressInfo.completed,
+          progress: initialProgressInfo.progress,
+        },
+        { status: 202 }
+      );
+    }
 
     try {
-      for (const task of imageTasks) {
-        const imageUrl = await generateSceneImageForPage({
-          story,
-          studentText: task.studentText,
-          coverImageUrl,
-        });
-
-        sceneImages[task.index] = imageUrl;
-
-        const progressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
-        await supabase
-          .from('stories')
-          .update({
-            production_progress: progressInfo.progress,
-            scene_images: sceneImages as unknown as string[],
-            cover_image_url: coverImageUrl,
-            production_status: progressInfo.progress >= 100 ? 'completed' : 'processing',
-          })
-          .eq('id', storyId);
-      }
-
-      const progressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
-      await supabase
-        .from('stories')
-        .update({
-          production_status: progressInfo.progress >= 100 ? 'completed' : 'pending',
-          production_progress: progressInfo.progress,
-          current_step: Math.max(story.current_step, 7),
-          scene_images: sceneImages as unknown as string[],
-          cover_image_url: coverImageUrl,
-        })
-        .eq('id', storyId);
-
-      return Response.json({
-        message: isSinglePageRegeneration
-          ? 'Page image regenerated'
-          : 'Production completed',
-        total: progressInfo.total,
-        completed: progressInfo.completed,
-        progress: progressInfo.progress,
-        page_index: pageIndex,
-        image_url: isSinglePageRegeneration && pageIndex !== null ? sceneImages[pageIndex] : null,
-        scene_images: sceneImages,
+      const result = await runProductionJob({
+        supabase,
+        story,
+        storyId,
+        finalText,
+        uploadedImages,
+        sceneImages,
+        imageTasks,
+        coverImageUrl,
+        isSinglePageRegeneration,
+        pageIndex,
       });
-    } catch (genError) {
-      console.error('Image generation error during production:', genError);
-      const progressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
 
-      await supabase
-        .from('stories')
-        .update({
-          production_status: 'failed',
-          production_progress: progressInfo.progress,
-          scene_images: sceneImages as unknown as string[],
-          cover_image_url: coverImageUrl,
-        })
-        .eq('id', storyId);
+      return Response.json(result);
+    } catch (genError) {
+      const progressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
 
       return Response.json(
         {

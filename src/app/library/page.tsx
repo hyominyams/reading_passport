@@ -23,6 +23,18 @@ function getLocalReadProgressKey(storyId: string, userId: string) {
   return `library-read-progress:${userId}:${storyId}`;
 }
 
+function buildViewerSceneImages(item: LibraryStoryItem) {
+  const pageCount = item.story.final_text?.length ?? 0;
+  const uploadedImages = item.story.uploaded_images ?? [];
+  const sceneImages = item.story.scene_images ?? [];
+
+  return Array.from({ length: pageCount }, (_, index) => (
+    uploadedImages[index]?.trim()
+    || sceneImages[index]?.trim()
+    || ''
+  ));
+}
+
 export default function LibraryPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [items, setItems] = useState<LibraryStoryItem[]>([]);
@@ -489,7 +501,7 @@ export default function LibraryPage() {
               setCommentText('');
             }}
             pages={selectedItem.story.final_text}
-            sceneImages={selectedItem.story.scene_images || []}
+            sceneImages={buildViewerSceneImages(selectedItem)}
             translatedPages={selectedItem.story.translation_text || undefined}
             translatedPagesByLanguage={normalizeTranslatedTextsMap(
               selectedItem.story.translated_texts,

@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import { getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
 import {
   DEFAULT_PICTURE_BOOK_SHAPE,
@@ -270,6 +270,9 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
       if (targetStep >= 7) {
         updatePayload.production_status = 'pending';
         updatePayload.production_progress = 0;
+        updatePayload.production_started_at = null;
+        updatePayload.production_heartbeat_at = null;
+        updatePayload.production_error_message = null;
         updatePayload.scene_images = null;
       }
     }
@@ -385,7 +388,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
         <p className="text-sm text-muted mt-2">
           표지를 꾸며 보세요
         </p>
-        <p className="text-xs text-gray-400 mt-1">Step 5/7</p>
+        <p className="text-xs text-gray-400 mt-1">{getDetailStepProgressLabel(6)}</p>
       </div>
 
       {error && (

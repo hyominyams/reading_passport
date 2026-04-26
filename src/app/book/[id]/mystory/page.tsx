@@ -90,7 +90,7 @@ export default async function MyStoryPage({
 
   const { data: activeDraftData } = await supabase
     .from('stories')
-    .select('id, language, current_step, started_at, cover_design, story_status')
+    .select('id, language, current_step, started_at, cover_design, story_status, production_status, production_progress')
     .eq('student_id', user.id)
     .eq('book_id', bookId)
     .eq('story_status', 'draft')
@@ -100,7 +100,7 @@ export default async function MyStoryPage({
 
   const activeDraft = (activeDraftData as Pick<
     Story,
-    'id' | 'language' | 'current_step' | 'started_at' | 'cover_design' | 'story_status'
+    'id' | 'language' | 'current_step' | 'started_at' | 'cover_design' | 'story_status' | 'production_status' | 'production_progress'
   > | null) ?? null;
 
   const { data: completedStoriesData } = await supabase
@@ -122,9 +122,7 @@ export default async function MyStoryPage({
         <Header />
         <MyStoryEntryHub
           bookId={bookId}
-          countryId={book.country_id}
           language={language}
-          userId={user.id}
           activeDraft={activeDraft}
           completedStories={completedStories}
         />

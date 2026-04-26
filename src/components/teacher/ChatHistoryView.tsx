@@ -9,10 +9,9 @@ interface ChatHistoryViewProps {
 }
 
 const QUESTION_CATEGORIES = [
-  { prefix: '[내용이해]', icon: '📖', title: '내용이해' },
-  { prefix: '[인물이해]', icon: '👤', title: '인물이해' },
-  { prefix: '[배경이해]', icon: '🌍', title: '배경이해' },
-  { prefix: '[추론]', icon: '💡', title: '추론' },
+  { prefixes: ['[이야기]', '[내용이해]'], icon: '📚', title: '이야기' },
+  { prefixes: ['[인물]', '[사람]', '[인물이해]'], icon: '👤', title: '인물' },
+  { prefixes: ['[세계(배경)]', '[세계]', '[배경이해]'], icon: '🌍', title: '세계(배경)' },
 ];
 
 export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHistoryViewProps) {
@@ -32,9 +31,10 @@ export default function ChatHistoryView({ chatLog, studentName, onBack }: ChatHi
     // Group by category prefix
     const grouped: Record<string, string[]> = {};
     for (const msg of userMessages) {
-      const cat = QUESTION_CATEGORIES.find(c => msg.content.startsWith(c.prefix));
+      const cat = QUESTION_CATEGORIES.find(c => c.prefixes.some((prefix) => msg.content.startsWith(prefix)));
       const key = cat?.title ?? '기타';
-      const text = cat ? msg.content.slice(cat.prefix.length).trim() : msg.content;
+      const matchedPrefix = cat?.prefixes.find((prefix) => msg.content.startsWith(prefix));
+      const text = matchedPrefix ? msg.content.slice(matchedPrefix.length).trim() : msg.content;
       if (!grouped[key]) grouped[key] = [];
       grouped[key].push(text);
     }

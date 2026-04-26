@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import type { Story, AiDraftPage } from '@/types/database';
 
 interface PageData {
@@ -152,14 +152,19 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
     try {
       const supabase = createClient();
       const finalText = pages.map(p => p.studentText);
-      await supabase
+      const { error: updateError } = await supabase
         .from('stories')
         .update({ final_text: finalText, current_step: 4 })
         .eq('id', storyId);
 
-      router.push(`/book/${bookId}/mystory/scenes?storyId=${storyId}`);
+      if (updateError) {
+        throw updateError;
+      }
+
+      router.push(getStepRouteWithLang(bookId, 4, storyId, story?.language));
     } catch (err) {
       console.error('Save error:', err);
+      setError('저장에 실패했어요. 다시 시도해 주세요.');
       setSaving(false);
     }
   };
@@ -182,14 +187,19 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
     setError(null);
     try {
       const supabase = createClient();
-      await supabase
+      const { error: updateError } = await supabase
         .from('stories')
         .update({ final_text: finalText, current_step: Math.max(story.current_step, targetStep) })
         .eq('id', storyId);
 
+      if (updateError) {
+        throw updateError;
+      }
+
       router.push(getStepRouteWithLang(bookId, targetStep, storyId, story.language));
     } catch (err) {
       console.error('Step navigation save error:', err);
+      setError('저장에 실패했어요. 다시 시도해 주세요.');
       setSaving(false);
     }
   }, [bookId, pages, router, story, storyId]);
@@ -237,7 +247,7 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
           <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">
-            Step 2/7
+            {getDetailStepProgressLabel(3)}
           </span>
           <span>토리가 써준 이야기 바꿔 쓰기</span>
         </div>
@@ -332,7 +342,7 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
           disabled={!canProceed}
           className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
         >
-          그림 만들러 가기
+          장면 상상하러 가기
         </button>
       </div>
       </main>

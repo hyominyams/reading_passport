@@ -48,8 +48,8 @@ export default function StampAnimation({
 
           {/* Passport stamp */}
           <motion.div
-            initial={{ scale: 4, opacity: 0, rotate: -25 }}
-            animate={{ scale: 1, opacity: 1, rotate: -14 }}
+            initial={{ scale: 4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
             transition={{
               type: 'spring',
               stiffness: 250,
@@ -60,36 +60,43 @@ export default function StampAnimation({
           >
             {/* Stamp body */}
             <motion.div
-              animate={{
-                boxShadow: [
-                  '0 0 0 0 rgba(185,28,28,0.3)',
-                  '0 0 0 16px rgba(185,28,28,0)',
-                ],
-              }}
-              transition={{ duration: 1, repeat: 2 }}
-              className="w-32 h-32 rounded-full border-[4px] border-red-700 bg-white flex items-center justify-center relative shadow-xl"
+              initial={{ rotate: -25 }}
+              animate={{ rotate: -14 }}
+              transition={{ type: 'spring', stiffness: 250, damping: 18, delay: 0.1 }}
+              className="origin-center"
             >
-              {/* Inner ring */}
-              <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700" />
-              {/* Stamp text */}
-              <div className="flex flex-col items-center z-10">
-                <span className="text-red-700 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">
-                  ★ WORLD STORY ★
-                </span>
-                <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">
-                  SUCCESS
-                </span>
-                <span className="text-red-700 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">
-                  APPROVED
-                </span>
-              </div>
+              <motion.div
+                animate={{
+                  boxShadow: [
+                    '0 0 0 0 rgba(185,28,28,0.3)',
+                    '0 0 0 16px rgba(185,28,28,0)',
+                  ],
+                }}
+                transition={{ duration: 1, repeat: 2 }}
+                className="relative flex h-32 w-32 items-center justify-center rounded-full border-[4px] border-red-700 bg-white shadow-xl"
+              >
+                {/* Inner ring */}
+                <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700" />
+                {/* Stamp text */}
+                <div className="flex flex-col items-center z-10">
+                  <span className="text-red-700 text-[9px] font-bold tracking-[0.18em] uppercase leading-none">
+                    ★ WORLD STORY ★
+                  </span>
+                  <span className="text-red-700 text-2xl font-black tracking-[0.1em] uppercase leading-tight mt-1">
+                    SUCCESS
+                  </span>
+                  <span className="text-red-700 text-[8px] font-semibold tracking-[0.25em] uppercase leading-none mt-0.5">
+                    APPROVED
+                  </span>
+                </div>
+              </motion.div>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="text-center rotate-[14deg]"
+              className="text-center"
             >
               <p className="text-2xl font-bold text-white mb-1">스탬프 획득!</p>
               <p className="text-base text-red-300 font-medium">

@@ -85,7 +85,6 @@ async function seed() {
       pdf_url_ko: '/Story/tanzania-who-is-real-hero.pdf',
       pdf_url_en: '/Story/tanzania-who-is-real-hero.pdf',
       languages_available: ['ko', 'en'],
-      character_analysis: {},
       created_by: adminId,
       scope: 'global',
       approved: true,

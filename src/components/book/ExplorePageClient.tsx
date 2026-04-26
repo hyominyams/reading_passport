@@ -18,13 +18,27 @@ import type {
 
 const MIN_DWELL_SECONDS: Record<string, number> = {
   image: 10,
-  link: 60,
+  link: 0,
   pdf: 60,
   video: 0,
+};
+const SAVE_TIMEOUT_MS = 15000;
+
+type SupabaseErrorLike = { message: string };
+type SupabaseResult<T> = {
+  data: T | null;
+  error: SupabaseErrorLike | null;
 };
 
 function getRequiredSeconds(type: string): number {
   return MIN_DWELL_SECONDS[type] ?? 30;
+}
+
+function getUnreadBadge(type: string): string {
+  if (type === 'image') return '10초';
+  if (type === 'video') return '80%';
+  if (type === 'link') return '열기';
+  return '1분';
 }
 
 function buildChallengeNotes(
@@ -37,6 +51,20 @@ function buildChallengeNotes(
     const leftOrder = orderMap.get(left.content_id) ?? Number.MAX_SAFE_INTEGER;
     const rightOrder = orderMap.get(right.content_id) ?? Number.MAX_SAFE_INTEGER;
     return leftOrder - rightOrder;
+  });
+}
+
+function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = SAVE_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error('timeout'));
+    }, timeoutMs);
+
+    Promise.resolve(promise)
+      .then(resolve, reject)
+      .finally(() => {
+        window.clearTimeout(timeoutId);
+      });
   });
 }
 
@@ -78,19 +106,9 @@ export default function ExplorePageClient({
       ? initialContents.map((content) => content.id)
       : initialChallengeNotes.map((note) => note.content_id);
 
-    const merged = new Set(baseIds);
-
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem(`explore-viewed-${book.id}`);
-      if (saved) {
-        for (const id of JSON.parse(saved) as string[]) {
-          merged.add(id);
-        }
-      }
-    }
-
-    return merged;
+    return new Set(baseIds);
   });
+  const [storedViewsLoaded, setStoredViewsLoaded] = useState(false);
 
   const [activeTimers, setActiveTimers] = useState<Record<string, number>>({});
   const [isCompleting, setIsCompleting] = useState(false);
@@ -107,6 +125,35 @@ export default function ExplorePageClient({
   const [savingChallenge, setSavingChallenge] = useState(false);
 
   useEffect(() => {
+    const storageKey = `explore-viewed-${book.id}`;
+    const contentIds = new Set(contents.map((content) => content.id));
+
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as unknown;
+        if (Array.isArray(parsed)) {
+          setViewedIds((prev) => {
+            const next = new Set(prev);
+            for (const id of parsed) {
+              if (typeof id === 'string' && contentIds.has(id)) {
+                next.add(id);
+              }
+            }
+            return next;
+          });
+        }
+      }
+    } catch {
+      sessionStorage.removeItem(storageKey);
+    } finally {
+      setStoredViewsLoaded(true);
+    }
+  }, [book.id, contents]);
+
+  useEffect(() => {
+    if (!storedViewsLoaded) return;
+
     if (viewedIds.size > 0) {
       sessionStorage.setItem(
         `explore-viewed-${book.id}`,
@@ -115,7 +162,7 @@ export default function ExplorePageClient({
     } else {
       sessionStorage.removeItem(`explore-viewed-${book.id}`);
     }
-  }, [viewedIds, book.id]);
+  }, [viewedIds, book.id, storedViewsLoaded]);
 
   const startTimer = useCallback((contentId: string) => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -161,6 +208,13 @@ export default function ExplorePageClient({
     };
   }, []);
 
+  const markContentViewed = useCallback((contentId: string) => {
+    setViewedIds((prev) => {
+      if (prev.has(contentId)) return prev;
+      return new Set(prev).add(contentId);
+    });
+  }, []);
+
   const ensureActivityId = useCallback(async () => {
     if (!user) {
       throw new Error('로그인이 필요합니다.');
@@ -170,29 +224,37 @@ export default function ExplorePageClient({
       return activityIdRef.current;
     }
 
-    const { data: existing } = await supabase
-      .from('activities')
-      .select('id')
-      .eq('student_id', user.id)
-      .eq('book_id', book.id)
-      .maybeSingle();
+    const { data: existing, error: selectError } = await withTimeout<SupabaseResult<{ id: string }>>(
+      supabase
+        .from('activities')
+        .select('id')
+        .eq('student_id', user.id)
+        .eq('book_id', book.id)
+        .maybeSingle()
+    );
+
+    if (selectError) {
+      throw new Error(selectError.message);
+    }
 
     if (existing?.id) {
       activityIdRef.current = existing.id;
       return existing.id;
     }
 
-    const { data: inserted, error } = await supabase
-      .from('activities')
-      .insert({
-        student_id: user.id,
-        book_id: book.id,
-        country_id: book.country_id,
-        language,
-        explore_challenges: challengeNotes,
-      })
-      .select('id')
-      .single();
+    const { data: inserted, error } = await withTimeout<SupabaseResult<{ id: string }>>(
+      supabase
+        .from('activities')
+        .insert({
+          student_id: user.id,
+          book_id: book.id,
+          country_id: book.country_id,
+          language,
+          explore_challenges: challengeNotes,
+        })
+        .select('id')
+        .single()
+    );
 
     if (error || !inserted?.id) {
       throw new Error(error?.message ?? '활동을 저장하지 못했습니다.');
@@ -205,7 +267,7 @@ export default function ExplorePageClient({
   const handleContentClick = (content: HiddenContent) => {
     if (content.type === 'link') {
       window.open(content.url, '_blank', 'noopener,noreferrer');
-      startTimer(content.id);
+      markContentViewed(content.id);
       setActiveContent(content);
       setViewerOpen(true);
       return;
@@ -274,10 +336,12 @@ export default function ExplorePageClient({
       );
       const activityId = await ensureActivityId();
 
-      const { error } = await supabase
-        .from('activities')
-        .update({ explore_challenges: nextNotes })
-        .eq('id', activityId);
+      const { error } = await withTimeout<SupabaseResult<null>>(
+        supabase
+          .from('activities')
+          .update({ explore_challenges: nextNotes })
+          .eq('id', activityId)
+      );
 
       if (error) {
         throw error;
@@ -288,7 +352,11 @@ export default function ExplorePageClient({
       handleCloseChallenge();
     } catch (error) {
       console.error('Error saving challenge:', error);
-      setChallengeError('챌린지를 저장하지 못했습니다.');
+      setChallengeError(
+        error instanceof Error && error.message === 'timeout'
+          ? '저장 시간이 길어지고 있어요. 다시 시도해 주세요.'
+          : '챌린지를 저장하지 못했습니다.'
+      );
     } finally {
       setSavingChallenge(false);
     }
@@ -300,11 +368,19 @@ export default function ExplorePageClient({
 
     try {
       const activityId = await ensureActivityId();
-      const { data: existing } = await supabase
-        .from('activities')
-        .select('completed_tabs, stamps_earned')
-        .eq('id', activityId)
-        .single();
+      const { data: existing, error: selectError } = await withTimeout<
+        SupabaseResult<Pick<Activity, 'completed_tabs' | 'stamps_earned'>>
+      >(
+        supabase
+          .from('activities')
+          .select('completed_tabs, stamps_earned')
+          .eq('id', activityId)
+          .single()
+      );
+
+      if (selectError) {
+        throw selectError;
+      }
 
       if (!existing) {
         throw new Error('활동 정보를 찾지 못했습니다.');
@@ -318,14 +394,20 @@ export default function ExplorePageClient({
         ? activity.stamps_earned
         : [...activity.stamps_earned, 'hidden'];
 
-      await supabase
-        .from('activities')
-        .update({
-          completed_tabs: completedTabs,
-          stamps_earned: stampsEarned,
-          explore_challenges: challengeNotes,
-        })
-        .eq('id', activityId);
+      const { error: updateError } = await withTimeout<SupabaseResult<null>>(
+        supabase
+          .from('activities')
+          .update({
+            completed_tabs: completedTabs,
+            stamps_earned: stampsEarned,
+            explore_challenges: challengeNotes,
+          })
+          .eq('id', activityId)
+      );
+
+      if (updateError) {
+        throw updateError;
+      }
 
       setExplorationCompleted(true);
       setShowStampAnimation(true);
@@ -435,11 +517,11 @@ export default function ExplorePageClient({
 
                   {!isViewed && (
                     <div className="absolute right-2 top-2 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                      {content.type === 'image' ? '10초' : content.type === 'video' ? '80%' : '1분'}
+                      {getUnreadBadge(content.type)}
                     </div>
                   )}
 
-                  {!isViewed && elapsed > 0 && (
+                  {!isViewed && elapsed > 0 && required > 0 && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden rounded-b-xl bg-gray-200">
                       <div
                         className="h-full bg-amber-400 transition-all duration-1000"
@@ -462,6 +544,7 @@ export default function ExplorePageClient({
             type={activeContent.type as ContentType}
             title={activeContent.title}
             url={activeContent.url}
+            onOpenExternal={() => markContentViewed(activeContent.id)}
           />
 
           {viewerOpen && !activeIsComplete && (
@@ -612,25 +695,30 @@ export default function ExplorePageClient({
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 pointer-events-none"
           >
             <motion.div
-              initial={{ scale: 4, opacity: 0, rotate: -25 }}
-              animate={{ scale: 1, opacity: 1, rotate: -14 }}
+              initial={{ scale: 4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 250, damping: 18 }}
               className="flex flex-col items-center gap-5"
             >
-              <div className="relative flex h-32 w-32 items-center justify-center rounded-full border-[4px] border-red-700/80 bg-white/95 shadow-xl">
+              <motion.div
+                initial={{ rotate: -25 }}
+                animate={{ rotate: -14 }}
+                transition={{ type: 'spring', stiffness: 250, damping: 18 }}
+                className="relative flex h-32 w-32 origin-center items-center justify-center rounded-full border-[4px] border-red-700/80 bg-white/95 shadow-xl"
+              >
                 <div className="absolute inset-[5px] rounded-full border-[2px] border-red-700/50" />
                 <div className="z-10 flex flex-col items-center">
                   <span className="text-[9px] font-bold uppercase leading-none tracking-[0.18em] text-red-700/80">WORLD STORY</span>
                   <span className="mt-1 text-2xl font-black uppercase leading-tight tracking-[0.1em] text-red-700">SUCCESS</span>
                   <span className="mt-0.5 text-[8px] font-semibold uppercase leading-none tracking-[0.25em] text-red-700/70">APPROVED</span>
                 </div>
-              </div>
+              </motion.div>
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                className="rotate-[14deg] text-center"
+                className="text-center"
               >
                 <p className="mb-1 text-2xl font-bold text-white">스탬프 획득!</p>
                 <p className="text-base font-medium text-red-300">탐험</p>

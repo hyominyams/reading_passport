@@ -1,14 +1,16 @@
 'use client';
 
-const STEPS = [
-  { step: 1, label: '질문' },
-  { step: 3, label: '초안' },
-  { step: 4, label: '장면' },
-  { step: 5, label: '주인공' },
-  { step: 6, label: '표지' },
-  { step: 7, label: '제작' },
-  { step: 8, label: '완성' },
-];
+import { DETAIL_STEP_META } from '@/lib/mystory-steps';
+
+const STEP_LABELS: Record<number, string> = {
+  1: '채팅',
+  3: '바꿔쓰기',
+  4: '장면',
+  5: '주인공',
+  6: '표지',
+  7: '제작',
+  8: '완성',
+};
 
 interface StepProgressProps {
   currentStep: number;
@@ -18,7 +20,7 @@ export default function StepProgress({ currentStep }: StepProgressProps) {
   return (
     <div className="w-full max-w-2xl mx-auto mb-6">
       <div className="flex items-center justify-between">
-        {STEPS.map((step, index) => {
+        {DETAIL_STEP_META.map((step, index) => {
           const isCompleted = currentStep > step.step;
           const isCurrent = currentStep === step.step;
           const displayNumber = index + 1;
@@ -43,12 +45,12 @@ export default function StepProgress({ currentStep }: StepProgressProps) {
                     isCurrent ? 'text-indigo-700 font-medium' : 'text-gray-400'
                   }`}
                 >
-                  {step.label}
+                  {STEP_LABELS[step.step] ?? step.label}
                 </span>
               </div>
 
               {/* Line */}
-              {index < STEPS.length - 1 && (
+              {index < DETAIL_STEP_META.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-1 ${
                     currentStep > step.step ? 'bg-indigo-400' : 'bg-gray-200'

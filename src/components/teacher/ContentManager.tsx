@@ -26,6 +26,58 @@ interface TeacherHiddenContent extends HiddenContent {
   can_manage?: boolean;
 }
 
+function hasCompletedAnalysis(book: Book) {
+  return book.book_analysis?.status === 'completed';
+}
+
+function hasCompletedPdfText(book: Book) {
+  return book.book_pdf_text?.status === 'completed';
+}
+
+function getPdfTextStatusBadge(book: Book) {
+  const status = book.book_pdf_text?.status ?? 'missing';
+
+  if (status === 'completed') {
+    return <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-700">원문 추출 완료</span>;
+  }
+
+  if (status === 'processing' || status === 'pending') {
+    return <span className="rounded-full bg-sky-100 px-2 py-1 text-[11px] font-medium text-sky-700">원문 추출 중</span>;
+  }
+
+  if (status === 'failed') {
+    return <span className="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-medium text-rose-700">원문 추출 실패</span>;
+  }
+
+  if (status === 'stale') {
+    return <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800">원문 재추출 필요</span>;
+  }
+
+  return <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">원문 추출 필요</span>;
+}
+
+function getAnalysisStatusBadge(book: Book) {
+  const status = book.book_analysis?.status ?? 'missing';
+
+  if (status === 'completed') {
+    return <span className="rounded-full bg-violet-100 px-2 py-1 text-[11px] font-medium text-violet-700">도서 분석 완료</span>;
+  }
+
+  if (status === 'processing' || status === 'pending') {
+    return <span className="rounded-full bg-sky-100 px-2 py-1 text-[11px] font-medium text-sky-700">분석 중</span>;
+  }
+
+  if (status === 'failed') {
+    return <span className="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-medium text-rose-700">분석 실패</span>;
+  }
+
+  if (status === 'stale') {
+    return <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800">재분석 필요</span>;
+  }
+
+  return <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">분석 필요</span>;
+}
+
 export default function ContentManager() {
   const [books, setBooks] = useState<TeacherBook[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -243,10 +295,11 @@ export default function ContentManager() {
 
     try {
       let targetBookId = editingBook?.id ?? null;
-      const hasExistingAnalysis = !!editingBook?.character_analysis && Object.keys(editingBook.character_analysis).length > 0;
+      const hasExistingAnalysis = !!editingBook && hasCompletedAnalysis(editingBook);
+      const hasExistingPdfText = !!editingBook && hasCompletedPdfText(editingBook);
       const oldPdfUrls = editingBook?.pdf_urls ?? {};
       const pdfChanged = !!editingBook && JSON.stringify(oldPdfUrls) !== JSON.stringify(pdfUrls);
-      const shouldAnalyze = !!analysisText.trim() || (!editingBook || pdfChanged || !hasExistingAnalysis);
+      const shouldAnalyze = !!analysisText.trim() || (!editingBook || pdfChanged || !hasExistingAnalysis || !hasExistingPdfText);
 
       const payload = {
         country_id: normalizedCountryId,
@@ -284,7 +337,7 @@ export default function ContentManager() {
       }
 
       if (targetBookId && shouldAnalyze) {
-        const analyzeRes = await fetch('/api/scan/characters', {
+        const analyzeRes = await fetch(`/api/books/${targetBookId}/analysis`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -506,13 +559,20 @@ export default function ContentManager() {
                         <div className="mb-1 flex flex-wrap items-center gap-2">
                           <p className="truncate text-sm font-semibold text-foreground">{book.title}</p>
                           {getBookStatusBadge(book)}
-                          {book.character_analysis && Object.keys(book.character_analysis).length > 0 ? (
-                            <span className="rounded-full bg-violet-100 px-2 py-1 text-[11px] font-medium text-violet-700">분석 완료</span>
-                          ) : (
-                            <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">분석 필요</span>
-                          )}
+                          {getPdfTextStatusBadge(book)}
+                          {getAnalysisStatusBadge(book)}
                         </div>
                         <p className="text-xs text-muted">{getCountryLabel(book.country_id)}</p>
+                        {book.book_pdf_text?.status === 'failed' && book.book_pdf_text.error_message && (
+                          <p className="mt-1 text-xs text-rose-600">
+                            원문 추출 오류: {book.book_pdf_text.error_message}
+                          </p>
+                        )}
+                        {book.book_analysis?.status === 'failed' && book.book_analysis.error_message && (
+                          <p className="mt-1 text-xs text-rose-600">
+                            도서 분석 오류: {book.book_analysis.error_message}
+                          </p>
+                        )}
                         {book.approval_status === 'rejected' && book.can_manage && (
                           <p className="mt-1 text-xs text-rose-600">
                             수정 후 저장하면 다시 승인 요청이 올라갑니다.
@@ -936,7 +996,7 @@ export default function ContentManager() {
                 <textarea
                   value={analysisText}
                   onChange={(event) => setAnalysisText(event.target.value)}
-                  placeholder="비워두면 PDF에서 자동 추출해서 등장인물/줄거리를 분석합니다."
+                  placeholder="비워두면 PDF에서 원문을 추출한 뒤 도서 내용을 분석합니다."
                   rows={5}
                   className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/15"
                 />
@@ -955,7 +1015,7 @@ export default function ContentManager() {
                   disabled={savingBook || anyUploading}
                   className="rounded-xl bg-foreground px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-foreground/90 disabled:opacity-50"
                 >
-                  {savingBook ? '저장 중...' : anyUploading ? '업로드 중...' : editingBook ? '수정 저장' : '도서 등록'}
+                  {savingBook ? '원문 추출 및 분석 중...' : anyUploading ? '업로드 중...' : editingBook ? '수정 저장' : '도서 등록'}
                 </button>
               </div>
             </form>

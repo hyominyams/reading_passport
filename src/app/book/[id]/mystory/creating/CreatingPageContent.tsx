@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { createClient } from '@/lib/supabase/client';
+import { getDetailStepProgressLabel } from '@/lib/mystory-steps';
 import type { Story, CountryFact } from '@/types/database';
 
-const POLL_INTERVAL = 5000;
+const POLL_INTERVAL = 30000;
 const CAROUSEL_INTERVAL = 5000;
 
 const FALLBACK_FACTS: CountryFact[] = [
@@ -118,6 +119,10 @@ export default function CreatingPageContent({
             return;
           }
 
+          if (s.production_status === 'failed') {
+            setError('그림책 제작이 멈췄어요. 다시 시도해 주세요.');
+          }
+
           const hasCoverConfig =
             !!s.cover_design?.title || !!s.cover_design?.description || !!s.cover_design?.image_url;
           if (!hasCoverConfig && s.production_status === 'pending') {
@@ -178,16 +183,33 @@ export default function CreatingPageContent({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storyId }),
       });
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error ?? 'Production failed to start');
+        setError(data.error ?? '그림책 제작을 시작하지 못했어요.');
+        return;
+      }
+
+      if (typeof data.status === 'string') {
+        setStatus(data.status);
+      } else {
+        setStatus('processing');
+      }
+
+      if (typeof data.progress === 'number') {
+        setProgress(data.progress);
+      }
+
+      if (data.progress >= 100 || data.message === 'Production already completed') {
+        setStatus('completed');
+        setProgress(100);
+        router.replace(`/book/${bookId}/mystory/finish?storyId=${storyId}&lang=${lang}`);
       }
     } catch (err) {
       console.error('Failed to start production:', err);
-      setError('Production failed to start');
+      setError('그림책 제작을 시작하지 못했어요.');
     }
-  }, [storyId]);
+  }, [bookId, lang, router, storyId]);
 
   useEffect(() => {
     if (!story || loading) return;
@@ -229,7 +251,7 @@ export default function CreatingPageContent({
             if (pollTimerRef.current) {
               clearInterval(pollTimerRef.current);
             }
-            setError('Image generation failed. Please try again.');
+            setError(data.error_message ?? '그림책 제작이 멈췄어요. 다시 시도해 주세요.');
           }
         }
       } catch {
@@ -253,10 +275,21 @@ export default function CreatingPageContent({
 
     // Reset the production status in DB via client
     const supabase = createClient();
-    await supabase
+    const { error: resetError } = await supabase
       .from('stories')
-      .update({ production_status: 'pending', production_progress: 0 })
+      .update({
+        production_status: 'pending',
+        production_progress: 0,
+        production_started_at: null,
+        production_heartbeat_at: null,
+        production_error_message: null,
+      })
       .eq('id', storyId);
+
+    if (resetError) {
+      setError('다시 시작하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
 
     startProduction();
   };
@@ -286,7 +319,7 @@ export default function CreatingPageContent({
   }
 
   // Calculate completed / total for display
-  // Images are generated from final_text (student's written text), not scene_descriptions
+  // Images are generated from the final page text plus any student scene descriptions.
   const finalText = story.final_text ?? [];
   const uploadedImages = story.uploaded_images ?? [];
 
@@ -327,6 +360,9 @@ export default function CreatingPageContent({
           ? 'Creating your story...'
           : '이야기를 만들고 있어요...'}
       </motion.h1>
+      <p className="text-sm text-muted mb-2 text-center">
+        {getDetailStepProgressLabel(7)}
+      </p>
 
       <p className="text-sm text-muted mb-8 text-center">
         {lang === 'en'
@@ -334,11 +370,20 @@ export default function CreatingPageContent({
           : 'AI가 그림책을 그리고 있어요. 잠시만 기다려 주세요!'}
       </p>
 
+      <a
+        href="/library"
+        target="_blank"
+        rel="noreferrer"
+        className="mb-8 inline-flex h-11 items-center rounded-full border border-border bg-white px-5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted-light"
+      >
+        {lang === 'en' ? 'Visit library' : '서재 보러가기'}
+      </a>
+
       {/* Progress bar */}
       <div className="w-full mb-3">
         <div className="h-4 bg-muted-light rounded-full overflow-hidden">
           <motion.div
-            className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+            className="h-full bg-primary rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -376,7 +421,7 @@ export default function CreatingPageContent({
       {/* Country facts carousel */}
       {facts.length > 0 && !error && (
         <div className="w-full">
-          <div className="relative bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 min-h-[160px] flex flex-col items-center justify-center">
+          <div className="relative bg-amber-50 border border-amber-200 rounded-2xl p-6 min-h-[160px] flex flex-col items-center justify-center">
             {/* Header */}
             <p className="text-xs font-semibold text-amber-600 mb-3 tracking-wide">
               {'🌍'}{' '}

@@ -8,14 +8,16 @@ import BookManager from '@/components/admin/BookManager';
 import HiddenContentManager from '@/components/admin/HiddenContentManager';
 import LibraryAdmin from '@/components/admin/LibraryAdmin';
 import FactsManager from '@/components/admin/FactsManager';
+import WorldSmartManagementPanel from '@/components/world-smart/WorldSmartManagementPanel';
 
-type Tab = 'overview' | 'teachers' | 'approvals' | 'books' | 'hidden' | 'library' | 'facts';
+type Tab = 'overview' | 'teachers' | 'approvals' | 'books' | 'worldSmart' | 'hidden' | 'library' | 'facts';
 
 const tabs: { key: Tab; label: string; icon: string }[] = [
   { key: 'overview', label: '운영 현황', icon: '📊' },
   { key: 'teachers', label: '교사 관리', icon: '👩‍🏫' },
   { key: 'approvals', label: '승인 검토', icon: '✅' },
   { key: 'books', label: '도서 관리', icon: '📚' },
+  { key: 'worldSmart', label: '질문 게시판', icon: '❓' },
   { key: 'hidden', label: 'Hidden Stories', icon: '🔍' },
   { key: 'library', label: '서재 관리', icon: '🏠' },
   { key: 'facts', label: '세계 상식', icon: '🌍' },
@@ -36,7 +38,7 @@ export default function AdminPage() {
             교사, 콘텐츠, 서재를 한 곳에서 관리하세요
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
-            교사 관리, 승인 검토, 전역 콘텐츠 운영, 서재 moderation, 세계 상식까지 한 흐름으로 제어할 수 있습니다.
+            교사 관리, 승인 검토, 전역 콘텐츠 운영, 서재 관리, 세계 상식까지 한 흐름으로 볼 수 있습니다.
           </p>
         </div>
       </section>
@@ -63,6 +65,7 @@ export default function AdminPage() {
         {activeTab === 'teachers' && <TeacherList />}
         {activeTab === 'approvals' && <ApprovalQueue />}
         {activeTab === 'books' && <BookManager />}
+        {activeTab === 'worldSmart' && <WorldSmartManagementPanel mode="admin" />}
         {activeTab === 'hidden' && <HiddenContentManager />}
         {activeTab === 'library' && <LibraryAdmin />}
         {activeTab === 'facts' && <FactsManager />}

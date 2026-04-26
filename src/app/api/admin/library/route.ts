@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/guards';
 import { createServiceClient } from '@/lib/supabase/service';
+import { STORY_VISIBILITY_OPTIONS, normalizeStoryVisibility } from '@/lib/story-visibility';
+import type { Visibility } from '@/types/database';
 
 const LIBRARY_METADATA_SELECT = 'id, story_id, likes, views, story_title, author_nickname, thumbnail_url';
 
@@ -109,7 +111,7 @@ export async function GET() {
         student_id: story.student_id,
         country_id: story.country_id,
         book_id: story.book_id,
-        visibility: story.visibility,
+        visibility: normalizeStoryVisibility(story.visibility),
         created_at: story.created_at,
         student: normalizedStudent,
         teacher_name: normalizedStudent?.teacher_id ? teacherById.get(normalizedStudent.teacher_id) ?? null : null,
@@ -171,7 +173,7 @@ export async function PUT(request: NextRequest) {
 
   if (action === 'set_visibility') {
     const visibility = body.visibility;
-    if (!['public', 'class', 'private'].includes(visibility)) {
+    if (!STORY_VISIBILITY_OPTIONS.includes(visibility as Visibility)) {
       return NextResponse.json({ error: '유효하지 않은 공개 범위입니다' }, { status: 400 });
     }
 

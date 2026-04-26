@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { ensureTeacherClassRecord } from '@/lib/classroom';
 import { generateAndStoreBookCover } from '@/lib/books/generate-cover';
+import { attachLatestBookAnalyses } from '@/lib/queries/book-analyses';
+import { attachLatestBookPdfTexts } from '@/lib/queries/book-pdf-texts';
 import { pickPreferredPdfUrlFromMap, computeLanguagesFromMap } from '@/lib/pdf-analysis';
 import type { ApprovalStatus } from '@/types/database';
 
@@ -127,15 +129,20 @@ export async function GET() {
     });
   }
 
-  return NextResponse.json({
-    books: Array.from(mergedBooks.values()).sort((a, b) => {
-      const countryCompare = String(a.country_id).localeCompare(String(b.country_id));
-      if (countryCompare !== 0) {
-        return countryCompare;
-      }
-      return String(a.title).localeCompare(String(b.title));
-    }),
+  const sortedBooks = Array.from(mergedBooks.values()).sort((a, b) => {
+    const countryCompare = String(a.country_id).localeCompare(String(b.country_id));
+    if (countryCompare !== 0) {
+      return countryCompare;
+    }
+    return String(a.title).localeCompare(String(b.title));
   });
+  const booksWithAnalyses = await attachLatestBookAnalyses(
+    service,
+    sortedBooks as (Record<string, unknown> & { id: string })[],
+  );
+  const books = await attachLatestBookPdfTexts(service, booksWithAnalyses);
+
+  return NextResponse.json({ books });
 }
 
 export async function POST(request: NextRequest) {
@@ -201,7 +208,6 @@ export async function POST(request: NextRequest) {
       pdf_url_ko: pdfUrls.ko ?? null,
       pdf_url_en: pdfUrls.en ?? null,
       languages_available: computeLanguagesFromMap(pdfUrls),
-      character_analysis: {},
       created_by: user.id,
       scope,
       class_id: classId,

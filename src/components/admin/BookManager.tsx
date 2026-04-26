@@ -25,6 +25,58 @@ interface PdfEntry {
   uploading?: boolean;
 }
 
+function hasCompletedAnalysis(book: Book) {
+  return book.book_analysis?.status === 'completed';
+}
+
+function hasCompletedPdfText(book: Book) {
+  return book.book_pdf_text?.status === 'completed';
+}
+
+function getPdfTextBadge(book: Book) {
+  const status = book.book_pdf_text?.status ?? 'missing';
+
+  if (status === 'completed') {
+    return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">원문 추출 완료</span>;
+  }
+
+  if (status === 'processing' || status === 'pending') {
+    return <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700">원문 추출 중</span>;
+  }
+
+  if (status === 'failed') {
+    return <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700">원문 추출 실패</span>;
+  }
+
+  if (status === 'stale') {
+    return <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">원문 재추출 필요</span>;
+  }
+
+  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">원문 추출 필요</span>;
+}
+
+function getBookAnalysisBadge(book: Book) {
+  const status = book.book_analysis?.status ?? 'missing';
+
+  if (status === 'completed') {
+    return <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">도서 분석 완료</span>;
+  }
+
+  if (status === 'processing' || status === 'pending') {
+    return <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700">분석 중</span>;
+  }
+
+  if (status === 'failed') {
+    return <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700">분석 실패</span>;
+  }
+
+  if (status === 'stale') {
+    return <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">재분석 필요</span>;
+  }
+
+  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">분석 필요</span>;
+}
+
 export default function BookManager() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +143,7 @@ export default function BookManager() {
   const counts = useMemo(() => ({
     total: books.length,
     approved: books.filter((book) => book.approved).length,
-    analyzed: books.filter((book) => Object.keys(book.character_analysis ?? {}).length > 0).length,
+    analyzed: books.filter(hasCompletedAnalysis).length,
     bilingual: books.filter((book) => Object.keys(book.pdf_urls ?? {}).length >= 2).length,
   }), [books]);
 
@@ -176,13 +228,11 @@ export default function BookManager() {
       const oldPdfUrls = editingBook?.pdf_urls ?? {};
       const pdfChanged =
         !!editingBook && JSON.stringify(oldPdfUrls) !== JSON.stringify(pdfUrls);
-      const hasExistingAnalysis =
-        !!editingBook
-        && !!editingBook.character_analysis
-        && Object.keys(editingBook.character_analysis).length > 0;
+      const hasExistingAnalysis = !!editingBook && hasCompletedAnalysis(editingBook);
+      const hasExistingPdfText = !!editingBook && hasCompletedPdfText(editingBook);
       const shouldAnalyze =
         !!manualAnalysisText
-        || (hasPdfs && (!editingBook || pdfChanged || !hasExistingAnalysis));
+        || (hasPdfs && (!editingBook || pdfChanged || !hasExistingAnalysis || !hasExistingPdfText));
 
       if (editingBook) {
         const res = await fetch('/api/admin/books', {
@@ -220,7 +270,7 @@ export default function BookManager() {
       }
 
       if (targetBookId && shouldAnalyze) {
-        const analysisRes = await fetch('/api/scan/characters', {
+        const analysisRes = await fetch(`/api/books/${targetBookId}/analysis`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -230,7 +280,7 @@ export default function BookManager() {
         });
         const analysisData = await analysisRes.json();
         if (!analysisRes.ok) {
-          throw new Error(analysisData.error || '캐릭터 분석에 실패했습니다');
+          throw new Error(analysisData.error || '도서 분석에 실패했습니다');
         }
       }
 
@@ -287,9 +337,9 @@ export default function BookManager() {
           tone={tone}
         />
         <AdminMetricCard
-          label="캐릭터 분석"
+          label="도서 분석"
           value={counts.analyzed}
-          caption="Hidden/질문 생성을 위한 분석 완료"
+          caption="질문 검증과 이야기 생성에 쓰는 분석"
           icon={ScanSearch}
           tone={tone}
         />
@@ -307,7 +357,7 @@ export default function BookManager() {
           <div>
             <h3 className="text-lg font-heading font-semibold text-slate-950">도서 카탈로그</h3>
             <p className="mt-1 text-sm text-slate-500">
-              국가별 도서와 PDF, 표지, 캐릭터 분석 준비 상태를 한 번에 점검합니다.
+              국가별 도서와 PDF, 표지, 도서 분석 준비 상태를 한 번에 점검합니다.
             </p>
           </div>
 
@@ -354,11 +404,10 @@ export default function BookManager() {
             표시할 도서가 없습니다.
           </div>
         ) : (
-          filteredBooks.map((book) => {
-            const country = countries.find((item) => item.id === book.country_id);
-            const isAnalyzed = Object.keys(book.character_analysis ?? {}).length > 0;
+            filteredBooks.map((book) => {
+              const country = countries.find((item) => item.id === book.country_id);
 
-            return (
+              return (
               <article
                 key={book.id}
                 className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_55px_-48px_rgba(15,23,42,0.35)]"
@@ -383,9 +432,8 @@ export default function BookManager() {
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${book.approved ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                         {book.approved ? '공개됨' : '승인 필요'}
                       </span>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isAnalyzed ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {isAnalyzed ? '분석 완료' : '분석 필요'}
-                      </span>
+                      {getPdfTextBadge(book)}
+                      {getBookAnalysisBadge(book)}
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
                         {(book.languages_available ?? []).map((l) => l.toUpperCase()).join('+') || 'KO 기본'}
                       </span>
@@ -400,6 +448,16 @@ export default function BookManager() {
                     <p className="mt-1 text-xs text-slate-500">
                       PDF {(book.languages_available ?? []).map((l) => getLanguageMeta(l).label).join(' / ') || '없음'}
                     </p>
+                    {book.book_pdf_text?.status === 'failed' && book.book_pdf_text.error_message ? (
+                      <p className="mt-2 text-xs text-rose-600">
+                        원문 추출 오류: {book.book_pdf_text.error_message}
+                      </p>
+                    ) : null}
+                    {book.book_analysis?.status === 'failed' && book.book_analysis.error_message ? (
+                      <p className="mt-1 text-xs text-rose-600">
+                        도서 분석 오류: {book.book_analysis.error_message}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
@@ -453,7 +511,7 @@ export default function BookManager() {
                   {editingBook ? '도서 수정' : '새 도서 등록'}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  저장 후 필요하면 캐릭터 분석을 자동으로 다시 수행합니다.
+                  저장 후 필요한 도서 분석을 수행합니다.
                 </p>
               </div>
               <button
@@ -617,7 +675,7 @@ export default function BookManager() {
                   className="flex-1 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
                 >
                   {saving
-                    ? '저장 및 분석 중...'
+                    ? '원문 추출 및 분석 중...'
                     : editingBook
                       ? '수정 후 자동 분석'
                       : '등록 후 자동 분석'}

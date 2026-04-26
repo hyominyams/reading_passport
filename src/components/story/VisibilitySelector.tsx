@@ -15,9 +15,9 @@ const options: { value: Visibility; label: string; description: string; icon: st
     icon: '🌍',
   },
   {
-    value: 'private',
-    label: '나만 보기',
-    description: '나만 볼 수 있어요',
+    value: 'secret',
+    label: '비밀',
+    description: '나와 선생님만 볼 수 있어요',
     icon: '🔒',
   },
 ];

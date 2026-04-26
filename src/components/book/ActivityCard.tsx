@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { LockKeyhole } from 'lucide-react';
 import type { StampType } from '@/types/database';
 
 interface ActivityCardProps {
@@ -41,10 +42,10 @@ export default function ActivityCard({
       whileTap={isLocked ? undefined : { scale: 0.97 }}
       className={`
         relative flex flex-col items-center justify-center gap-4
-        p-6 sm:p-8 rounded-2xl border-2 w-full
+        min-h-[220px] overflow-hidden p-6 sm:p-8 rounded-2xl border-2 w-full
         transition-all duration-300
         ${isLocked
-          ? 'border-border bg-slate-100 opacity-50 grayscale cursor-not-allowed'
+          ? 'border-slate-900 bg-slate-100 cursor-not-allowed shadow-[inset_0_0_0_1px_rgba(15,23,42,0.22)]'
           : isCompleted
             ? isHovered
               ? 'border-red-200 bg-red-50/60 shadow-lg'
@@ -55,13 +56,23 @@ export default function ActivityCard({
         }
         ${isLocked ? 'text-slate-400' : 'text-foreground'}
       `}
+      aria-disabled={isLocked}
     >
       {/* Lock overlay */}
       {isLocked && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-2xl">
-          <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-          </svg>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-2xl border-[3px] border-slate-950 bg-slate-950/88 px-5 text-center text-white">
+          <div className="absolute left-4 top-4 rounded-full border border-white/30 bg-white/12 px-3 py-1 text-[11px] font-black tracking-[0.12em] text-white">
+            잠김
+          </div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-white bg-white text-slate-950 shadow-lg">
+            <LockKeyhole className="h-9 w-9" strokeWidth={2.6} aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-lg font-black leading-tight">{title}</p>
+            <p className="mt-2 rounded-full border border-white/35 bg-white px-4 py-1.5 text-sm font-black text-slate-950">
+              Step 1~3 완료 후 열림
+            </p>
+          </div>
         </div>
       )}
 
@@ -83,10 +94,10 @@ export default function ActivityCard({
       )}
 
       {/* Icon */}
-      <span className={`text-4xl sm:text-5xl ${isLocked ? 'opacity-30' : ''}`}>{icon}</span>
+      <span className={`text-4xl sm:text-5xl ${isLocked ? 'opacity-20 grayscale' : ''}`}>{icon}</span>
 
       {/* Title */}
-      <h3 className={`text-base sm:text-lg font-bold text-center ${isLocked ? 'opacity-30' : ''}`}>
+      <h3 className={`text-base sm:text-lg font-bold text-center ${isLocked ? 'opacity-20' : ''}`}>
         {title}
       </h3>
 
@@ -95,7 +106,7 @@ export default function ActivityCard({
         className={`
           text-xs px-3 py-1 rounded-full font-medium
           ${isLocked
-            ? 'bg-slate-200 text-slate-400'
+            ? 'bg-slate-900 text-white'
             : isCompleted
               ? 'bg-green-100 text-green-700'
               : 'bg-primary/10 text-primary'
@@ -103,7 +114,7 @@ export default function ActivityCard({
         `}
       >
         {isLocked
-          ? 'Step 1~3을 먼저 완료하세요'
+          ? 'Step 1~3 완료 후 열림'
           : isCompleted
             ? `${stampLabel} ✓`
             : stampLabel}

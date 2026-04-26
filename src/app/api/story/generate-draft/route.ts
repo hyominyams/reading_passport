@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { chatCompletion } from '@/lib/ai/openai';
-import { buildBookAnalysisPromptContext, parseBookCharacterAnalysis } from '@/lib/book-analysis';
-import { createServiceClient } from '@/lib/supabase/service';
-import { extractPreferredPdfText } from '@/lib/pdf-analysis';
+import { buildBookAnalysisPromptContext } from '@/lib/book-analysis';
+import { getLatestCompletedBookAnalysis } from '@/lib/queries/book-analyses';
+import { getLatestCompletedBookPdfText } from '@/lib/queries/book-pdf-texts';
+import { createClient } from '@/lib/supabase/server';
 
 type DraftPage = {
   draft: string;
@@ -183,19 +184,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const serviceClient = createServiceClient();
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return Response.json({ error: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     let resolvedBookTitle = book_title ?? '';
     let resolvedCountry = country ?? '';
     let resolvedStorySummary = story_summary ?? '';
     let resolvedCharacters = characters ?? '';
     let resolvedAnalysisContext = '';
-    let resolvedBookText =
+    let resolvedPdfText = '';
+    const resolvedBookText =
       typeof book_full_text === 'string' ? book_full_text.trim() : '';
 
     if (bookId) {
-      const { data: book } = await serviceClient
+      const { data: book } = await supabase
         .from('books')
-        .select('title, country_id, pdf_urls, pdf_url_ko, pdf_url_en, character_analysis')
+        .select('title, country_id')
         .eq('id', bookId)
         .single();
 
@@ -203,14 +213,18 @@ export async function POST(request: NextRequest) {
         resolvedBookTitle = resolvedBookTitle || book.title;
         resolvedCountry = resolvedCountry || book.country_id;
 
-        const analysis = parseBookCharacterAnalysis(book.character_analysis);
-        resolvedAnalysisContext = buildBookAnalysisPromptContext(analysis);
+        const pdfTextRecord = await getLatestCompletedBookPdfText(supabase, bookId);
+        resolvedPdfText = pdfTextRecord?.extracted_text?.trim() ?? '';
 
-        if (!resolvedStorySummary && analysis.story_summary) {
+        const analysisRecord = await getLatestCompletedBookAnalysis(supabase, bookId);
+        const analysis = analysisRecord?.analysis_json;
+        resolvedAnalysisContext = analysis ? buildBookAnalysisPromptContext(analysis) : '';
+
+        if (!resolvedStorySummary && analysis?.story_summary) {
           resolvedStorySummary = analysis.story_summary;
         }
 
-        if (!resolvedCharacters && analysis.characters.length > 0) {
+        if (!resolvedCharacters && analysis?.characters.length) {
           resolvedCharacters = analysis.characters
             .map((character) => [
               character.name,
@@ -221,35 +235,34 @@ export async function POST(request: NextRequest) {
             .filter(Boolean)
             .join('\n');
         }
-
-        if (!resolvedBookText && !resolvedAnalysisContext) {
-          const bookPdfUrls = (book.pdf_urls as Record<string, string>) ?? {};
-          const fallbackKo = bookPdfUrls.ko ?? (book.pdf_url_ko as string | null);
-          const fallbackEn = bookPdfUrls.en ?? (book.pdf_url_en as string | null);
-          try {
-            resolvedBookText = await extractPreferredPdfText(
-              fallbackKo,
-              fallbackEn,
-              request.url,
-              100
-            );
-          } catch (error) {
-            console.warn('Book PDF text extraction failed:', error);
-          }
-        }
       }
     }
 
-    const bookContextSection = resolvedAnalysisContext
-      ? `[도서 구조화 요약]\n${resolvedAnalysisContext}`
-      : resolvedBookText
-        ? `[원문 텍스트]\n${resolvedBookText}`
-        : '[도서 맥락]\n(도서 요약을 불러오지 못했습니다.)';
+    const bookContextSection = resolvedBookText
+      ? `[원문 텍스트]\n${resolvedBookText}`
+      : resolvedPdfText
+        ? `[PDF 원문 텍스트]\n${resolvedPdfText}`
+        : resolvedAnalysisContext
+          ? `[도서 구조화 요약]\n${resolvedAnalysisContext}`
+          : '[도서 맥락]\n(도서 요약을 불러오지 못했습니다.)';
+
+    const analysisContextSection = resolvedAnalysisContext
+      ? `\n\n[도서 분석 보조 정보]\n${resolvedAnalysisContext}`
+      : '';
+
+    const finalBookContextSection = `${bookContextSection}${analysisContextSection}`;
+
+    if (!resolvedBookText && !resolvedPdfText && !resolvedAnalysisContext) {
+      return Response.json(
+        { error: '도서 원문 또는 분석 데이터가 아직 준비되지 않았습니다.' },
+        { status: 409 }
+      );
+    }
 
     const systemPrompt = `당신은 초등학생의 그림책 창작을 돕는 아동 창작 교육 도우미입니다.
 
 [도서 맥락]
-${bookContextSection}
+${finalBookContextSection}
 
 [이야기 유형] ${storyTypeLabel[story_type] || story_type}
 
@@ -265,12 +278,13 @@ ${studentSource.text}
 
 [초안 작성 규칙]
 1. 학생이 직접 말한 재료를 최우선으로 사용하세요.
-2. 책의 배경과 분위기는 참고하되, 학생이 말하지 않은 핵심 사건을 멋대로 새로 만들지 마세요.
-3. 초안은 비어 있으면 안 됩니다. 각 장면마다 실제 문장으로 초안을 써 주세요.
-4. 일부 감정 묘사나 연결 문장은 일부러 덜 채워 학생이 다시 쓸 여백을 남기세요.
-5. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
-6. 정확히 5개 장면으로 나누세요: 발단(이야기의 시작, 배경과 인물 소개), 전개(사건이 펼쳐지며 이야기가 진행), 위기(갈등이나 어려움 등장), 절정(가장 긴장감 넘치는 순간), 결말(문제 해결과 마무리).
-7. 각 장면의 draft는 2~4문장으로 쓰세요.
+2. PDF 원문 텍스트가 있으면 원작의 사건 순서, 등장인물 관계, 핵심 선택을 정확히 참고하세요.
+3. 책의 배경과 분위기는 참고하되, 학생이 말하지 않은 핵심 사건을 멋대로 새로 만들지 마세요.
+4. 초안은 비어 있으면 안 됩니다. 각 장면마다 실제 문장으로 초안을 써 주세요.
+5. 일부 감정 묘사나 연결 문장은 일부러 덜 채워 학생이 다시 쓸 여백을 남기세요.
+6. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
+7. 정확히 5개 장면으로 나누세요: 발단(이야기의 시작, 배경과 인물 소개), 전개(사건이 펼쳐지며 이야기가 진행), 위기(갈등이나 어려움 등장), 절정(가장 긴장감 넘치는 순간), 결말(문제 해결과 마무리).
+8. 각 장면의 draft는 2~4문장으로 쓰세요.
 
 [조언 작성 규칙]
 1. 각 장면마다 학생이 이미 말한 내용 중 살릴 만한 요소를 하나씩 짚어 주세요.
@@ -297,6 +311,7 @@ ${studentSource.text}
         model: 'gpt-5-mini',
         maxTokens: 3500,
         jsonMode: true,
+        timeoutMs: 90_000,
       }
     );
 

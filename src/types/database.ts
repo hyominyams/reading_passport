@@ -2,6 +2,8 @@ export type UserRole = 'admin' | 'teacher' | 'student';
 export type ContentScope = 'global' | 'class';
 export type ContentType = 'video' | 'pdf' | 'image' | 'link';
 export type ChatType = 'character' | 'story_gauge' | 'questions';
+export type QuestionBoardCategory = 'content' | 'character' | 'world';
+export type AnswerModerationStatus = 'visible' | 'hidden';
 export type ProductionStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type IllustrationStyle =
   | 'watercolor'
@@ -74,7 +76,7 @@ export interface BookPlotStructure {
   ending?: string;
 }
 
-export interface BookCharacterAnalysis {
+export interface BookAnalysis {
   story_summary: string;
   detailed_story_summary: string;
   setting: BookSettingSummary;
@@ -88,6 +90,48 @@ export interface BookCharacterAnalysis {
   out_of_scope_topics: string[];
 }
 
+/** @deprecated Use BookAnalysis. */
+export type BookCharacterAnalysis = BookAnalysis;
+
+export type BookAnalysisStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'stale';
+export type BookPdfTextStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'stale';
+
+export interface BookPdfTextRecord {
+  id: string;
+  book_id: string;
+  extraction_type: string;
+  source_language: string;
+  source_pdf_url: string | null;
+  source_hash: string | null;
+  status: BookPdfTextStatus;
+  extracted_text: string | null;
+  extracted_text_chars: number;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookAnalysisRecord {
+  id: string;
+  book_id: string;
+  analysis_type: string;
+  source_language: string;
+  source_pdf_url: string | null;
+  source_hash: string | null;
+  status: BookAnalysisStatus;
+  model: string | null;
+  prompt_version: string | null;
+  analysis_json: BookAnalysis;
+  extracted_text_chars: number;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CountryFact {
   id: string;
   country_id: string;
@@ -96,7 +140,7 @@ export interface CountryFact {
   order: number;
 }
 export type StoryType = 'continue' | 'new_protagonist' | 'extra_backstory' | 'change_ending' | 'custom';
-export type Visibility = 'public' | 'class' | 'private';
+export type Visibility = 'public' | 'secret';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type Language = string;
 
@@ -161,7 +205,8 @@ export interface Book {
   pdf_url_en: string | null;
   pdf_urls: Record<string, string>;
   languages_available: Language[];
-  character_analysis: BookCharacterAnalysis;
+  book_pdf_text?: BookPdfTextRecord | null;
+  book_analysis?: BookAnalysisRecord | null;
   created_by: string;
   scope: ContentScope;
   class_id: string | null;
@@ -260,6 +305,9 @@ export interface Story {
   cover_image_url: string | null;
   production_status: ProductionStatus;
   production_progress: number;
+  production_started_at: string | null;
+  production_heartbeat_at: string | null;
+  production_error_message: string | null;
   // Shared fields
   translation_text: string[] | null;
   translated_texts: StoryTranslationMap | null;
@@ -315,6 +363,44 @@ export interface ApprovalRequest {
   review_note: string | null;
   content_title: string | null;
   content_scope: ContentScope | null;
+}
+
+export interface QuestionPost {
+  id: string;
+  book_id: string;
+  student_id: string;
+  teacher_id: string;
+  class_name: string;
+  chat_log_id: string | null;
+  question_type: QuestionBoardCategory;
+  question_text: string;
+  adopted_answer_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuestionAnswer {
+  id: string;
+  post_id: string;
+  student_id: string;
+  answer_text: string;
+  moderation_status: AnswerModerationStatus;
+  moderated_by: string | null;
+  moderated_at: string | null;
+  moderation_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuestionModerationLog {
+  id: string;
+  target_type: 'answer';
+  target_id: string;
+  action: 'hide' | 'unhide' | 'delete';
+  moderator_id: string | null;
+  moderator_role: UserRole;
+  reason: string | null;
+  created_at: string;
 }
 
 // ── Campaign System ──
