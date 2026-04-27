@@ -40,6 +40,8 @@ export interface CoverDesign {
   image_url?: string;
   description?: string;
   picture_book_shape?: PictureBookShape;
+  story_font_key?: string;
+  story_font_size?: number;
 }
 
 export interface CharacterDesign {

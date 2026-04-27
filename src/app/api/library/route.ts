@@ -13,6 +13,7 @@ const LIBRARY_STORY_SELECT = `
   final_text,
   uploaded_images,
   scene_images,
+  illustration_style,
   cover_image_url,
   cover_design,
   translation_text,
@@ -41,8 +42,15 @@ type LibraryStoryRow = {
   final_text?: string[] | null;
   uploaded_images?: string[] | null;
   scene_images?: string[] | null;
+  illustration_style?: string | null;
   cover_image_url?: string | null;
-  cover_design?: { title?: string | null; image_url?: string | null } | null;
+  cover_design?: {
+    title?: string | null;
+    author?: string | null;
+    image_url?: string | null;
+    story_font_key?: string | null;
+    story_font_size?: number | null;
+  } | null;
   translation_text?: string[] | null;
   translated_texts?: Record<string, string[]> | null;
   pdf_url_original?: string | null;

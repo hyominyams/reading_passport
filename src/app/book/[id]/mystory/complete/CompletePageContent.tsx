@@ -15,6 +15,11 @@ import {
   getTranslationLanguageLabel,
   normalizeTranslatedTextsMap,
 } from '@/lib/story-translations';
+import {
+  generateSingleFontFaceCSS,
+  getCoverTypographyFont,
+  normalizeStorybookFontSize,
+} from '@/lib/storybook-fonts';
 
 function formatCompletedDate(value: string | null | undefined) {
   if (!value) return '날짜 정보 없음';
@@ -27,6 +32,40 @@ function formatCompletedDate(value: string | null | undefined) {
     month: 'long',
     day: 'numeric',
   }).format(date);
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return char;
+    }
+  });
+}
+
+function waitForPrintImages(documentRef: Document) {
+  const images = Array.from(documentRef.images);
+
+  return Promise.all(
+    images.map((image) => {
+      if (image.complete) return Promise.resolve();
+
+      return new Promise<void>((resolve) => {
+        image.addEventListener('load', () => resolve(), { once: true });
+        image.addEventListener('error', () => resolve(), { once: true });
+      });
+    }),
+  );
 }
 
 export default function CompletePageContent({ storyId }: { storyId: string | null }) {
@@ -84,6 +123,8 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
   const pictureBookShape = normalizePictureBookShape(story?.cover_design?.picture_book_shape);
   const shapeOption = getPictureBookShapeOption(pictureBookShape);
   const cssAspectRatio = shapeOption.aspectRatio.replace(':', '/');
+  const storyFont = getCoverTypographyFont(story?.cover_design, story?.illustration_style);
+  const storyFontSize = normalizeStorybookFontSize(story?.cover_design?.story_font_size);
   const isHistoryView = story?.story_status === 'completed';
   const completedDateLabel = formatCompletedDate(story?.completed_at ?? story?.created_at);
 
@@ -128,16 +169,18 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
     const title = languageCode
       ? `${coverTitle} (${getTranslationLanguageLabel(languageCode)})`
       : coverTitle;
+    const printFontFamily = `'${storyFont.fontFamily}', 'Noto Sans KR', sans-serif`;
+    const fontFaceCSS = generateSingleFontFaceCSS(storyFont, window.location.origin);
 
     const bookPages: string[] = [];
 
     bookPages.push(`
       <div class="book-page cover-page page-break">
         ${coverImage
-          ? `<img src="${coverImage}" alt="Cover" class="cover-img" />`
+          ? `<img src="${escapeHtml(coverImage)}" alt="Cover" class="cover-img" />`
           : `<div class="cover-text-only">
-               <h1 class="cover-title">${title}</h1>
-               <p class="cover-author">${coverAuthor}</p>
+               <h1 class="cover-title">${escapeHtml(title)}</h1>
+               <p class="cover-author">${escapeHtml(coverAuthor)}</p>
              </div>`
         }
       </div>
@@ -149,7 +192,7 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
       if (image) {
         bookPages.push(`
           <div class="book-page image-page page-break">
-            <img src="${image}" alt="Scene ${index + 1}" class="scene-img" />
+            <img src="${escapeHtml(image)}" alt="Scene ${index + 1}" class="scene-img" />
           </div>
         `);
       }
@@ -157,7 +200,7 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
       bookPages.push(`
         <div class="book-page text-page ${index < pages.length - 1 || image ? 'page-break' : ''}">
           <div class="text-wrapper">
-            <p class="story-text">${text.replace(/\n/g, '<br/>')}</p>
+            <p class="story-text">${escapeHtml(text ?? '').replace(/\n/g, '<br/>')}</p>
           </div>
         </div>
       `);
@@ -168,15 +211,16 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
       <html>
       <head>
         <meta charset="utf-8" />
-        <title>${title}</title>
+        <title>${escapeHtml(title)}</title>
         <style>
+          ${fontFaceCSS}
           @page { margin: 0; size: A4; }
           @media print {
             body { margin: 0; }
             .page-break { page-break-after: always; }
           }
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; }
+          body { font-family: ${printFontFamily}; }
           .book-page {
             width: 100vw;
             height: 100vh;
@@ -203,7 +247,8 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
             transform: translateY(-4%);
           }
           .story-text {
-            font-size: 20px;
+            font-family: ${printFontFamily};
+            font-size: ${storyFontSize}px;
             line-height: 2;
             text-align: center;
             color: #222;
@@ -221,9 +266,31 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
 
     const printWindow = window.open('', '_blank');
     if (printWindow) {
+      let didPrint = false;
+      const printWhenReady = async () => {
+        if (didPrint) return;
+        didPrint = true;
+
+        try {
+          await Promise.all([
+            printWindow.document.fonts?.ready ?? Promise.resolve(),
+            waitForPrintImages(printWindow.document),
+          ]);
+        } finally {
+          printWindow.focus();
+          printWindow.print();
+        }
+      };
+
+      printWindow.document.open();
       printWindow.document.write(htmlContent);
       printWindow.document.close();
-      printWindow.onload = () => printWindow.print();
+      printWindow.addEventListener('load', () => {
+        void printWhenReady();
+      }, { once: true });
+      window.setTimeout(() => {
+        void printWhenReady();
+      }, 500);
     }
   };
 
@@ -345,6 +412,8 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
                 sceneImages={story.scene_images ?? []}
                 coverImage={coverImage}
                 title={coverTitle}
+                storyFontFamily={storyFont.fontFamily}
+                storyFontSize={storyFontSize}
               />
             </div>
 

@@ -34,6 +34,8 @@ interface BookViewerModalProps {
   isLiked?: boolean;
   onLike?: () => void;
   commentCount?: number;
+  storyFontFamily?: string;
+  storyFontSize?: number;
 }
 
 /* ─── Animation variants ─── */
@@ -114,6 +116,8 @@ export default function BookViewerModal({
   isLiked = false,
   onLike,
   commentCount,
+  storyFontFamily,
+  storyFontSize,
 }: BookViewerModalProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -311,7 +315,13 @@ export default function BookViewerModal({
                       />
                     )}
                     <div className={isMobile ? '' : 'w-full px-8 lg:px-12'}>
-                      <p className="text-[#3d2a17] text-sm sm:text-base lg:text-lg leading-relaxed sm:leading-loose whitespace-pre-wrap font-medium text-center">
+                      <p
+                        className="text-[#3d2a17] text-sm sm:text-base lg:text-lg leading-relaxed sm:leading-loose whitespace-pre-wrap font-medium text-center"
+                        style={{
+                          fontFamily: storyFontFamily ? `'${storyFontFamily}', sans-serif` : undefined,
+                          fontSize: storyFontSize ? `${storyFontSize}px` : undefined,
+                        }}
+                      >
                         {(currentPages[currentPage] || pages[currentPage] || '').trim()}
                       </p>
                     </div>

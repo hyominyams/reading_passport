@@ -246,6 +246,13 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
       picture_book_shape: pictureBookShape,
     };
 
+    if (story.cover_design?.story_font_key) {
+      coverDesign.story_font_key = story.cover_design.story_font_key;
+    }
+    if (typeof story.cover_design?.story_font_size === 'number') {
+      coverDesign.story_font_size = story.cover_design.story_font_size;
+    }
+
     if (coverImageMode === 'upload' && imageUrl) {
       coverDesign.image_url = imageUrl;
     }

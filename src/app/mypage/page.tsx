@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import { normalizeTranslatedTextsMap } from '@/lib/story-translations';
 import { getStoryVisibilityLabel, normalizeStoryVisibility } from '@/lib/story-visibility';
+import { getCoverTypographyFont, normalizeStorybookFontSize } from '@/lib/storybook-fonts';
 import {
   avatarOptions,
   buildAutoNickname,
@@ -22,7 +23,7 @@ import {
   getWorldSmartCategoryMeta,
   type MyWorldSmartSummary,
 } from '@/lib/world-smart';
-import type { CoverDesign, ProductionStatus, StampType, StoryStatus, User, Visibility } from '@/types/database';
+import type { CoverDesign, IllustrationStyle, ProductionStatus, StampType, StoryStatus, User, Visibility } from '@/types/database';
 
 const requiredStamps: StampType[] = ['read', 'hidden', 'questions', 'mystory'];
 
@@ -39,6 +40,7 @@ type MyStoryRow = {
   book_id: string;
   cover_image_url: string | null;
   cover_design: CoverDesign | null;
+  illustration_style: IllustrationStyle | null;
   scene_images: string[] | null;
   final_text: string[] | null;
   translation_text: string[] | null;
@@ -215,7 +217,7 @@ export default function MyPage() {
               .not('final_text', 'is', null),
             supabase
               .from('stories')
-              .select('id, book_id, cover_image_url, cover_design, scene_images, final_text, translation_text, translated_texts, visibility, created_at, language')
+              .select('id, book_id, cover_image_url, cover_design, illustration_style, scene_images, final_text, translation_text, translated_texts, visibility, created_at, language')
               .eq('student_id', user.id)
               .not('final_text', 'is', null)
               .order('created_at', { ascending: false }),
@@ -1107,6 +1109,11 @@ export default function MyPage() {
           onSubmitComment={() => {}}
           submittingComment={false}
           commentCount={0}
+          storyFontFamily={getCoverTypographyFont(
+            selectedMyStory.cover_design,
+            selectedMyStory.illustration_style,
+          ).fontFamily}
+          storyFontSize={normalizeStorybookFontSize(selectedMyStory.cover_design?.story_font_size)}
         />
       )}
     </>

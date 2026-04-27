@@ -17,11 +17,15 @@ import {
   STORY_TRANSLATION_LANGUAGE_OPTIONS,
 } from '@/lib/story-translations';
 import {
+  STORYBOOK_FONT_SIZE_MAX,
+  STORYBOOK_FONT_SIZE_MIN,
   STORYBOOK_FONTS,
+  getCoverTypographyFont,
   getRecommendedFont,
+  normalizeStorybookFontSize,
   type StorybookFont,
 } from '@/lib/storybook-fonts';
-import type { Story, StoryTranslationMap, Visibility } from '@/types/database';
+import type { CoverDesign, Story, StoryTranslationMap, Visibility } from '@/types/database';
 
 // ── Types ──
 
@@ -123,7 +127,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   const [actionError, setActionError] = useState<string | null>(null);
   const [editedTexts, setEditedTexts] = useState<string[]>([]);
   const [selectedFont, setSelectedFont] = useState<StorybookFont | null>(null);
-  const [fontSize, setFontSize] = useState(18);
+  const [fontSize, setFontSize] = useState(normalizeStorybookFontSize(undefined));
   const [textLayoutMode, setTextLayoutMode] = useState<'edit' | 'preview'>('edit');
   const [regeneratingPageIndex, setRegeneratingPageIndex] = useState<number | null>(null);
   const autoEnglishTranslationStartedRef = useRef(false);
@@ -137,8 +141,8 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   const touchStartRef = useRef<number | null>(null);
   const translationPreviewRef = useRef<HTMLDivElement | null>(null);
 
-  const FONT_SIZE_MIN = 12;
-  const FONT_SIZE_MAX = 32;
+  const FONT_SIZE_MIN = STORYBOOK_FONT_SIZE_MIN;
+  const FONT_SIZE_MAX = STORYBOOK_FONT_SIZE_MAX;
 
   const sourceLanguage = story?.language ?? 'ko';
   const availableTranslationOptions = useMemo(
@@ -167,7 +171,8 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
           setTranslatedTexts(
             normalizeTranslatedTextsMap(s.translated_texts, s.translation_text, s.language),
           );
-          setSelectedFont(getRecommendedFont(s.illustration_style));
+          setSelectedFont(getCoverTypographyFont(s.cover_design, s.illustration_style));
+          setFontSize(normalizeStorybookFontSize(s.cover_design?.story_font_size));
         }
       } finally { setLoading(false); }
     };
@@ -185,7 +190,22 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   const coverTitle = story?.cover_design?.title ?? '나의 이야기';
   const coverAuthor = story?.cover_design?.author ?? '';
   const coverImage = story?.cover_image_url ?? story?.cover_design?.image_url ?? null;
-  const storyFontFamily = selectedFont?.fontFamily ?? 'inherit';
+  const activeStoryFont = selectedFont ?? getRecommendedFont(story?.illustration_style);
+  const storyFontFamily = activeStoryFont.fontFamily;
+  const coverDesignWithTypography = useMemo<CoverDesign | null>(() => {
+    if (!story) return null;
+
+    const nextCoverDesign = {
+      ...(story.cover_design ?? {}),
+    } as CoverDesign;
+
+    nextCoverDesign.title = nextCoverDesign.title?.trim() || coverTitle;
+    nextCoverDesign.author = nextCoverDesign.author?.trim() || coverAuthor;
+    nextCoverDesign.story_font_key = activeStoryFont.key;
+    nextCoverDesign.story_font_size = normalizeStorybookFontSize(fontSize);
+
+    return nextCoverDesign;
+  }, [activeStoryFont.key, coverAuthor, coverTitle, fontSize, story]);
   const availableTranslationEntries = Object.entries(translatedTexts).filter(([, pages]) =>
     hasMeaningfulTranslatedPages(pages)
   );
@@ -236,7 +256,11 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
     saveTimerRef.current = setTimeout(async () => {
       if (!storyId) return;
       const supabase = createClient();
-      await supabase.from('stories').update({ final_text: editedTexts }).eq('id', storyId);
+      const payload: Record<string, unknown> = { final_text: editedTexts };
+      if (coverDesignWithTypography) {
+        payload.cover_design = coverDesignWithTypography;
+      }
+      await supabase.from('stories').update(payload).eq('id', storyId);
       setSaveStatus('saved');
       savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 3000);
     }, 1500);
@@ -245,7 +269,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
-  }, [editedTexts, storyId]);
+  }, [coverDesignWithTypography, editedTexts, storyId]);
 
   const persistEditedTextsImmediately = useCallback(async () => {
     if (!storyId) return;
@@ -256,9 +280,14 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
     setSaveStatus('saving');
 
     const supabase = createClient();
+    const payload: Record<string, unknown> = { final_text: editedTexts };
+    if (coverDesignWithTypography) {
+      payload.cover_design = coverDesignWithTypography;
+    }
+
     const { error } = await supabase
       .from('stories')
-      .update({ final_text: editedTexts })
+      .update(payload)
       .eq('id', storyId);
 
     if (error) {
@@ -270,13 +299,14 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
         ? {
           ...prev,
           final_text: editedTexts,
+          cover_design: coverDesignWithTypography ?? prev.cover_design,
         }
         : prev
     ));
 
     setSaveStatus('saved');
     savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 3000);
-  }, [editedTexts, storyId]);
+  }, [coverDesignWithTypography, editedTexts, storyId]);
 
   // ── Auto English translation ──
   useEffect(() => { autoEnglishTranslationStartedRef.current = false; }, [storyId]);
@@ -302,6 +332,9 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
       translation_text: englishTranslation,
       translated_texts: translatedTexts,
     };
+    if (coverDesignWithTypography) {
+      payload.cover_design = coverDesignWithTypography;
+    }
     if (typeof targetStep === 'number') payload.current_step = Math.max(story.current_step, targetStep);
     const nextPayload = translatedTextsColumnSupportedRef.current
       ? payload
@@ -350,6 +383,9 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
         translated_texts: translatedTexts,
         current_step: Math.max(story.current_step, targetStep),
       };
+      if (coverDesignWithTypography) {
+        payload.cover_design = coverDesignWithTypography;
+      }
       const nextPayload = translatedTextsColumnSupportedRef.current
         ? payload
         : { ...payload, translated_texts: undefined };
@@ -430,6 +466,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
           ? {
             ...prev,
             final_text: editedTexts,
+            cover_design: coverDesignWithTypography ?? prev.cover_design,
             scene_images: nextSceneImages as unknown as string[],
             production_progress:
               typeof data.progress === 'number'

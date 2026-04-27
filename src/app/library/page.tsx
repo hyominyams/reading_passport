@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 import { countries } from '@/lib/data/countries';
 import { generateDummyLibraryItems, isDummyId } from '@/lib/data/dummyLibrary';
 import { normalizeTranslatedTextsMap } from '@/lib/story-translations';
+import { getCoverTypographyFont, normalizeStorybookFontSize } from '@/lib/storybook-fonts';
 
 interface Comment {
   author: string;
@@ -446,6 +447,13 @@ export default function LibraryPage() {
     );
   }
 
+  const selectedStoryFont = selectedItem
+    ? getCoverTypographyFont(selectedItem.story.cover_design, selectedItem.story.illustration_style)
+    : null;
+  const selectedStoryFontSize = selectedItem
+    ? normalizeStorybookFontSize(selectedItem.story.cover_design?.story_font_size)
+    : undefined;
+
   return (
     <>
       <Header />
@@ -520,6 +528,8 @@ export default function LibraryPage() {
             isLiked={likedStories.has(selectedItem.story_id)}
             onLike={() => handleLike(selectedItem.story_id)}
             commentCount={selectedItem.comment_count ?? 0}
+            storyFontFamily={selectedStoryFont?.fontFamily}
+            storyFontSize={selectedStoryFontSize}
           />
         )}
       </main>

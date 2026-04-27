@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import BookshelfRow from './BookshelfRow';
 import { countries } from '@/lib/data/countries';
+import type { IllustrationStyle } from '@/types/database';
 
 export interface LibraryStoryItem {
   id: string;
@@ -36,11 +37,14 @@ export interface LibraryStoryItem {
     character_refs: { name: string; imageUrl: string }[] | null;
     uploaded_images?: string[] | null;
     scene_images: string[] | null;
+    illustration_style?: IllustrationStyle | null;
     cover_image_url?: string | null;
     cover_design?: {
       title?: string | null;
       author?: string | null;
       image_url?: string | null;
+      story_font_key?: string | null;
+      story_font_size?: number | null;
     } | null;
     translation_text: string[] | null;
     translated_texts: Record<string, string[]> | null;
