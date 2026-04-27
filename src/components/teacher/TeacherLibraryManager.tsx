@@ -5,11 +5,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import CommentBox from '@/components/teacher/CommentBox';
+import { STORY_VISIBILITY_OPTIONS, getStoryVisibilityLabel } from '@/lib/story-visibility';
+import type { Visibility } from '@/types/database';
 
 interface TeacherLibraryItem {
   story_id: string;
   student_id: string;
-  visibility: 'public' | 'class' | 'private';
+  visibility: Visibility;
   created_at: string;
   country_id: string;
   book_id: string;
@@ -163,12 +165,6 @@ export default function TeacherLibraryManager() {
     }
   };
 
-  const visibilityLabel: Record<TeacherLibraryItem['visibility'], string> = {
-    public: '전체 공개',
-    class: '반 공개',
-    private: '비공개',
-  };
-
   const openStoryDetail = async (storyId: string) => {
     setDetailLoading(true);
     setError('');
@@ -266,7 +262,7 @@ export default function TeacherLibraryManager() {
                         {item.in_library ? '도서관 등록됨' : '도서관 미등록'}
                       </span>
                       <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700">
-                        {visibilityLabel[item.visibility]}
+                        {getStoryVisibilityLabel(item.visibility)}
                       </span>
                     </div>
 
@@ -312,7 +308,7 @@ export default function TeacherLibraryManager() {
                     {item.in_library ? '도서관에서 제외' : '도서관에 등록'}
                   </button>
 
-                  {(['public', 'class', 'private'] as const).map((visibility) => (
+                  {STORY_VISIBILITY_OPTIONS.map((visibility) => (
                     <button
                       key={visibility}
                       onClick={() => updateVisibility(item.story_id, visibility)}
@@ -323,7 +319,7 @@ export default function TeacherLibraryManager() {
                           : 'border-border hover:bg-muted-light'
                       }`}
                     >
-                      {visibilityLabel[visibility]}
+                      {getStoryVisibilityLabel(visibility)}
                     </button>
                   ))}
                 </div>

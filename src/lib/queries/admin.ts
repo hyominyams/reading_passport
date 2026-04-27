@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
+import { attachLatestBookAnalyses } from '@/lib/queries/book-analyses';
+import { attachLatestBookPdfTexts } from '@/lib/queries/book-pdf-texts';
 import { computeLanguagesFromMap, pickPreferredPdfUrlFromMap } from '@/lib/pdf-analysis';
-import type { User, Book, ApprovalRequest, HiddenContent, Story, LibraryItem } from '@/types/database';
+import type { User, Book, ApprovalRequest, HiddenContent, Story, LibraryItem, Visibility } from '@/types/database';
 
 async function generateBookCover(options: {
   bookId: string;
@@ -110,7 +112,8 @@ export async function getAllBooks(): Promise<Book[]> {
     return [];
   }
 
-  return (data ?? []) as Book[];
+  const booksWithAnalyses = await attachLatestBookAnalyses(supabase, (data ?? []) as Book[]);
+  return attachLatestBookPdfTexts(supabase, booksWithAnalyses);
 }
 
 export async function createBook(data: {
@@ -122,7 +125,6 @@ export async function createBook(data: {
   pdf_url_ko?: string | null;
   /** @deprecated */
   pdf_url_en?: string | null;
-  character_analysis?: Record<string, unknown>;
   created_by: string;
   base_url?: string;
 }): Promise<{ success: boolean; bookId?: string; error?: string }> {
@@ -145,7 +147,6 @@ export async function createBook(data: {
       pdf_url_ko: pdfUrls.ko ?? null,
       pdf_url_en: pdfUrls.en ?? null,
       languages_available: computeLanguagesFromMap(pdfUrls),
-      character_analysis: data.character_analysis ?? {},
       created_by: data.created_by,
       scope: 'global',
       approved: true,
@@ -196,7 +197,6 @@ export async function updateBook(
     /** @deprecated */
     pdf_url_en: string | null;
     approved: boolean;
-    character_analysis: Record<string, unknown>;
     base_url: string;
   }>
 ): Promise<{ success: boolean; error?: string }> {
@@ -230,7 +230,12 @@ export async function updateBook(
   }
 
   const nextLanguages = computeLanguagesFromMap(nextPdfUrls);
-  const { base_url, pdf_urls: _pdfUrlsParam, pdf_url_ko: _ko, pdf_url_en: _en, ...bookUpdateData } = data;
+  const baseUrl = data.base_url;
+  const bookUpdateData = { ...data };
+  delete bookUpdateData.base_url;
+  delete bookUpdateData.pdf_urls;
+  delete bookUpdateData.pdf_url_ko;
+  delete bookUpdateData.pdf_url_en;
 
   const { error } = await supabase
     .from('books')
@@ -261,7 +266,7 @@ export async function updateBook(
       const generatedCoverUrl = await generateBookCover({
         bookId,
         pdfUrls: nextPdfUrls,
-        baseUrl: base_url,
+        baseUrl,
       });
 
       if (generatedCoverUrl && generatedCoverUrl !== currentBook.cover_url) {
@@ -332,7 +337,7 @@ export async function hideLibraryItem(libraryId: string): Promise<{ success: boo
 
 export async function updateStoryVisibility(
   storyId: string,
-  visibility: 'public' | 'class' | 'private'
+  visibility: Visibility
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
 

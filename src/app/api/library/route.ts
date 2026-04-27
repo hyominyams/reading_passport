@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { normalizeStoryVisibility } from '@/lib/story-visibility';
 
 const LIBRARY_STORY_SELECT = `
   id,
@@ -9,7 +11,9 @@ const LIBRARY_STORY_SELECT = `
   language,
   story_type,
   final_text,
+  uploaded_images,
   scene_images,
+  illustration_style,
   cover_image_url,
   cover_design,
   translation_text,
@@ -19,7 +23,7 @@ const LIBRARY_STORY_SELECT = `
   translated_pdf_urls,
   visibility,
   created_at,
-  author:users!stories_student_id_fkey(nickname)
+  author:users!stories_student_id_fkey(nickname, teacher_id)
 `;
 
 type LibraryBookRow = {
@@ -36,9 +40,17 @@ type LibraryStoryRow = {
   language: string;
   story_type: string;
   final_text?: string[] | null;
+  uploaded_images?: string[] | null;
   scene_images?: string[] | null;
+  illustration_style?: string | null;
   cover_image_url?: string | null;
-  cover_design?: { title?: string | null; image_url?: string | null } | null;
+  cover_design?: {
+    title?: string | null;
+    author?: string | null;
+    image_url?: string | null;
+    story_font_key?: string | null;
+    story_font_size?: number | null;
+  } | null;
   translation_text?: string[] | null;
   translated_texts?: Record<string, string[]> | null;
   pdf_url_original?: string | null;
@@ -46,7 +58,7 @@ type LibraryStoryRow = {
   translated_pdf_urls?: Record<string, string> | null;
   visibility?: string | null;
   created_at: string;
-  author?: { nickname?: string | null } | { nickname?: string | null }[] | null;
+  author?: { nickname?: string | null; teacher_id?: string | null } | { nickname?: string | null; teacher_id?: string | null }[] | null;
 };
 
 type LibraryRow = {
@@ -72,7 +84,21 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export async function GET() {
+  const authClient = await createClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
+  }
+
   const supabase = createServiceClient();
+  const { data: viewer } = await supabase
+    .from('users')
+    .select('id, role')
+    .eq('id', user.id)
+    .maybeSingle<{ id: string; role: 'admin' | 'teacher' | 'student' }>();
 
   const { data, error } = await supabase
     .from('library')
@@ -112,7 +138,23 @@ export async function GET() {
     };
   });
 
-  const storyIds = rows.map((item) => item.story_id);
+  const visibleRows = rows.filter((item) => {
+    const story = item.story;
+    if (!story) return false;
+
+    const visibility = normalizeStoryVisibility(story.visibility);
+    if (visibility === 'public' || story.student_id === user.id) {
+      return true;
+    }
+
+    if (viewer?.role === 'admin') {
+      return true;
+    }
+
+    return viewer?.role === 'teacher' && story.author?.teacher_id === user.id;
+  });
+
+  const storyIds = visibleRows.map((item) => item.story_id);
 
   const likeCounts: Record<string, number> = {};
   const commentCounts: Record<string, number> = {};
@@ -141,10 +183,15 @@ export async function GET() {
     }
   }
 
-  const items = rows
-    .filter((item) => item.story && item.story.visibility !== 'private')
+  const items = visibleRows
     .map((item) => ({
       ...item,
+      story: item.story
+        ? {
+            ...item.story,
+            visibility: normalizeStoryVisibility(item.story.visibility),
+          }
+        : item.story,
       story_title:
         item.story_title?.trim()
         || item.story?.cover_design?.title?.trim()
@@ -157,7 +204,8 @@ export async function GET() {
         item.thumbnail_url?.trim()
         || item.story?.cover_image_url?.trim()
         || item.story?.cover_design?.image_url?.trim()
-        || item.story?.scene_images?.[0]
+        || item.story?.uploaded_images?.find((url) => typeof url === 'string' && url.trim().length > 0)
+        || item.story?.scene_images?.find((url) => typeof url === 'string' && url.trim().length > 0)
         || null,
       likes: likeCounts[item.story_id] ?? item.likes,
       comment_count: commentCounts[item.story_id] ?? 0,

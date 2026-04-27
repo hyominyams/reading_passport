@@ -47,7 +47,7 @@ export async function proxy(request: NextRequest) {
   const isStudentOnlyRoute = studentOnlyRoutes.some((route) =>
     pathname.startsWith(route)
   );
-  const isStudentOnlyBookRoute = /^\/book\/[^/]+\/(activity|read|explore|questions|mystory)(\/.*)?$/.test(pathname);
+  const isStudentOnlyBookRoute = /^\/book\/[^/]+\/(activity|read|explore|questions|world-smart|mystory)(\/.*)?$/.test(pathname);
 
   if (isTeacherRoute || isAdminRoute || isStudentOnlyRoute || isStudentOnlyBookRoute) {
     const serviceClient = createClient(

@@ -9,6 +9,7 @@ interface ContentViewerProps {
   type: ContentType;
   title: string;
   url: string;
+  onOpenExternal?: () => void;
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -24,6 +25,7 @@ export default function ContentViewer({
   type,
   title,
   url,
+  onOpenExternal,
 }: ContentViewerProps) {
   const videoId = type === 'video' ? extractYouTubeId(url) : null;
 
@@ -102,6 +104,7 @@ export default function ContentViewer({
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={onOpenExternal}
                     className="px-6 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"
                   >
                     링크 열기 &rarr;

@@ -1,6 +1,7 @@
 import Header from '@/components/common/Header';
-import { getBookById } from '@/lib/queries/books';
+import { getBookById, getStudentActivity } from '@/lib/queries/books';
 import ReadPageClient from '@/components/book/ReadPageClient';
+import { createClient } from '@/lib/supabase/server';
 
 export default async function ReadPage({
   params,
@@ -11,7 +12,15 @@ export default async function ReadPage({
 }) {
   const { id } = await params;
   const { lang } = await searchParams;
-  const book = await getBookById(id);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [book, activity] = await Promise.all([
+    getBookById(id),
+    user ? getStudentActivity(user.id, id) : Promise.resolve(null),
+  ]);
 
   if (!book) {
     return (
@@ -41,7 +50,7 @@ export default async function ReadPage({
       <link rel="modulepreload" href="/pdfjs/pdf.worker.min.mjs" />
       <Header />
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <ReadPageClient book={book} pdfUrl={pdfUrl} language={language} />
+        <ReadPageClient book={book} pdfUrl={pdfUrl} language={language} initialActivity={activity} />
       </main>
     </>
   );

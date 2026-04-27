@@ -101,14 +101,16 @@ export default function Header() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                    title={link.label}
+                    aria-label={link.label}
+                    className={`inline-flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
                       isActive
                         ? 'text-foreground font-medium bg-foreground/[0.06]'
                         : 'text-muted hover:text-foreground hover:bg-foreground/[0.04]'
                     }`}
                   >
                     {navIcons[link.href]}
-                    <span className="hidden sm:inline">{link.label}</span>
+                    <span className="hidden lg:inline">{link.label}</span>
                   </Link>
                 );
               })}
@@ -117,7 +119,7 @@ export default function Header() {
                 <div className="w-7 h-7 rounded-full bg-foreground/[0.08] text-foreground flex items-center justify-center text-xs font-medium">
                   {avatarEmoji ? <span className="text-sm">{avatarEmoji}</span> : initial}
                 </div>
-                <span className="text-sm text-foreground hidden sm:inline">
+                <span className="text-sm text-foreground hidden lg:inline whitespace-nowrap max-w-[10rem] truncate">
                   {displayName}
                 </span>
                 <button
@@ -126,9 +128,21 @@ export default function Header() {
                     void handleSignOut();
                   }}
                   disabled={signingOut}
-                  className="text-xs text-muted hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:text-muted/50"
+                  title="로그아웃"
+                  aria-label="로그아웃"
+                  className="text-xs text-muted hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:text-muted/50 whitespace-nowrap"
                 >
-                  {signingOut ? '로그아웃 중...' : '로그아웃'}
+                  {signingOut ? (
+                    <span className="hidden lg:inline">로그아웃 중...</span>
+                  ) : (
+                    <>
+                      {/* Icon-only on tablet, text on desktop */}
+                      <svg className="w-4 h-4 lg:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                      </svg>
+                      <span className="hidden lg:inline">로그아웃</span>
+                    </>
+                  )}
                 </button>
               </div>
             </nav>

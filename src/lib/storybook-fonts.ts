@@ -9,6 +9,10 @@ export interface StorybookFont {
   matchStyles: IllustrationStyle[];
 }
 
+export const STORYBOOK_FONT_SIZE_MIN = 12;
+export const STORYBOOK_FONT_SIZE_MAX = 32;
+export const DEFAULT_STORYBOOK_FONT_SIZE = 18;
+
 export const STORYBOOK_FONTS: StorybookFont[] = [
   {
     key: 'cute-bold',
@@ -69,15 +73,41 @@ export function getStorybookFont(key: string): StorybookFont | undefined {
   return STORYBOOK_FONTS.find((f) => f.key === key);
 }
 
+export function normalizeStorybookFontSize(value: unknown): number {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return DEFAULT_STORYBOOK_FONT_SIZE;
+
+  return Math.min(
+    STORYBOOK_FONT_SIZE_MAX,
+    Math.max(STORYBOOK_FONT_SIZE_MIN, Math.round(numericValue)),
+  );
+}
+
+export function getCoverTypographyFont(
+  coverDesign: { story_font_key?: string | null } | null | undefined,
+  style: IllustrationStyle | null | undefined,
+): StorybookFont {
+  const savedFont = coverDesign?.story_font_key
+    ? getStorybookFont(coverDesign.story_font_key)
+    : undefined;
+
+  return savedFont ?? getRecommendedFont(style);
+}
+
+export function getStorybookFontSource(font: StorybookFont, baseUrl?: string): string {
+  const path = `/fonts/${encodeURIComponent(font.fileName)}`;
+  return baseUrl ? new URL(path, baseUrl).toString() : path;
+}
+
 /** Generate @font-face CSS for all storybook fonts */
-export function generateFontFaceCSS(): string {
+export function generateFontFaceCSS(baseUrl?: string): string {
   return STORYBOOK_FONTS.map(
     (f) =>
-      `@font-face { font-family: '${f.fontFamily}'; src: url('/fonts/${encodeURIComponent(f.fileName)}') format('truetype'); font-display: swap; }`,
+      `@font-face { font-family: '${f.fontFamily}'; src: url('${getStorybookFontSource(f, baseUrl)}') format('truetype'); font-display: block; }`,
   ).join('\n');
 }
 
 /** Generate @font-face CSS for a single font */
-export function generateSingleFontFaceCSS(font: StorybookFont): string {
-  return `@font-face { font-family: '${font.fontFamily}'; src: url('/fonts/${encodeURIComponent(font.fileName)}') format('truetype'); font-display: swap; }`;
+export function generateSingleFontFaceCSS(font: StorybookFont, baseUrl?: string): string {
+  return `@font-face { font-family: '${font.fontFamily}'; src: url('${getStorybookFontSource(font, baseUrl)}') format('truetype'); font-display: block; }`;
 }

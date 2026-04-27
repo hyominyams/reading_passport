@@ -7,8 +7,9 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import VisibilitySelector from '@/components/story/VisibilitySelector';
 import { createClient } from '@/lib/supabase/client';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import { normalizePictureBookShape, getPictureBookShapeOption } from '@/lib/picture-book-shapes';
+import { normalizeStoryVisibility } from '@/lib/story-visibility';
 import {
   getTranslationLanguageLabel,
   hasMeaningfulTranslatedPages,
@@ -16,12 +17,15 @@ import {
   STORY_TRANSLATION_LANGUAGE_OPTIONS,
 } from '@/lib/story-translations';
 import {
+  STORYBOOK_FONT_SIZE_MAX,
+  STORYBOOK_FONT_SIZE_MIN,
   STORYBOOK_FONTS,
+  getCoverTypographyFont,
   getRecommendedFont,
-  generateFontFaceCSS,
+  normalizeStorybookFontSize,
   type StorybookFont,
 } from '@/lib/storybook-fonts';
-import type { Story, StoryTranslationMap, Visibility } from '@/types/database';
+import type { CoverDesign, Story, StoryTranslationMap, Visibility } from '@/types/database';
 
 // ── Types ──
 
@@ -123,7 +127,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   const [actionError, setActionError] = useState<string | null>(null);
   const [editedTexts, setEditedTexts] = useState<string[]>([]);
   const [selectedFont, setSelectedFont] = useState<StorybookFont | null>(null);
-  const [fontSize, setFontSize] = useState(18);
+  const [fontSize, setFontSize] = useState(normalizeStorybookFontSize(undefined));
   const [textLayoutMode, setTextLayoutMode] = useState<'edit' | 'preview'>('edit');
   const [regeneratingPageIndex, setRegeneratingPageIndex] = useState<number | null>(null);
   const autoEnglishTranslationStartedRef = useRef(false);
@@ -137,25 +141,14 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   const touchStartRef = useRef<number | null>(null);
   const translationPreviewRef = useRef<HTMLDivElement | null>(null);
 
-  const FONT_SIZE_MIN = 12;
-  const FONT_SIZE_MAX = 32;
+  const FONT_SIZE_MIN = STORYBOOK_FONT_SIZE_MIN;
+  const FONT_SIZE_MAX = STORYBOOK_FONT_SIZE_MAX;
 
   const sourceLanguage = story?.language ?? 'ko';
   const availableTranslationOptions = useMemo(
     () => STORY_TRANSLATION_LANGUAGE_OPTIONS.filter((option) => option.code !== sourceLanguage),
     [sourceLanguage],
   );
-
-  // ── Font loading ──
-  useEffect(() => {
-    const styleId = 'storybook-fonts-style';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = generateFontFaceCSS();
-      document.head.appendChild(style);
-    }
-  }, []);
 
   // ── Fetch story ──
   useEffect(() => {
@@ -173,12 +166,13 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
           }
 
           setStory(s);
-          setVisibility(s.visibility);
+          setVisibility(normalizeStoryVisibility(s.visibility));
           setEditedTexts(s.final_text ?? []);
           setTranslatedTexts(
             normalizeTranslatedTextsMap(s.translated_texts, s.translation_text, s.language),
           );
-          setSelectedFont(getRecommendedFont(s.illustration_style));
+          setSelectedFont(getCoverTypographyFont(s.cover_design, s.illustration_style));
+          setFontSize(normalizeStorybookFontSize(s.cover_design?.story_font_size));
         }
       } finally { setLoading(false); }
     };
@@ -196,7 +190,22 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   const coverTitle = story?.cover_design?.title ?? '나의 이야기';
   const coverAuthor = story?.cover_design?.author ?? '';
   const coverImage = story?.cover_image_url ?? story?.cover_design?.image_url ?? null;
-  const storyFontFamily = selectedFont?.fontFamily ?? 'inherit';
+  const activeStoryFont = selectedFont ?? getRecommendedFont(story?.illustration_style);
+  const storyFontFamily = activeStoryFont.fontFamily;
+  const coverDesignWithTypography = useMemo<CoverDesign | null>(() => {
+    if (!story) return null;
+
+    const nextCoverDesign = {
+      ...(story.cover_design ?? {}),
+    } as CoverDesign;
+
+    nextCoverDesign.title = nextCoverDesign.title?.trim() || coverTitle;
+    nextCoverDesign.author = nextCoverDesign.author?.trim() || coverAuthor;
+    nextCoverDesign.story_font_key = activeStoryFont.key;
+    nextCoverDesign.story_font_size = normalizeStorybookFontSize(fontSize);
+
+    return nextCoverDesign;
+  }, [activeStoryFont.key, coverAuthor, coverTitle, fontSize, story]);
   const availableTranslationEntries = Object.entries(translatedTexts).filter(([, pages]) =>
     hasMeaningfulTranslatedPages(pages)
   );
@@ -247,7 +256,11 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
     saveTimerRef.current = setTimeout(async () => {
       if (!storyId) return;
       const supabase = createClient();
-      await supabase.from('stories').update({ final_text: editedTexts }).eq('id', storyId);
+      const payload: Record<string, unknown> = { final_text: editedTexts };
+      if (coverDesignWithTypography) {
+        payload.cover_design = coverDesignWithTypography;
+      }
+      await supabase.from('stories').update(payload).eq('id', storyId);
       setSaveStatus('saved');
       savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 3000);
     }, 1500);
@@ -256,7 +269,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
-  }, [editedTexts, storyId]);
+  }, [coverDesignWithTypography, editedTexts, storyId]);
 
   const persistEditedTextsImmediately = useCallback(async () => {
     if (!storyId) return;
@@ -267,9 +280,14 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
     setSaveStatus('saving');
 
     const supabase = createClient();
+    const payload: Record<string, unknown> = { final_text: editedTexts };
+    if (coverDesignWithTypography) {
+      payload.cover_design = coverDesignWithTypography;
+    }
+
     const { error } = await supabase
       .from('stories')
-      .update({ final_text: editedTexts })
+      .update(payload)
       .eq('id', storyId);
 
     if (error) {
@@ -281,13 +299,14 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
         ? {
           ...prev,
           final_text: editedTexts,
+          cover_design: coverDesignWithTypography ?? prev.cover_design,
         }
         : prev
     ));
 
     setSaveStatus('saved');
     savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 3000);
-  }, [editedTexts, storyId]);
+  }, [coverDesignWithTypography, editedTexts, storyId]);
 
   // ── Auto English translation ──
   useEffect(() => { autoEnglishTranslationStartedRef.current = false; }, [storyId]);
@@ -313,6 +332,9 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
       translation_text: englishTranslation,
       translated_texts: translatedTexts,
     };
+    if (coverDesignWithTypography) {
+      payload.cover_design = coverDesignWithTypography;
+    }
     if (typeof targetStep === 'number') payload.current_step = Math.max(story.current_step, targetStep);
     const nextPayload = translatedTextsColumnSupportedRef.current
       ? payload
@@ -361,6 +383,9 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
         translated_texts: translatedTexts,
         current_step: Math.max(story.current_step, targetStep),
       };
+      if (coverDesignWithTypography) {
+        payload.cover_design = coverDesignWithTypography;
+      }
       const nextPayload = translatedTextsColumnSupportedRef.current
         ? payload
         : { ...payload, translated_texts: undefined };
@@ -441,6 +466,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
           ? {
             ...prev,
             final_text: editedTexts,
+            cover_design: coverDesignWithTypography ?? prev.cover_design,
             scene_images: nextSceneImages as unknown as string[],
             production_progress:
               typeof data.progress === 'number'
@@ -573,7 +599,9 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
         {/* Step indicator */}
         <div className="px-4 pt-6 pb-2">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">Step 6/7</span>
+            <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">
+              {getDetailStepProgressLabel(7)}
+            </span>
             <span>그림책 제작</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">만들어진 그림책을 확인해 보세요</h1>
@@ -625,14 +653,14 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
 
           {/* Font picker dropdown */}
           {showFontPicker && (
-            <div className="mt-2 pb-1 grid grid-cols-3 gap-1.5">
+            <div className="mt-2 pb-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {STORYBOOK_FONTS.map(font => (
                 <button
                   key={font.key}
                   onClick={() => { setSelectedFont(font); setShowFontPicker(false); }}
                   className={`p-2 rounded-lg border text-center transition-all ${selectedFont?.key === font.key ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
                 >
-                  <span className="block text-sm text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>가나다</span>
+                  <span className="block text-lg leading-tight text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>가나다라</span>
                   <span className="text-[10px] text-gray-500">{font.label}</span>
                 </button>
               ))}
@@ -675,7 +703,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                           <img src={coverImage} alt="표지" className="w-full h-full object-cover" />
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50" style={{ aspectRatio: cssAspectRatio }}>
+                        <div className="flex items-center justify-center bg-indigo-50" style={{ aspectRatio: cssAspectRatio }}>
                           <div className="text-center px-6">
                             <h2 className="text-xl font-bold text-gray-900">{coverTitle}</h2>
                             <p className="text-gray-500 text-sm mt-1">글/그림: {coverAuthor}</p>
@@ -825,7 +853,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                   onClick={() => { setSelectedFont(font); setOpenAccordion(null); }}
                   className={`p-3 rounded-xl border text-center transition-all ${selectedFont?.key === font.key ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
                 >
-                  <span className="block text-base mb-0.5 text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>가나다라</span>
+                  <span className="block text-xl mb-0.5 leading-tight text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>이야기 글꼴</span>
                   <span className="text-xs text-gray-500">{font.label}</span>
                 </button>
               ))}

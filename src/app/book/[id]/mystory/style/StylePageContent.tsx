@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import { getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
 import {
   DEFAULT_PICTURE_BOOK_SHAPE,
@@ -245,6 +246,13 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
       picture_book_shape: pictureBookShape,
     };
 
+    if (story.cover_design?.story_font_key) {
+      coverDesign.story_font_key = story.cover_design.story_font_key;
+    }
+    if (typeof story.cover_design?.story_font_size === 'number') {
+      coverDesign.story_font_size = story.cover_design.story_font_size;
+    }
+
     if (coverImageMode === 'upload' && imageUrl) {
       coverDesign.image_url = imageUrl;
     }
@@ -269,6 +277,9 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
       if (targetStep >= 7) {
         updatePayload.production_status = 'pending';
         updatePayload.production_progress = 0;
+        updatePayload.production_started_at = null;
+        updatePayload.production_heartbeat_at = null;
+        updatePayload.production_error_message = null;
         updatePayload.scene_images = null;
       }
     }
@@ -384,7 +395,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
         <p className="text-sm text-muted mt-2">
           표지를 꾸며 보세요
         </p>
-        <p className="text-xs text-gray-400 mt-1">Step 5/7</p>
+        <p className="text-xs text-gray-400 mt-1">{getDetailStepProgressLabel(6)}</p>
       </div>
 
       {error && (
@@ -539,11 +550,16 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
               />
               {coverPreviewUrl ? (
                 <div className="relative">
-                  <img
-                    src={coverPreviewUrl}
-                    alt="표지 미리보기"
-                    className="w-full max-h-80 object-contain rounded-xl border border-border bg-white"
-                  />
+                  <div className="relative h-80 w-full overflow-hidden rounded-xl border border-border bg-white">
+                    <Image
+                      src={coverPreviewUrl}
+                      alt="표지 미리보기"
+                      fill
+                      unoptimized
+                      sizes="(max-width: 768px) 100vw, 768px"
+                      className="object-contain"
+                    />
+                  </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="mt-2 text-xs text-secondary hover:text-secondary-dark font-medium transition-colors"
@@ -614,11 +630,16 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
 
               {coverPreviewUrl && (
                 <div className="mt-4">
-                  <img
-                    src={coverPreviewUrl}
-                    alt="생성된 표지 미리보기"
-                    className="w-full max-h-80 object-contain rounded-xl border border-border bg-white"
-                  />
+                  <div className="relative h-80 w-full overflow-hidden rounded-xl border border-border bg-white">
+                    <Image
+                      src={coverPreviewUrl}
+                      alt="생성된 표지 미리보기"
+                      fill
+                      unoptimized
+                      sizes="(max-width: 768px) 100vw, 768px"
+                      className="object-contain"
+                    />
+                  </div>
                 </div>
               )}
             </motion.div>

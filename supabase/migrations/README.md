@@ -38,6 +38,16 @@
    - 일부 환경에서 누락된 `classes.mystory_required_turns` 컬럼을 실제 스키마에 복구합니다.
    - PostgREST schema cache도 함께 갱신합니다.
 
+11. `023_activity_question_seed_and_challenges.sql`
+   - `activities`에 Step 1 질문 씨앗과 Step 2 탐색 챌린지 메모 저장 컬럼을 추가합니다.
+
+12. `028_story_visibility_secret.sql`
+   - 학생 작품 공개 범위를 `public`/`secret`으로 단순화하고 기존 `class`/`private` 값은 `secret`으로 전환합니다.
+
+13. `029_book_pdf_texts.sql`
+   - 책 PDF 원문 추출 결과를 `book_pdf_texts` 테이블에 분리 저장합니다.
+   - 원문 추출 상태/오류를 교사 및 관리자 대시보드에서 확인할 수 있게 합니다.
+
 ## 원격 DB 상태 점검
 
 - 애플리케이션 레벨 점검은 `npx tsx scripts/check-books.ts` 또는 `npx tsx scripts/check-db-health.ts`로 확인합니다.

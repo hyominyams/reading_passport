@@ -18,18 +18,30 @@ const emotions: Emotion[] = [
 ];
 
 interface EmotionPickerProps {
-  onSubmit: (emotion: string, oneLine: string) => void;
+  onSubmit: (emotion: string, oneLine: string, questionSeed: string) => void;
   isSubmitting: boolean;
+  initialEmotion?: string | null;
+  initialOneLine?: string | null;
+  initialQuestionSeed?: string | null;
+  errorMessage?: string | null;
 }
 
-export default function EmotionPicker({ onSubmit, isSubmitting }: EmotionPickerProps) {
-  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
-  const [oneLine, setOneLine] = useState('');
+export default function EmotionPicker({
+  onSubmit,
+  isSubmitting,
+  initialEmotion,
+  initialOneLine,
+  initialQuestionSeed,
+  errorMessage,
+}: EmotionPickerProps) {
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(initialEmotion ?? null);
+  const [oneLine, setOneLine] = useState(initialOneLine ?? '');
+  const [questionSeed, setQuestionSeed] = useState(initialQuestionSeed ?? '');
   const [dragOverZone, setDragOverZone] = useState(false);
 
   const handleSubmit = () => {
     if (selectedEmotion && oneLine.trim()) {
-      onSubmit(selectedEmotion, oneLine.trim());
+      onSubmit(selectedEmotion, oneLine.trim(), questionSeed.trim());
     }
   };
 
@@ -151,6 +163,28 @@ export default function EmotionPicker({ onSubmit, isSubmitting }: EmotionPickerP
         </p>
       </div>
 
+      <div className="mb-8 rounded-2xl border border-[#d9c7ae] bg-[#fbf6ec] p-4">
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-foreground">
+            더 알고 싶은 점
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            다음 단계에 가져갈 궁금증을 남겨 두세요
+          </p>
+        </div>
+        <textarea
+          value={questionSeed}
+          onChange={(e) => setQuestionSeed(e.target.value)}
+          placeholder="예) 주인공은 왜 그런 선택을 했을까요?"
+          rows={3}
+          maxLength={240}
+          className="w-full resize-none rounded-xl border border-[#dcc8ad] bg-white px-4 py-3 text-sm text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-[#b78559]/25 focus:border-[#b78559] transition-all"
+        />
+        <p className="mt-1 text-right text-xs text-muted">
+          {questionSeed.length}/240
+        </p>
+      </div>
+
       {/* Submit button */}
       <motion.button
         onClick={handleSubmit}
@@ -164,6 +198,11 @@ export default function EmotionPicker({ onSubmit, isSubmitting }: EmotionPickerP
       >
         {isSubmitting ? '저장 중...' : '저장하기'}
       </motion.button>
+      {errorMessage && (
+        <p className="mt-3 text-center text-sm font-medium text-red-600" role="alert">
+          {errorMessage}
+        </p>
+      )}
     </motion.div>
   );
 }

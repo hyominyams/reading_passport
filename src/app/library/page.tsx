@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 import { countries } from '@/lib/data/countries';
 import { generateDummyLibraryItems, isDummyId } from '@/lib/data/dummyLibrary';
 import { normalizeTranslatedTextsMap } from '@/lib/story-translations';
+import { getCoverTypographyFont, normalizeStorybookFontSize } from '@/lib/storybook-fonts';
 
 interface Comment {
   author: string;
@@ -21,6 +22,18 @@ interface Comment {
 
 function getLocalReadProgressKey(storyId: string, userId: string) {
   return `library-read-progress:${userId}:${storyId}`;
+}
+
+function buildViewerSceneImages(item: LibraryStoryItem) {
+  const pageCount = item.story.final_text?.length ?? 0;
+  const uploadedImages = item.story.uploaded_images ?? [];
+  const sceneImages = item.story.scene_images ?? [];
+
+  return Array.from({ length: pageCount }, (_, index) => (
+    uploadedImages[index]?.trim()
+    || sceneImages[index]?.trim()
+    || ''
+  ));
 }
 
 export default function LibraryPage() {
@@ -434,6 +447,13 @@ export default function LibraryPage() {
     );
   }
 
+  const selectedStoryFont = selectedItem
+    ? getCoverTypographyFont(selectedItem.story.cover_design, selectedItem.story.illustration_style)
+    : null;
+  const selectedStoryFontSize = selectedItem
+    ? normalizeStorybookFontSize(selectedItem.story.cover_design?.story_font_size)
+    : undefined;
+
   return (
     <>
       <Header />
@@ -489,7 +509,7 @@ export default function LibraryPage() {
               setCommentText('');
             }}
             pages={selectedItem.story.final_text}
-            sceneImages={selectedItem.story.scene_images || []}
+            sceneImages={buildViewerSceneImages(selectedItem)}
             translatedPages={selectedItem.story.translation_text || undefined}
             translatedPagesByLanguage={normalizeTranslatedTextsMap(
               selectedItem.story.translated_texts,
@@ -508,6 +528,8 @@ export default function LibraryPage() {
             isLiked={likedStories.has(selectedItem.story_id)}
             onLike={() => handleLike(selectedItem.story_id)}
             commentCount={selectedItem.comment_count ?? 0}
+            storyFontFamily={selectedStoryFont?.fontFamily}
+            storyFontSize={selectedStoryFontSize}
           />
         )}
       </main>

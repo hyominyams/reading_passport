@@ -9,12 +9,17 @@ import ConfettiAnimation from '@/components/story/ConfettiAnimation';
 import BookPreview from '@/components/story/BookPreview';
 import { createClient } from '@/lib/supabase/client';
 import type { Story } from '@/types/database';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import { normalizePictureBookShape, getPictureBookShapeOption } from '@/lib/picture-book-shapes';
 import {
   getTranslationLanguageLabel,
   normalizeTranslatedTextsMap,
 } from '@/lib/story-translations';
+import {
+  generateSingleFontFaceCSS,
+  getCoverTypographyFont,
+  normalizeStorybookFontSize,
+} from '@/lib/storybook-fonts';
 
 function formatCompletedDate(value: string | null | undefined) {
   if (!value) return '날짜 정보 없음';
@@ -27,6 +32,40 @@ function formatCompletedDate(value: string | null | undefined) {
     month: 'long',
     day: 'numeric',
   }).format(date);
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return char;
+    }
+  });
+}
+
+function waitForPrintImages(documentRef: Document) {
+  const images = Array.from(documentRef.images);
+
+  return Promise.all(
+    images.map((image) => {
+      if (image.complete) return Promise.resolve();
+
+      return new Promise<void>((resolve) => {
+        image.addEventListener('load', () => resolve(), { once: true });
+        image.addEventListener('error', () => resolve(), { once: true });
+      });
+    }),
+  );
 }
 
 export default function CompletePageContent({ storyId }: { storyId: string | null }) {
@@ -84,12 +123,8 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
   const pictureBookShape = normalizePictureBookShape(story?.cover_design?.picture_book_shape);
   const shapeOption = getPictureBookShapeOption(pictureBookShape);
   const cssAspectRatio = shapeOption.aspectRatio.replace(':', '/');
-  const libraryStoryTitle = story?.cover_design?.title?.trim() || '나의 이야기';
-  const libraryThumbnailUrl =
-    story?.cover_image_url?.trim()
-    || story?.cover_design?.image_url?.trim()
-    || story?.scene_images?.[0]
-    || null;
+  const storyFont = getCoverTypographyFont(story?.cover_design, story?.illustration_style);
+  const storyFontSize = normalizeStorybookFontSize(story?.cover_design?.story_font_size);
   const isHistoryView = story?.story_status === 'completed';
   const completedDateLabel = formatCompletedDate(story?.completed_at ?? story?.created_at);
 
@@ -110,10 +145,14 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
 
     try {
       const supabase = createClient();
-      await supabase
+      const { error } = await supabase
         .from('stories')
         .update({ current_step: Math.max(story.current_step, targetStep) })
         .eq('id', storyId);
+
+      if (error) {
+        throw error;
+      }
 
       router.push(getStepRouteWithLang(bookId, targetStep, storyId, story.language));
     } catch (error) {
@@ -130,16 +169,18 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
     const title = languageCode
       ? `${coverTitle} (${getTranslationLanguageLabel(languageCode)})`
       : coverTitle;
+    const printFontFamily = `'${storyFont.fontFamily}', 'Noto Sans KR', sans-serif`;
+    const fontFaceCSS = generateSingleFontFaceCSS(storyFont, window.location.origin);
 
     const bookPages: string[] = [];
 
     bookPages.push(`
       <div class="book-page cover-page page-break">
         ${coverImage
-          ? `<img src="${coverImage}" alt="Cover" class="cover-img" />`
+          ? `<img src="${escapeHtml(coverImage)}" alt="Cover" class="cover-img" />`
           : `<div class="cover-text-only">
-               <h1 class="cover-title">${title}</h1>
-               <p class="cover-author">${coverAuthor}</p>
+               <h1 class="cover-title">${escapeHtml(title)}</h1>
+               <p class="cover-author">${escapeHtml(coverAuthor)}</p>
              </div>`
         }
       </div>
@@ -151,7 +192,7 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
       if (image) {
         bookPages.push(`
           <div class="book-page image-page page-break">
-            <img src="${image}" alt="Scene ${index + 1}" class="scene-img" />
+            <img src="${escapeHtml(image)}" alt="Scene ${index + 1}" class="scene-img" />
           </div>
         `);
       }
@@ -159,7 +200,7 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
       bookPages.push(`
         <div class="book-page text-page ${index < pages.length - 1 || image ? 'page-break' : ''}">
           <div class="text-wrapper">
-            <p class="story-text">${text.replace(/\n/g, '<br/>')}</p>
+            <p class="story-text">${escapeHtml(text ?? '').replace(/\n/g, '<br/>')}</p>
           </div>
         </div>
       `);
@@ -170,15 +211,16 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
       <html>
       <head>
         <meta charset="utf-8" />
-        <title>${title}</title>
+        <title>${escapeHtml(title)}</title>
         <style>
+          ${fontFaceCSS}
           @page { margin: 0; size: A4; }
           @media print {
             body { margin: 0; }
             .page-break { page-break-after: always; }
           }
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; }
+          body { font-family: ${printFontFamily}; }
           .book-page {
             width: 100vw;
             height: 100vh;
@@ -205,7 +247,8 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
             transform: translateY(-4%);
           }
           .story-text {
-            font-size: 20px;
+            font-family: ${printFontFamily};
+            font-size: ${storyFontSize}px;
             line-height: 2;
             text-align: center;
             color: #222;
@@ -223,9 +266,31 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
 
     const printWindow = window.open('', '_blank');
     if (printWindow) {
+      let didPrint = false;
+      const printWhenReady = async () => {
+        if (didPrint) return;
+        didPrint = true;
+
+        try {
+          await Promise.all([
+            printWindow.document.fonts?.ready ?? Promise.resolve(),
+            waitForPrintImages(printWindow.document),
+          ]);
+        } finally {
+          printWindow.focus();
+          printWindow.print();
+        }
+      };
+
+      printWindow.document.open();
       printWindow.document.write(htmlContent);
       printWindow.document.close();
-      printWindow.onload = () => printWindow.print();
+      printWindow.addEventListener('load', () => {
+        void printWhenReady();
+      }, { once: true });
+      window.setTimeout(() => {
+        void printWhenReady();
+      }, 500);
     }
   };
 
@@ -235,87 +300,21 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
     setSaveError(null);
 
     try {
-      const supabase = createClient();
-      const completedAt = new Date().toISOString();
-
-      await supabase
-        .from('stories')
-        .update({
-          story_status: 'completed',
-          completed_at: completedAt,
-          current_step: Math.max(story.current_step, 8),
-        })
-        .eq('id', storyId);
-
-      const { data: existingLib } = await supabase
-        .from('library')
-        .select('id')
-        .eq('story_id', storyId)
-        .maybeSingle();
-
-      const { data: authorProfile } = await supabase
-        .from('users')
-        .select('nickname')
-        .eq('id', story.student_id)
-        .maybeSingle();
-
-      const libraryAuthorNickname =
-        authorProfile?.nickname?.trim()
-        || coverAuthor.trim()
-        || '작성자';
-
-      const libraryMetadata = {
-        country_id: story.country_id,
-        book_id: bookId,
-        story_title: libraryStoryTitle,
-        author_nickname: libraryAuthorNickname,
-        thumbnail_url: libraryThumbnailUrl,
+      const response = await fetch('/api/story/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        completedAt?: string;
+        error?: string;
       };
 
-      if (existingLib) {
-        await supabase
-          .from('library')
-          .update(libraryMetadata)
-          .eq('id', existingLib.id);
-      } else {
-        await supabase.from('library').insert({
-          story_id: storyId,
-          ...libraryMetadata,
-          likes: 0,
-          views: 0,
-        });
+      if (!response.ok) {
+        throw new Error(data.error || '도서관에 공유하지 못했어요.');
       }
 
-      const { data: activity } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('student_id', story.student_id)
-        .eq('book_id', bookId)
-        .maybeSingle();
-
-      if (activity) {
-        const completedTabs = (activity.completed_tabs as string[]).includes('mystory')
-          ? activity.completed_tabs as string[]
-          : [...(activity.completed_tabs as string[]), 'mystory'];
-        const stampsEarned = (activity.stamps_earned as string[]).includes('mystory')
-          ? activity.stamps_earned as string[]
-          : [...(activity.stamps_earned as string[]), 'mystory'];
-
-        await supabase
-          .from('activities')
-          .update({ completed_tabs: completedTabs, stamps_earned: stampsEarned })
-          .eq('id', activity.id);
-      } else {
-        await supabase.from('activities').insert({
-          student_id: story.student_id,
-          book_id: bookId,
-          country_id: story.country_id,
-          language: story.language,
-          completed_tabs: ['mystory'],
-          stamps_earned: ['mystory'],
-        });
-      }
-
+      const completedAt = data.completedAt ?? new Date().toISOString();
       setStory((prev) => (
         prev
           ? {
@@ -396,7 +395,7 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
             <div className="mb-6">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                 <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">
-                  Step 7/7
+                  {getDetailStepProgressLabel(8)}
                 </span>
                 <span>완성하기</span>
               </div>
@@ -413,6 +412,8 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
                 sceneImages={story.scene_images ?? []}
                 coverImage={coverImage}
                 title={coverTitle}
+                storyFontFamily={storyFont.fontFamily}
+                storyFontSize={storyFontSize}
               />
             </div>
 
@@ -498,7 +499,7 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
                       도서관에 공유하면 모든 사용자에게 공개됩니다
                     </p>
                     <p className="text-xs text-amber-600 mt-1">
-                      공유한 후에도 마이페이지에서 비공개로 변경할 수 있어요
+                      공유한 후에도 마이페이지에서 비밀로 변경할 수 있어요
                     </p>
                     <div className="flex justify-center gap-3 mt-4">
                       <button

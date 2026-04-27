@@ -1,4 +1,4 @@
-import type { BookCharacterAnalysis, BookCharacterProfile } from '@/types/database';
+import type { BookAnalysis, BookCharacterProfile } from '@/types/database';
 
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value)
@@ -29,7 +29,7 @@ function parseCharacters(value: unknown): BookCharacterProfile[] {
     }));
 }
 
-export function parseBookCharacterAnalysis(raw: unknown): BookCharacterAnalysis {
+export function parseBookAnalysis(raw: unknown): BookAnalysis {
   const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const settingSource =
     source.setting && typeof source.setting === 'object' ? source.setting as Record<string, unknown> : {};
@@ -64,6 +64,9 @@ export function parseBookCharacterAnalysis(raw: unknown): BookCharacterAnalysis 
   };
 }
 
+/** @deprecated Use parseBookAnalysis. Kept only to avoid stale route bundles failing during deploy/dev reloads. */
+export const parseBookCharacterAnalysis = parseBookAnalysis;
+
 function formatCharacterLine(character: BookCharacterProfile): string {
   const pieces = [
     character.name,
@@ -78,7 +81,7 @@ function formatCharacterLine(character: BookCharacterProfile): string {
   return pieces.join(' / ');
 }
 
-export function buildBookAnalysisPromptContext(analysis: BookCharacterAnalysis): string {
+export function buildBookAnalysisPromptContext(analysis: BookAnalysis): string {
   const lines: string[] = [];
 
   if (analysis.story_summary) {

@@ -67,6 +67,14 @@ export const ILLUSTRATION_STYLE_OPTIONS: IllustrationStyleOption[] = [
     exampleImagePath: '/example_image/일본 애니메이션.png',
   },
   {
+    value: 'three_d_chibi',
+    icon: '🪆',
+    label: '2D 치비캐릭터',
+    description: '작고 귀여운 비율의 2D 치비 캐릭터 스타일',
+    promptLabel: '2D chibi character illustration, cute proportions, clean anime-inspired line art, flat cel shading',
+    exampleImagePath: '/example_image/3D치비캐릭터.png',
+  },
+  {
     value: 'caricature',
     icon: '🖼️',
     label: '캐리커처',
@@ -97,14 +105,6 @@ export const ILLUSTRATION_STYLE_OPTIONS: IllustrationStyleOption[] = [
     description: '입체감 있는 3D 애니메이션 스타일',
     promptLabel: 'stylized 3D animation look, smooth dimensional forms, polished lighting',
     exampleImagePath: '/example_image/3DAnimation.png',
-  },
-  {
-    value: 'three_d_chibi',
-    icon: '🪆',
-    label: '3D 치비캐릭터',
-    description: '작고 귀여운 비율의 3D 치비 스타일',
-    promptLabel: 'stylized 3D chibi character design, cute proportions, toy-like finish',
-    exampleImagePath: '/example_image/3D치비캐릭터.png',
   },
 ];
 

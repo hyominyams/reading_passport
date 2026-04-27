@@ -14,8 +14,9 @@ import TeacherLibraryManager from '@/components/teacher/TeacherLibraryManager';
 import ClassSettingsPanel from '@/components/teacher/ClassSettingsPanel';
 import TeacherCampaignManager from '@/components/teacher/TeacherCampaignManager';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import WorldSmartManagementPanel from '@/components/world-smart/WorldSmartManagementPanel';
 
-type Tab = 'overview' | 'resources' | 'students' | 'library' | 'campaign' | 'settings';
+type Tab = 'overview' | 'worldSmart' | 'resources' | 'students' | 'library' | 'campaign' | 'settings';
 
 // Level for the overview tab drill-down
 type OverviewLevel = 'list' | 'detail' | 'chat';
@@ -129,6 +130,7 @@ export default function TeacherPage() {
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'overview', label: '반 전체 현황', icon: '\uD83D\uDCCA' },
+    { key: 'worldSmart', label: '질문 게시판', icon: '\u2753' },
     { key: 'students', label: '계정 관리', icon: '\uD83D\uDC65' },
     { key: 'resources', label: '책/자료 관리', icon: '\uD83D\uDCDA' },
     { key: 'library', label: '도서관 관리', icon: '\uD83C\uDFE0' },
@@ -300,6 +302,7 @@ export default function TeacherPage() {
 
       <section className="rounded-3xl border border-border bg-white p-6 shadow-sm">
         {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'worldSmart' && <WorldSmartManagementPanel mode="teacher" />}
         {activeTab === 'resources' && <ContentManager />}
         {activeTab === 'students' && <StudentCreator />}
         {activeTab === 'library' && <TeacherLibraryManager />}

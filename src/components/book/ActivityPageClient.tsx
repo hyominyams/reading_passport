@@ -65,6 +65,7 @@ export default function ActivityPageClient({
     stampsEarned.includes('read') &&
     stampsEarned.includes('hidden') &&
     stampsEarned.includes('questions');
+  const worldSmartUnlocked = stampsEarned.includes('questions');
 
   return (
     <div className="flex flex-col items-center gap-8">
@@ -94,6 +95,35 @@ export default function ActivityPageClient({
           />
         ))}
       </div>
+
+      <section className="w-full max-w-3xl rounded-[28px] border border-border bg-[#fbf7ef] p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black tracking-[0.18em] text-[#7f6246]">WORLD SMART</p>
+            <h2 className="mt-2 text-xl font-bold text-foreground">질문게시판</h2>
+            <p className="mt-1 text-sm text-[#6d5e4c]">
+              Step 3 질문은 완료와 동시에 게시판에 올라가고, 여기서 다시 확인할 수 있어요.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (worldSmartUnlocked) {
+                router.push(`/book/${book.id}/world-smart?lang=${language}`);
+              }
+            }}
+            disabled={!worldSmartUnlocked}
+            className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-colors ${
+              worldSmartUnlocked
+                ? 'bg-foreground text-white hover:bg-foreground/90'
+                : 'border border-border bg-white text-muted'
+            }`}
+          >
+            {worldSmartUnlocked ? 'World Smart 열기' : 'Step 3 완료 후 열려요'}
+          </button>
+        </div>
+      </section>
 
       {/* 4th card: My World — always visible, locked until 1-3 completed */}
       <div className="w-full max-w-xs">

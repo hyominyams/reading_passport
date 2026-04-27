@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Space_Grotesk, Noto_Sans_KR } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthProvider';
+import ActiveGenerationProvider from '@/components/story/ActiveGenerationProvider';
 import MobileNav from '@/components/common/MobileNav';
 import './globals.css';
 
@@ -32,8 +33,10 @@ export default function RootLayout({
     <html lang="ko" className={`${spaceGrotesk.variable} ${notoSansKR.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <AuthProvider>
-          {children}
-          <MobileNav />
+          <ActiveGenerationProvider>
+            {children}
+            <MobileNav />
+          </ActiveGenerationProvider>
         </AuthProvider>
       </body>
     </html>

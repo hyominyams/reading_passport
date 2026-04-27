@@ -6,7 +6,7 @@ import Image from 'next/image';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
-import { getStepRouteWithLang } from '@/lib/mystory-steps';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import type { Story } from '@/types/database';
 
 type PageChoice = 'upload' | 'describe' | 'skip';
@@ -77,7 +77,7 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
 
           // Guard: scenes needs story text to exist
           if (!s.final_text || s.final_text.length === 0) {
-            router.replace(`/book/${bookId}/mystory/draft?storyId=${storyId}&lang=${s.language}`);
+            router.replace(getStepRouteWithLang(bookId, 3, storyId, s.language));
             return;
           }
 
@@ -122,13 +122,18 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
         s.choice === 'describe' ? s.description || null : null,
       );
 
-      await supabase
+      const { error: saveError } = await supabase
         .from('stories')
         .update({
           uploaded_images: uploadedImages as string[],
           scene_descriptions: sceneDescriptions as string[],
         })
         .eq('id', storyId);
+
+      if (saveError) {
+        console.error('Scene autosave error:', saveError);
+        setError('자동 저장에 실패했어요. 다음 단계로 이동할 때 다시 저장해요.');
+      }
     },
     [storyId],
   );
@@ -216,7 +221,7 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
 
       if (updateError) throw updateError;
 
-      router.push(`/book/${bookId}/mystory/characters?storyId=${storyId}`);
+      router.push(getStepRouteWithLang(bookId, 5, storyId, story?.language));
     } catch (err) {
       console.error('Save error:', err);
       setError('저장에 실패했어요. 다시 시도해 주세요.');
@@ -285,7 +290,7 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
       <main className="flex-1 px-4 py-8 max-w-3xl">
         {/* Header */}
         <div className="mb-8">
-          <p className="text-sm text-muted mb-1">Step 3/7</p>
+          <p className="text-sm text-muted mb-1">{getDetailStepProgressLabel(4)}</p>
           <h1 className="text-2xl font-heading font-bold text-foreground">
             장면 상상하기
           </h1>
@@ -294,6 +299,30 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
             비워두기를 선택해도 괜찮아요.
           </p>
         </div>
+
+        {/* Mobile/tablet CTA — desktop uses sidebar */}
+        <button
+          type="button"
+          onClick={() => window.open('/guide/prompt-tips', '_blank')}
+          className="lg:hidden mb-6 w-full flex items-center gap-3 px-4 py-3 rounded-2xl
+            border border-amber-200 bg-amber-50 hover:bg-amber-100 active:bg-amber-100
+            transition-colors text-left"
+        >
+          <span className="flex-shrink-0 w-10 h-10 rounded-full bg-white border border-amber-200 flex items-center justify-center text-xl shadow-sm">
+            🎨
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-bold text-amber-900">
+              그림을 잘 만드는 법, 알고 싶어?
+            </span>
+            <span className="block text-xs text-amber-700 mt-0.5">
+              장면 설명 꿀팁 보러 가기
+            </span>
+          </span>
+          <span className="flex-shrink-0 px-3 py-1.5 rounded-full bg-amber-400 text-white text-xs font-bold whitespace-nowrap">
+            배우러 가기 →
+          </span>
+        </button>
 
         {/* Error banner */}
         {error && (
@@ -344,7 +373,7 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
         <div className="sticky top-28">
           <div className="flex flex-col items-center text-center">
             {/* Artist character */}
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-100 to-pink-100 border-2 border-amber-200 flex items-center justify-center text-3xl shadow-sm mb-3">
+            <div className="w-16 h-16 rounded-full bg-amber-100 border-2 border-amber-200 flex items-center justify-center text-3xl shadow-sm mb-3">
               🎨
             </div>
 

@@ -1,4 +1,4 @@
-export type QuestionCategoryKey = 'content' | 'character' | 'world' | 'inference';
+export type QuestionCategoryKey = 'content' | 'character' | 'world';
 
 export interface QuestionRequirement {
   key: QuestionCategoryKey;
@@ -10,14 +10,12 @@ const BASE_REQUIREMENTS: QuestionRequirement[] = [
   { key: 'content', required: 1, max: 3 },
   { key: 'character', required: 1, max: 3 },
   { key: 'world', required: 1, max: 3 },
-  { key: 'inference', required: 1, max: 2 },
 ];
 
 const EXTRA_DISTRIBUTION_ORDER: QuestionCategoryKey[] = [
   'content',
   'character',
   'world',
-  'inference',
   'content',
   'character',
   'world',

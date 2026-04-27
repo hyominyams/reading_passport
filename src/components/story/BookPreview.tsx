@@ -10,6 +10,8 @@ interface BookPreviewProps {
   coverImage?: string;
   title?: string;
   translatedPages?: string[];
+  storyFontFamily?: string;
+  storyFontSize?: number;
 }
 
 export default function BookPreview({
@@ -18,6 +20,8 @@ export default function BookPreview({
   coverImage,
   title,
   translatedPages,
+  storyFontFamily,
+  storyFontSize,
 }: BookPreviewProps) {
   const [currentPage, setCurrentPage] = useState(-1); // -1 = cover
   const [showTranslation, setShowTranslation] = useState(false);
@@ -115,7 +119,13 @@ export default function BookPreview({
 
               {/* Text */}
               <div className="p-6 flex-1 flex items-center justify-center">
-                <p className="text-base leading-relaxed text-foreground whitespace-pre-wrap text-center">
+                <p
+                  className="text-base leading-relaxed text-foreground whitespace-pre-wrap text-center"
+                  style={{
+                    fontFamily: storyFontFamily ? `'${storyFontFamily}', sans-serif` : undefined,
+                    fontSize: storyFontSize ? `${storyFontSize}px` : undefined,
+                  }}
+                >
                   {(showTranslation && translatedPages
                     ? translatedPages[currentPage] || pages[currentPage]
                     : pages[currentPage] || '').trim()}

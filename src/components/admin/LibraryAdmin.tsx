@@ -12,13 +12,15 @@ import {
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { adminSectionMap } from '@/components/admin/admin-config';
+import { STORY_VISIBILITY_OPTIONS, getStoryVisibilityLabel } from '@/lib/story-visibility';
+import type { Visibility } from '@/types/database';
 
 interface LibraryAdminItem {
   story_id: string;
   student_id: string;
   country_id: string;
   book_id: string;
-  visibility: 'public' | 'class' | 'private';
+  visibility: Visibility;
   created_at: string;
   student?: {
     id?: string;
@@ -39,7 +41,7 @@ interface LibraryAdminItem {
   thumbnail_url: string | null;
 }
 
-type VisibilityFilter = 'all' | 'public' | 'class' | 'private';
+type VisibilityFilter = 'all' | Visibility;
 type LibraryFilter = 'all' | 'in_library' | 'not_in_library';
 type SortOption = 'recent' | 'likes' | 'views';
 
@@ -134,7 +136,7 @@ export default function LibraryAdmin() {
     likes: items.reduce((sum, item) => sum + item.likes, 0),
   }), [items]);
 
-  const setVisibility = async (storyId: string, visibility: 'public' | 'class' | 'private') => {
+  const setVisibility = async (storyId: string, visibility: Visibility) => {
     setUpdatingId(storyId);
     setError('');
 
@@ -220,7 +222,7 @@ export default function LibraryAdmin() {
         <AdminMetricCard
           label="전체 공개"
           value={counts.public}
-          caption="public visibility 상태의 작품"
+          caption="도서관 전체에 열려 있는 작품"
           icon={Eye}
           tone={tone}
         />
@@ -236,9 +238,9 @@ export default function LibraryAdmin() {
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_20px_70px_-52px_rgba(15,23,42,0.3)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h3 className="text-lg font-heading font-semibold text-slate-950">서재 작품 moderation</h3>
+            <h3 className="text-lg font-heading font-semibold text-slate-950">서재 작품 관리</h3>
             <p className="mt-1 text-sm text-slate-500">
-              작품 노출 여부와 공개 범위를 관리자 API를 통해 직접 조정합니다.
+              작품 노출 여부와 공개 범위를 관리합니다.
             </p>
           </div>
 
@@ -257,8 +259,7 @@ export default function LibraryAdmin() {
             >
               <option value="all">모든 공개 범위</option>
               <option value="public">전체 공개</option>
-              <option value="class">반 공개</option>
-              <option value="private">비공개</option>
+              <option value="secret">비밀</option>
             </select>
             <select
               value={libraryFilter}
@@ -322,15 +323,9 @@ export default function LibraryAdmin() {
                       <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
                         item.visibility === 'public'
                           ? 'bg-sky-100 text-sky-800'
-                          : item.visibility === 'class'
-                            ? 'bg-indigo-100 text-indigo-800'
-                            : 'bg-slate-100 text-slate-700'
+                          : 'bg-slate-100 text-slate-700'
                       }`}>
-                        {item.visibility === 'public'
-                          ? '전체 공개'
-                          : item.visibility === 'class'
-                            ? '반 공개'
-                            : '비공개'}
+                        {getStoryVisibilityLabel(item.visibility)}
                       </span>
                     </div>
 
@@ -368,7 +363,7 @@ export default function LibraryAdmin() {
                     {item.in_library ? '서재에서 제외' : '서재에 등록'}
                   </button>
 
-                  {(['public', 'class', 'private'] as const).map((visibility) => (
+                  {STORY_VISIBILITY_OPTIONS.map((visibility) => (
                     <button
                       key={visibility}
                       type="button"
@@ -380,7 +375,7 @@ export default function LibraryAdmin() {
                           : 'border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      {visibility === 'public' ? '전체 공개' : visibility === 'class' ? '반 공개' : '비공개'}
+                      {getStoryVisibilityLabel(visibility)}
                     </button>
                   ))}
                 </div>

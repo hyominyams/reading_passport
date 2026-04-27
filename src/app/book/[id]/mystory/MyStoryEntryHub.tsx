@@ -1,12 +1,11 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@/lib/supabase/client';
-import { DETAIL_STEP_META, getStepRouteWithLang } from '@/lib/mystory-steps';
+import { DETAIL_STEP_META, getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import BackToActivity from '@/components/book/BackToActivity';
-import type { Language, StoryStatus, StoryType } from '@/types/database';
+import type { Language, ProductionStatus, StoryStatus, StoryType } from '@/types/database';
 
 /* ── Types ── */
 
@@ -16,6 +15,8 @@ type DraftSummary = {
   current_step: number;
   started_at: string;
   story_status?: StoryStatus;
+  production_status: ProductionStatus;
+  production_progress: number;
   cover_design: { title?: string } | null;
 };
 
@@ -40,7 +41,7 @@ const STORY_TYPE_LABELS: Record<StoryType, string> = {
 
 const STEP_SHORT_LABELS: Record<number, string> = {
   1: '채팅',
-  3: '초안',
+  3: '바꿔쓰기',
   4: '장면',
   5: '주인공',
   6: '표지',
@@ -51,7 +52,7 @@ const STEP_SHORT_LABELS: Record<number, string> = {
 /* ── Helpers ── */
 
 function getStepLabel(step: number) {
-  return DETAIL_STEP_META.find((item) => item.step === step)?.label ?? '이야기 채팅';
+  return getDetailStepProgressLabel(step);
 }
 
 function formatKoreanDate(value: string | null | undefined) {
@@ -65,6 +66,36 @@ function formatKoreanDate(value: string | null | undefined) {
   }).format(date);
 }
 
+function getDraftResumeHref(bookId: string, draft: DraftSummary) {
+  if (draft.current_step >= 7) {
+    const suffix = draft.production_status === 'completed' ? '/finish' : '/creating';
+    return `/book/${bookId}/mystory${suffix}?storyId=${draft.id}&lang=${draft.language}`;
+  }
+
+  const targetStep = draft.current_step > 1 ? draft.current_step : 1;
+  return getStepRouteWithLang(bookId, targetStep, draft.id, draft.language);
+}
+
+function getDraftActionLabel(draft: DraftSummary) {
+  if (draft.current_step >= 7) {
+    if (draft.production_status === 'completed') return '완성본 확인하기';
+    if (draft.production_status === 'failed') return '다시 시도하기';
+    return '제작 화면 열기';
+  }
+
+  return '이어서 하기';
+}
+
+function getDraftStatusLabel(draft: DraftSummary) {
+  if (draft.current_step >= 7) {
+    if (draft.production_status === 'completed') return '그림책 완성';
+    if (draft.production_status === 'failed') return '제작 멈춤';
+    if (draft.production_status === 'processing') return `제작 중 ${draft.production_progress}%`;
+  }
+
+  return getStepLabel(draft.current_step);
+}
+
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
@@ -75,38 +106,28 @@ const fadeUp = (delay = 0) => ({
 
 interface MyStoryEntryHubProps {
   bookId: string;
-  countryId: string;
   language: Language;
-  userId: string;
   activeDraft: DraftSummary | null;
   completedStories: CompletedStorySummary[];
 }
 
 export default function MyStoryEntryHub({
   bookId,
-  countryId,
   language,
-  userId,
   activeDraft,
   completedStories,
 }: MyStoryEntryHubProps) {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
   const [startingFresh, setStartingFresh] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeDraftTitle = activeDraft?.cover_design?.title?.trim() || '진행 중인 새 이야기';
   const activeDraftDate = activeDraft ? formatKoreanDate(activeDraft.started_at) : null;
-  const activeDraftStepLabel = activeDraft ? getStepLabel(activeDraft.current_step) : null;
+  const activeDraftStepLabel = activeDraft ? getDraftStatusLabel(activeDraft) : null;
 
   const navigateToStep = (targetRoute: string) => {
-    if (typeof window !== 'undefined') {
-      window.location.assign(targetRoute);
-      return;
-    }
-    router.replace(targetRoute);
-    router.refresh();
+    router.push(targetRoute);
   };
 
   const handleContinue = async () => {
@@ -114,8 +135,7 @@ export default function MyStoryEntryHub({
     setContinuing(true);
     setError(null);
     try {
-      const targetStep = activeDraft.current_step > 1 ? activeDraft.current_step : 1;
-      navigateToStep(getStepRouteWithLang(bookId, targetStep, activeDraft.id, activeDraft.language));
+      navigateToStep(getDraftResumeHref(bookId, activeDraft));
     } catch (err) {
       console.error('Failed to continue story:', err);
       setError('진행 중인 이야기를 열지 못했어요. 다시 시도해 주세요.');
@@ -127,39 +147,25 @@ export default function MyStoryEntryHub({
     setStartingFresh(true);
     setError(null);
     try {
-      if (activeDraft && activeDraft.story_status === 'draft') {
-        const { error: archiveError } = await supabase
-          .from('stories')
-          .update({ story_status: 'archived' })
-          .eq('id', activeDraft.id);
-        if (archiveError) throw archiveError;
+      const response = await fetch('/api/story/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId, language }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        storyId?: string;
+        language?: Language;
+        error?: string;
+      };
+
+      if (!response.ok || !data.storyId) {
+        throw new Error(data.error || '새 이야기를 만들지 못했습니다.');
       }
 
-      const { data, error: createError } = await supabase
-        .from('stories')
-        .insert({
-          student_id: userId,
-          book_id: bookId,
-          country_id: countryId,
-          language,
-          story_type: 'continue',
-          current_step: 1,
-          chat_log: [],
-          all_student_messages: null,
-          gauge_final: 0,
-          visibility: 'public',
-        })
-        .select('id')
-        .single();
-
-      if (createError || !data?.id) {
-        throw createError ?? new Error('새 이야기를 만들지 못했습니다.');
-      }
-
-      navigateToStep(getStepRouteWithLang(bookId, 1, data.id, language));
+      navigateToStep(getStepRouteWithLang(bookId, 1, data.storyId, data.language ?? language));
     } catch (err) {
       console.error('Failed to start a fresh story:', err);
-      setError('새 이야기를 시작하지 못했어요. 다시 시도해 주세요.');
+      setError(err instanceof Error ? err.message : '새 이야기를 시작하지 못했어요. 다시 시도해 주세요.');
       setStartingFresh(false);
     }
   };
@@ -277,7 +283,7 @@ export default function MyStoryEntryHub({
             whileTap={{ scale: 0.98 }}
             className="mt-6 w-full rounded-xl bg-foreground py-3.5 text-center text-sm font-bold text-white shadow-sm transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-10"
           >
-            {continuing ? '이동 중...' : '이어서 하기'}
+            {continuing ? '이동 중...' : getDraftActionLabel(activeDraft)}
           </motion.button>
         </motion.article>
       ) : (
@@ -391,11 +397,11 @@ export default function MyStoryEntryHub({
                   <button
                     type="button"
                     onClick={() => {
-                      router.push(getStepRouteWithLang(bookId, 7, story.id, story.language));
+                      router.push(getStepRouteWithLang(bookId, 8, story.id, story.language));
                     }}
                     className="mt-4 w-full rounded-xl border border-border bg-white py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted-light"
                   >
-                    다시 수정하기
+                    완성본 보기
                   </button>
                 </motion.article>
               );

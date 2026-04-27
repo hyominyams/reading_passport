@@ -9,14 +9,21 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import BookViewerModal from '@/components/story/BookViewerModal';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
+import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import { normalizeTranslatedTextsMap } from '@/lib/story-translations';
+import { getStoryVisibilityLabel, normalizeStoryVisibility } from '@/lib/story-visibility';
+import { getCoverTypographyFont, normalizeStorybookFontSize } from '@/lib/storybook-fonts';
 import {
   avatarOptions,
   buildAutoNickname,
   getAvatarEmoji,
   getRoleLabel,
 } from '@/lib/profile';
-import type { CoverDesign, StampType, User, Visibility } from '@/types/database';
+import {
+  getWorldSmartCategoryMeta,
+  type MyWorldSmartSummary,
+} from '@/lib/world-smart';
+import type { CoverDesign, IllustrationStyle, ProductionStatus, StampType, StoryStatus, User, Visibility } from '@/types/database';
 
 const requiredStamps: StampType[] = ['read', 'hidden', 'questions', 'mystory'];
 
@@ -33,6 +40,7 @@ type MyStoryRow = {
   book_id: string;
   cover_image_url: string | null;
   cover_design: CoverDesign | null;
+  illustration_style: IllustrationStyle | null;
   scene_images: string[] | null;
   final_text: string[] | null;
   translation_text: string[] | null;
@@ -42,11 +50,24 @@ type MyStoryRow = {
   language: string;
 };
 
+type ActiveDraftRow = {
+  id: string;
+  book_id: string;
+  language: string;
+  current_step: number;
+  production_status: ProductionStatus;
+  production_progress: number;
+  cover_design: CoverDesign | null;
+  started_at: string;
+  story_status: StoryStatus;
+};
+
 type StudentStats = {
   booksStarted: number;
   completedBooks: number;
   totalStamps: number;
   storyCount: number;
+  acceptedAnswerCount: number;
   latestBookTitle: string | null;
   latestActivityAt: string | null;
 };
@@ -71,10 +92,40 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString('ko-KR');
 }
 
+function getActiveDraftHref(draft: ActiveDraftRow) {
+  if (draft.current_step >= 7) {
+    const suffix = draft.production_status === 'completed' ? '/finish' : '/creating';
+    return `/book/${draft.book_id}/mystory${suffix}?storyId=${draft.id}&lang=${draft.language}`;
+  }
+
+  const targetStep = draft.current_step > 1 ? draft.current_step : 1;
+  return getStepRouteWithLang(draft.book_id, targetStep, draft.id, draft.language);
+}
+
+function getActiveDraftStatusLabel(draft: ActiveDraftRow) {
+  if (draft.current_step >= 7) {
+    if (draft.production_status === 'completed') return '그림책 완성';
+    if (draft.production_status === 'failed') return '제작 멈춤';
+    if (draft.production_status === 'processing') return `제작 중 ${draft.production_progress}%`;
+  }
+
+  return getDetailStepProgressLabel(draft.current_step);
+}
+
+function getActiveDraftActionLabel(draft: ActiveDraftRow) {
+  if (draft.current_step >= 7) {
+    if (draft.production_status === 'completed') return '완성본 열기';
+    if (draft.production_status === 'failed') return '다시 시도하기';
+    return '제작 화면 열기';
+  }
+
+  return '이어서 하기';
+}
+
 const studentStatMeta = [
-  { key: 'booksStarted', label: '시작한 책', suffix: '권', icon: '📖', gradient: 'from-blue-500/10 to-indigo-500/10', border: 'border-blue-200/60' },
   { key: 'completedBooks', label: '완성한 여권', suffix: '개', icon: '🛂', gradient: 'from-emerald-500/10 to-teal-500/10', border: 'border-emerald-200/60' },
   { key: 'totalStamps', label: '획득한 도장', suffix: '개', icon: '🏅', gradient: 'from-amber-500/10 to-orange-500/10', border: 'border-amber-200/60' },
+  { key: 'acceptedAnswerCount', label: '채택된 답변', suffix: '개', icon: '✨', gradient: 'from-sky-500/10 to-cyan-500/10', border: 'border-sky-200/60' },
   { key: 'storyCount', label: '완성한 이야기', suffix: '편', icon: '✍️', gradient: 'from-purple-500/10 to-pink-500/10', border: 'border-purple-200/60' },
 ] as const;
 
@@ -103,6 +154,8 @@ export default function MyPage() {
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [myStories, setMyStories] = useState<MyStoryRow[]>([]);
+  const [activeDraft, setActiveDraft] = useState<ActiveDraftRow | null>(null);
+  const [worldSmartSummary, setWorldSmartSummary] = useState<MyWorldSmartSummary | null>(null);
   const [selectedMyStory, setSelectedMyStory] = useState<MyStoryRow | null>(null);
   const [storyViewerSession, setStoryViewerSession] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -124,6 +177,8 @@ export default function MyPage() {
   useEffect(() => {
     if (!user || !profile) {
       setStats(null);
+      setWorldSmartSummary(null);
+      setActiveDraft(null);
       setStatsLoading(false);
       return;
     }
@@ -136,7 +191,20 @@ export default function MyPage() {
 
       try {
         if (profile.role === 'student') {
-          const [activitiesResult, storiesCountResult, storiesListResult] = await Promise.all([
+          const worldSmartPromise = fetch('/api/world-smart/me')
+            .then(async (response) => {
+              const payload = await response.json() as MyWorldSmartSummary | { error?: string };
+              if (!response.ok) {
+                throw new Error('error' in payload ? payload.error : 'World Smart 정보를 불러오지 못했습니다.');
+              }
+              return payload as MyWorldSmartSummary;
+            })
+            .catch((error) => {
+              console.error('Failed to load world smart summary:', error);
+              return null;
+            });
+
+          const [activitiesResult, storiesCountResult, storiesListResult, activeDraftResult, worldSmartResult] = await Promise.all([
             supabase
               .from('activities')
               .select('created_at, stamps_earned, book:book_id(title)')
@@ -149,10 +217,19 @@ export default function MyPage() {
               .not('final_text', 'is', null),
             supabase
               .from('stories')
-              .select('id, book_id, cover_image_url, cover_design, scene_images, final_text, translation_text, translated_texts, visibility, created_at, language')
+              .select('id, book_id, cover_image_url, cover_design, illustration_style, scene_images, final_text, translation_text, translated_texts, visibility, created_at, language')
               .eq('student_id', user.id)
               .not('final_text', 'is', null)
               .order('created_at', { ascending: false }),
+            supabase
+              .from('stories')
+              .select('id, book_id, language, current_step, production_status, production_progress, cover_design, started_at, story_status')
+              .eq('student_id', user.id)
+              .eq('story_status', 'draft')
+              .order('started_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            worldSmartPromise,
           ]);
 
           if (cancelled) {
@@ -169,6 +246,8 @@ export default function MyPage() {
           ).length;
 
           setMyStories((storiesListResult.data ?? []) as MyStoryRow[]);
+          setActiveDraft((activeDraftResult.data as ActiveDraftRow | null) ?? null);
+          setWorldSmartSummary(worldSmartResult);
 
           setStats({
             kind: 'student',
@@ -177,12 +256,16 @@ export default function MyPage() {
               completedBooks,
               totalStamps,
               storyCount: storiesCountResult.count ?? 0,
+              acceptedAnswerCount: worldSmartResult?.acceptedAnswerCount ?? 0,
               latestBookTitle: latestActivity?.book?.[0]?.title ?? null,
               latestActivityAt: latestActivity?.created_at ?? null,
             },
           });
           return;
         }
+
+        setWorldSmartSummary(null);
+        setActiveDraft(null);
 
         const { data: studentRows, error: studentsError } = await supabase
           .from('users')
@@ -531,7 +614,7 @@ export default function MyPage() {
               {stats.kind === 'student' ? (
                 <>
                   <h2 className="text-lg font-heading font-semibold text-foreground">최근 학습 기록</h2>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100/60 p-5">
                       <div className="text-[10px] font-bold tracking-[0.16em] uppercase text-muted/70">
                         Last Book
@@ -546,6 +629,28 @@ export default function MyPage() {
                       </div>
                       <div className="mt-2 text-base font-medium text-foreground">
                         {formatDate(stats.value.latestActivityAt)}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-violet-100 bg-violet-50 p-5">
+                      <div className="text-[10px] font-bold tracking-[0.16em] uppercase text-muted/70">
+                        World Smart Badge
+                      </div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <span className={`flex h-11 w-11 items-center justify-center rounded-2xl text-xl ${
+                          worldSmartSummary?.badge.current.ringClass ?? 'bg-stone-100 text-stone-700'
+                        }`}>
+                          {worldSmartSummary?.badge.current.icon ?? '🌱'}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-base font-semibold text-foreground">
+                            {worldSmartSummary?.badge.current.label ?? '질문 씨앗'}
+                          </p>
+                          <p className="mt-1 text-xs text-muted">
+                            {worldSmartSummary?.badge.next
+                              ? `${worldSmartSummary.badge.next.minAccepted}회 채택까지 ${worldSmartSummary.badge.remainingToNext}개 남았어요`
+                              : '최고 배지를 받았어요'}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -594,6 +699,52 @@ export default function MyPage() {
             <div className="flex min-h-40 items-center justify-center rounded-3xl border border-border/60 bg-white shadow-sm">
               <LoadingSpinner message="현황을 불러오는 중..." />
             </div>
+          )}
+
+          {stats?.kind === 'student' && activeDraft && (
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.38, duration: 0.5 }}
+              className="rounded-3xl border border-border/60 bg-white p-6 shadow-sm"
+            >
+              <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-border bg-muted-light px-3 py-1 text-xs font-semibold text-muted">
+                      이어하기
+                    </span>
+                    <span className="rounded-full bg-foreground/[0.06] px-3 py-1 text-xs font-semibold text-foreground">
+                      {getActiveDraftStatusLabel(activeDraft)}
+                    </span>
+                  </div>
+                  <h2 className="mt-3 truncate text-xl font-heading font-bold text-foreground">
+                    {activeDraft.cover_design?.title?.trim() || '진행 중인 그림책'}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted">
+                    시작일 {formatDate(activeDraft.started_at)}
+                  </p>
+
+                  {activeDraft.current_step >= 7 && activeDraft.production_status !== 'completed' && (
+                    <div className="mt-4 max-w-md">
+                      <div className="h-2 overflow-hidden rounded-full bg-muted-light">
+                        <div
+                          className="h-full rounded-full bg-foreground transition-all"
+                          style={{ width: `${Math.max(0, Math.min(100, activeDraft.production_progress))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Link
+                  href={getActiveDraftHref(activeDraft)}
+                  className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-foreground px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-foreground/90"
+                >
+                  {getActiveDraftActionLabel(activeDraft)}
+                </Link>
+              </div>
+            </motion.section>
           )}
 
           {!statsLoading && !stats && (
@@ -772,6 +923,66 @@ export default function MyPage() {
             </section>
           </motion.div>
 
+          {stats?.kind === 'student' && worldSmartSummary && (
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.46, duration: 0.5 }}
+              className="rounded-3xl border border-border/60 bg-white p-6 shadow-sm"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h2 className="text-lg font-heading font-semibold text-foreground">내 질문</h2>
+                  <p className="mt-1 text-sm text-muted">내가 올린 질문을 다시 보고 같은 유형 탭으로 바로 들어갈 수 있어요.</p>
+                </div>
+                <div className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${worldSmartSummary.badge.current.toneClass}`}>
+                  <span>{worldSmartSummary.badge.current.icon}</span>
+                  <span>{worldSmartSummary.badge.current.label}</span>
+                  <span>· 채택 {worldSmartSummary.acceptedAnswerCount}개</span>
+                </div>
+              </div>
+
+              {worldSmartSummary.myQuestions.length === 0 ? (
+                <div className="mt-5 rounded-2xl border border-dashed border-border bg-[#faf8f4] px-5 py-8 text-center">
+                  <p className="text-sm font-medium text-foreground">아직 등록된 질문이 없습니다.</p>
+                  <p className="mt-1 text-sm text-muted">책을 읽고 질문을 만들면 World Smart에 자동으로 올라갑니다.</p>
+                </div>
+              ) : (
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  {worldSmartSummary.myQuestions.slice(0, 8).map((question) => {
+                    const category = getWorldSmartCategoryMeta(question.questionType);
+
+                    return (
+                      <Link
+                        key={question.id}
+                        href={`/book/${question.bookId}/world-smart?tab=${question.questionType}&post=${question.id}`}
+                        className="rounded-2xl border border-border bg-[#fcfaf7] px-4 py-4 transition-colors hover:border-foreground/30 hover:bg-white"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${category.chipClass}`}>
+                            {category.icon} {category.label}
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            question.adoptedAnswerId
+                              ? 'border border-amber-200 bg-amber-50 text-amber-700'
+                              : 'border border-border bg-white text-muted'
+                          }`}>
+                            {question.adoptedAnswerId ? '채택 완료' : '답변 기다리는 중'}
+                          </span>
+                        </div>
+                        <p className="mt-3 line-clamp-2 text-sm font-semibold text-foreground">{question.questionText}</p>
+                        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted">
+                          <span>{question.bookTitle ?? '책 정보 없음'}</span>
+                          <span>{formatDate(question.createdAt)}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.section>
+          )}
+
           {/* ── My stories (student only) ── */}
           {stats?.kind === 'student' && (
             <motion.section
@@ -822,12 +1033,8 @@ export default function MyPage() {
                       story.scene_images?.[0] ??
                       null;
                     const title = story.cover_design?.title ?? '나의 이야기';
-                    const visLabel =
-                      story.visibility === 'public'
-                        ? '공개'
-                        : story.visibility === 'class'
-                          ? '반 공개'
-                          : '비공개';
+                    const normalizedVisibility = normalizeStoryVisibility(story.visibility);
+                    const visLabel = getStoryVisibilityLabel(normalizedVisibility);
 
                     return (
                       <motion.div
@@ -855,11 +1062,9 @@ export default function MyPage() {
                               </div>
                             )}
                             <span className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${
-                              story.visibility === 'public'
+                              normalizedVisibility === 'public'
                                 ? 'bg-emerald-500/80 text-white'
-                                : story.visibility === 'class'
-                                  ? 'bg-amber-500/80 text-white'
-                                  : 'bg-gray-500/80 text-white'
+                                : 'bg-gray-500/80 text-white'
                             }`}>
                               {visLabel}
                             </span>
@@ -904,6 +1109,11 @@ export default function MyPage() {
           onSubmitComment={() => {}}
           submittingComment={false}
           commentCount={0}
+          storyFontFamily={getCoverTypographyFont(
+            selectedMyStory.cover_design,
+            selectedMyStory.illustration_style,
+          ).fontFamily}
+          storyFontSize={normalizeStorybookFontSize(selectedMyStory.cover_design?.story_font_size)}
         />
       )}
     </>

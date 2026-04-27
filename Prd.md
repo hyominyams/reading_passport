@@ -65,7 +65,7 @@ AI가 답을 주는 게 아니라, 학생이 스스로 생각하게 만드는 �
 | 전역 승인 검토 | ✅ | ❌ | ❌ |
 | 서재 전체 관리 | ✅ | ❌ | ❌ |
 | 담당 반 서재 관리 | ✅ | ✅ | ❌ |
-| 서재 공개범위 설정 | - | - | ✅ 본인 작품 |
+| 서재 공개범위 설정 | ✅ 전체 작품 | ✅ 담당 학생 작품 | ✅ 본인 작품 |
 | 서재 좋아요 | ✅ | ✅ | ✅ |
 | 서재 댓글 | ✅ 타인 작품 읽기 완료 시 | ✅ 타인 작품 읽기 완료 시 | ✅ 타인 작품 읽기 완료 시 |
 | 창작 활동 | ❌ | ❌ | ✅ |
@@ -570,7 +570,7 @@ Step 2의 학생 자유 작성 내용을 바탕으로 AI가 한 번에 생성:
 │  └──────────────────────────────────────────┘│
 │  ...                                        │
 ├─────────────────────────────────────────────┤
-│  공개 설정: [전체 공개 ▼] / [우리 반만] / [나만] │
+│  공개 설정: [전체 공개 ▼] / [비밀]          │
 │                                             │
 │                    [서재에 등록하기! 🎊]       │
 └─────────────────────────────────────────────┘
@@ -590,8 +590,7 @@ Step 2의 학생 자유 작성 내용을 바탕으로 AI가 한 번에 생성:
 
 **서재 공개 설정 (학생 선택):**
 - 전체 공개 (기본값)
-- 우리 반만
-- 나만 보기
+- 비밀
 
 **PDF 다운로드:**
 - 작성 언어 버전
@@ -657,8 +656,8 @@ stories.current_step 값 기반 라우팅:
 ### 정렬 / 노출 기준
 - 기본 정렬은 원작 책 섹션 안에서 좋아요 순
 - 추후 옵션: 최신순 / 조회순
-- `private` 작품은 서재에 노출하지 않는다
-- `class` 공개 작품은 권한이 있는 사용자에게만 노출한다
+- `public` 작품은 로그인 사용자의 도서관에 노출한다
+- `secret` 작품은 작성자, 담당 교사, 관리자에게만 노출한다
 
 ---
 
@@ -1015,9 +1014,15 @@ books
   id, country_id, title, cover_url
   pdf_url_ko, pdf_url_en
   languages_available[]
-  character_analysis      -- JSON (스캔 결과)
   created_by, scope (global/class), class_id
   approved                -- 전역 승인 여부
+
+book_analyses
+  id, book_id, analysis_type
+  source_language, source_pdf_url, source_hash
+  status, model, prompt_version
+  analysis_json           -- 책 전체 분석 결과
+  extracted_text_chars, error_message
 
 -- Hidden Stories 콘텐츠
 hidden_content
@@ -1064,7 +1069,7 @@ stories
   translation_text[]      -- 번역본
   pdf_url_original
   pdf_url_translated
-  visibility              -- 'public' / 'class' / 'private'
+  visibility              -- 'public' / 'secret'
   production_status       -- 'pending'/'processing'/'completed'/'failed' (Step 6)
   production_progress     -- 0~100 (제작 진행률)
   created_at

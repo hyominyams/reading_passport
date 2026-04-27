@@ -142,6 +142,7 @@ export async function saveReadingComplete(
   countryId: string,
   emotion: string,
   oneLine: string,
+  readQuestionSeed: string,
   language: Language
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
@@ -169,6 +170,7 @@ export async function saveReadingComplete(
       .update({
         emotion,
         one_line: oneLine,
+        read_question_seed: readQuestionSeed || null,
         language,
         completed_tabs: completedTabs,
         stamps_earned: stampsEarned,
@@ -188,6 +190,7 @@ export async function saveReadingComplete(
       language,
       emotion,
       one_line: oneLine,
+      read_question_seed: readQuestionSeed || null,
       completed_tabs: ['read'],
       stamps_earned: ['read'],
     });

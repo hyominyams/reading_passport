@@ -1,13 +1,23 @@
 import { NextRequest } from 'next/server';
-import { generateGeminiImage } from '@/lib/ai/gemini';
+import { generateOpenAIImage } from '@/lib/ai/openai-image';
 import { getIllustrationStyleOption, normalizeIllustrationStyle } from '@/lib/illustration-styles';
 import { storeGeneratedImage } from '@/lib/storage/generated-images';
+import { createClient } from '@/lib/supabase/server';
 import type { CharacterRef, IllustrationStyle } from '@/types/database';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = (await request.json()) as {
       prompt?: string;
       character_refs?: CharacterRef[];
@@ -64,7 +74,7 @@ export async function POST(request: NextRequest) {
         : `Children's book illustration: ${fullPrompt}. Style: warm, friendly, appropriate for elementary school students.`
       : `Children's book illustration: ${fullPrompt}. Style: warm, friendly, appropriate for elementary school students. Do not include any written text, letters, words, captions, speech bubbles, signs, logos, or typography in the image.`;
 
-    const generatedImage = await generateGeminiImage({
+    const generatedImage = await generateOpenAIImage({
       prompt: textRule,
       referenceImages: [
         ...styleReferenceImages,
@@ -74,13 +84,16 @@ export async function POST(request: NextRequest) {
         })),
       ],
       aspectRatio,
-      imageSize: '1K',
     });
 
     const imageUrl = await storeGeneratedImage({
       base64Data: generatedImage.data,
       mimeType: generatedImage.mimeType,
-      folder: referenceCharacters.length > 0 ? 'scene-images' : 'character-images',
+      folder: body.cover_mode
+        ? 'cover-images'
+        : referenceCharacters.length > 0
+          ? 'scene-images'
+          : 'character-images',
     });
 
     return Response.json({
