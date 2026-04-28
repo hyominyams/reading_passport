@@ -1,35 +1,35 @@
 import type { LibraryStoryItem } from '@/components/story/LibraryGrid';
 
-// Unsplash-sourced cover images for visual variety
+// GPT-generated local cover images for copyright-safe demo data.
 const covers = {
   colombia: [
-    'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1533050487297-09b450131914?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=600&fit=crop',
+    '/generated-copyright-safe/library-colombia-butterfly.jpg',
+    '/generated-copyright-safe/library-colombia-amazon-song.jpg',
+    '/generated-copyright-safe/library-colombia-river-star.jpg',
+    '/generated-copyright-safe/library-colombia-secret-garden.jpg',
   ],
   tanzania: [
-    'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1523805009345-7448845a9e53?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1535941339077-2dd1c7963fc8?w=400&h=600&fit=crop',
+    '/generated-copyright-safe/library-tanzania-warrior.jpg',
+    '/generated-copyright-safe/library-tanzania-giraffe.jpg',
+    '/generated-copyright-safe/library-tanzania-baobab.jpg',
+    '/generated-copyright-safe/library-tanzania-cloud.jpg',
+    '/generated-copyright-safe/library-tanzania-zanzibar.jpg',
   ],
   cambodia: [
-    'https://images.unsplash.com/photo-1528181304800-259b08848526?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1539650116574-8efeb43e2750?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1504457047772-27faf1c00561?w=400&h=600&fit=crop',
+    '/generated-copyright-safe/library-cambodia-stone.jpg',
+    '/generated-copyright-safe/library-cambodia-guardian.jpg',
+    '/generated-copyright-safe/library-cambodia-floating-school.jpg',
+    '/generated-copyright-safe/library-cambodia-lotus.jpg',
   ],
   nepal: [
-    'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1526712318848-5f38e2740d44?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1558799401-1dcba79834c2?w=400&h=600&fit=crop',
+    '/generated-copyright-safe/library-nepal-everest-flower.jpg',
+    '/generated-copyright-safe/library-nepal-echo.jpg',
+    '/generated-copyright-safe/library-nepal-alley.jpg',
   ],
   kenya: [
-    'https://images.unsplash.com/photo-1489392191049-fc10c97e64b6?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1547970810-dc1eac37d174?w=400&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1518709594023-6eab9bab7b23?w=400&h=600&fit=crop',
+    '/generated-copyright-safe/library-kenya-maasai.jpg',
+    '/generated-copyright-safe/library-kenya-nairobi.jpg',
+    '/generated-copyright-safe/library-kenya-flamingo.jpg',
   ],
 };
 
@@ -174,7 +174,7 @@ export function generateDummyLibraryItems(): LibraryStoryItem[] {
         book: {
           id: bookId,
           title: group.bookTitle,
-          cover_url: `/images/countries/${group.countryId}.jpg`,
+          cover_url: `/generated-copyright-safe/country-${group.countryId}.jpg`,
         },
         story: {
           id: storyId,

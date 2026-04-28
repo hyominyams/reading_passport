@@ -4,12 +4,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const COUNTRY_SLIDES = [
-  { name: '콜롬비아', flag: '🇨🇴', desc: '커피와 음악의 나라', image: 'https://images.unsplash.com/photo-1536308037887-165852797016?w=800&h=500&fit=crop' },
-  { name: '탄자니아', flag: '🇹🇿', desc: '킬리만자로의 나라', image: 'https://images.unsplash.com/photo-1525535816528-974e4b19eb51?w=800&h=500&fit=crop' },
-  { name: '캄보디아', flag: '🇰🇭', desc: '앙코르와트의 나라', image: 'https://images.unsplash.com/photo-1504639650150-bf773680d8c3?w=800&h=500&fit=crop' },
-  { name: '네팔', flag: '🇳🇵', desc: '히말라야의 나라', image: 'https://images.unsplash.com/photo-1668966780359-78fe21493d9b?w=800&h=500&fit=crop' },
-  { name: '르완다', flag: '🇷🇼', desc: '천 개의 언덕 나라', image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800&h=500&fit=crop' },
-  { name: '케냐', flag: '🇰🇪', desc: '사파리의 나라', image: 'https://images.unsplash.com/photo-1554490752-6a232eca5e60?w=800&h=500&fit=crop' },
+  { name: '콜롬비아', flag: '🇨🇴', desc: '커피와 음악의 나라', image: '/generated-copyright-safe/country-colombia.jpg' },
+  { name: '탄자니아', flag: '🇹🇿', desc: '킬리만자로의 나라', image: '/generated-copyright-safe/country-tanzania.jpg' },
+  { name: '캄보디아', flag: '🇰🇭', desc: '앙코르와트의 나라', image: '/generated-copyright-safe/country-cambodia.jpg' },
+  { name: '네팔', flag: '🇳🇵', desc: '히말라야의 나라', image: '/generated-copyright-safe/country-nepal.jpg' },
+  { name: '르완다', flag: '🇷🇼', desc: '천 개의 언덕 나라', image: '/generated-copyright-safe/country-rwanda.jpg' },
+  { name: '케냐', flag: '🇰🇪', desc: '사파리의 나라', image: '/generated-copyright-safe/country-kenya.jpg' },
 ];
 
 export default function HomeCountryCarousel() {

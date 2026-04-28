@@ -82,6 +82,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Step 1부터 Step 3까지 먼저 완료해 주세요.' }, { status: 403 });
   }
 
+  const { data: draftToReplace } = await supabase
+    .from('stories')
+    .select('id')
+    .eq('student_id', user.id)
+    .eq('book_id', book.id)
+    .eq('story_status', 'draft')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
   const { error: archiveError } = await supabase
     .from('stories')
     .update({ story_status: 'archived' })
@@ -104,6 +114,9 @@ export async function POST(request: NextRequest) {
       story_status: 'draft',
       story_type: 'continue',
       current_step: 1,
+      docent_chat_log: [],
+      docent_recommendations: [],
+      selected_activity: null,
       chat_log: [],
       all_student_messages: null,
       gauge_final: 0,
@@ -117,22 +130,16 @@ export async function POST(request: NextRequest) {
   if (insertError || !story?.id) {
     console.error('Failed to create MyStory draft:', insertError);
 
-    const { data: existingDraft } = await supabase
-      .from('stories')
-      .select('id, language')
-      .eq('student_id', user.id)
-      .eq('book_id', book.id)
-      .eq('story_status', 'draft')
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle<{ id: string; language: string }>();
+    if (draftToReplace?.id) {
+      const { error: restoreError } = await supabase
+        .from('stories')
+        .update({ story_status: 'draft' })
+        .eq('id', draftToReplace.id)
+        .eq('student_id', user.id);
 
-    if (existingDraft?.id) {
-      return NextResponse.json({
-        storyId: existingDraft.id,
-        language: existingDraft.language ?? language,
-        reused: true,
-      });
+      if (restoreError) {
+        console.error('Failed to restore previous MyStory draft:', restoreError);
+      }
     }
 
     return NextResponse.json({ error: '새 이야기를 만들지 못했어요.' }, { status: 500 });

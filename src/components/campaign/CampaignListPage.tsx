@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import type { Campaign, CampaignContentType } from '@/types/database';
 import { SAMPLE_CAMPAIGNS } from '@/lib/data/dummyCampaign';
+import { isCampaignParticipationOpen } from '@/lib/campaign-deadline';
 import CampaignCard from './CampaignCard';
 import CampaignHero from './CampaignHero';
 
@@ -60,7 +61,7 @@ export default function CampaignListPage() {
     );
   }, [campaigns, selectedFilter]);
 
-  const featuredCampaign = campaigns.find((c) => c.status === 'active') ?? campaigns[0];
+  const featuredCampaign = campaigns.find((c) => isCampaignParticipationOpen(c)) ?? campaigns[0];
   const isTeacher = role === 'teacher' || role === 'admin';
 
   return (

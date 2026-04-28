@@ -55,16 +55,44 @@ export async function GET(request: NextRequest) {
   }
 
   const bookId = request.nextUrl.searchParams.get('bookId');
+  const classId = request.nextUrl.searchParams.get('classId');
   if (!bookId) {
     return NextResponse.json({ error: 'bookId가 필요합니다' }, { status: 400 });
   }
 
-  const content = await getTeacherHiddenContent(bookId, user.id);
+  let teacherClassIds = new Set<string>();
+  const { data: classes } = await service
+    .from('classes')
+    .select('id')
+    .eq('teacher_id', user.id);
+  teacherClassIds = new Set((classes ?? []).map((item) => item.id as string));
+
+  if (classId && !teacherClassIds.has(classId)) {
+    return NextResponse.json({ error: '학급 권한이 없습니다' }, { status: 403 });
+  }
+
+  const { data: rawContent, error: contentError } = await service
+    .from('hidden_content')
+    .select('*')
+    .eq('book_id', bookId)
+    .order('order', { ascending: true });
+
+  if (contentError) {
+    return NextResponse.json({ error: contentError.message }, { status: 500 });
+  }
+
+  const content = ((rawContent ?? []) as Awaited<ReturnType<typeof getTeacherHiddenContent>>)
+    .filter((item) => (
+      item.created_by === user.id
+      || (item.scope === 'global' && item.approved)
+      || (!!item.class_id && teacherClassIds.has(item.class_id))
+    ));
   const ownContentIds = content
     .filter((item) => item.created_by === user.id)
     .map((item) => item.id);
 
   const approvalMap = new Map<string, string>();
+  const hiddenForClass = new Set<string>();
 
   if (ownContentIds.length > 0) {
     const { data: approvalRequests } = await service
@@ -83,11 +111,25 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  if (classId && content.length > 0) {
+    const { data: overrides } = await service
+      .from('hidden_content_class_overrides')
+      .select('hidden_content_id')
+      .eq('class_id', classId)
+      .eq('hidden', true)
+      .in('hidden_content_id', content.map((item) => item.id));
+
+    for (const item of overrides ?? []) {
+      hiddenForClass.add(item.hidden_content_id as string);
+    }
+  }
+
   return NextResponse.json({
     content: content.map((item) => ({
       ...item,
       approval_status: approvalMap.get(item.id) ?? null,
       can_manage: item.created_by === user.id,
+      is_hidden_for_class: hiddenForClass.has(item.id),
     })),
   });
 }
@@ -186,10 +228,64 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { id, title, type, url, order } = body;
+  const { id, title, type, url, order, classId, hiddenForClass, targetBookId } = body;
 
   if (!id) {
     return NextResponse.json({ error: '콘텐츠 ID가 필요합니다' }, { status: 400 });
+  }
+
+  if (typeof hiddenForClass === 'boolean') {
+    if (typeof classId !== 'string' || !classId) {
+      return NextResponse.json({ error: '학급 ID가 필요합니다' }, { status: 400 });
+    }
+
+    const { data: classRecord } = await service
+      .from('classes')
+      .select('id')
+      .eq('id', classId)
+      .eq('teacher_id', user.id)
+      .maybeSingle();
+
+    if (!classRecord) {
+      return NextResponse.json({ error: '학급 권한이 없습니다' }, { status: 403 });
+    }
+
+    const { data: existingContent } = await service
+      .from('hidden_content')
+      .select('id, approved')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!existingContent || !existingContent.approved) {
+      return NextResponse.json({ error: '자료를 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    if (hiddenForClass) {
+      const { error } = await service
+        .from('hidden_content_class_overrides')
+        .upsert({
+          hidden_content_id: id,
+          teacher_id: user.id,
+          class_id: classId,
+          hidden: true,
+        }, { onConflict: 'hidden_content_id,class_id' });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    } else {
+      const { error } = await service
+        .from('hidden_content_class_overrides')
+        .delete()
+        .eq('hidden_content_id', id)
+        .eq('class_id', classId);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ success: true });
   }
 
   // Verify ownership
@@ -205,6 +301,50 @@ export async function PUT(request: NextRequest) {
 
   if (existing.created_by !== user.id) {
     return NextResponse.json({ error: '수정 권한이 없습니다' }, { status: 403 });
+  }
+
+  if (typeof targetBookId === 'string' && targetBookId) {
+    const { data: targetBook, error: targetBookError } = await service
+      .from('books')
+      .select('id, country_id, created_by, scope, approved, class_id')
+      .eq('id', targetBookId)
+      .maybeSingle();
+
+    if (targetBookError) {
+      return NextResponse.json({ error: targetBookError.message }, { status: 500 });
+    }
+
+    if (!targetBook) {
+      return NextResponse.json({ error: '이동할 도서를 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    const { data: classes } = await service
+      .from('classes')
+      .select('id')
+      .eq('teacher_id', user.id);
+    const teacherClassIds = new Set((classes ?? []).map((item) => item.id as string));
+    const canUseTargetBook =
+      targetBook.created_by === user.id
+      || (targetBook.scope === 'global' && targetBook.approved)
+      || (!!targetBook.class_id && teacherClassIds.has(targetBook.class_id as string));
+
+    if (!canUseTargetBook) {
+      return NextResponse.json({ error: '이동할 도서 권한이 없습니다' }, { status: 403 });
+    }
+
+    const { error } = await service
+      .from('hidden_content')
+      .update({
+        book_id: targetBook.id,
+        country_id: targetBook.country_id,
+      })
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
   }
 
   const updateData: Record<string, unknown> = {};

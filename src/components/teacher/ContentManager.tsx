@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Plus, Trash2, Upload } from 'lucide-react';
+import { Eye, EyeOff, FileText, MoveRight, Plus, Trash2, Upload } from 'lucide-react';
 import type { ApprovalStatus, Book, Class, HiddenContent } from '@/types/database';
 import { SUPPORTED_LANGUAGES } from '@/types/database';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -24,6 +24,7 @@ interface TeacherBook extends Book {
 interface TeacherHiddenContent extends HiddenContent {
   approval_status?: ApprovalStatus | null;
   can_manage?: boolean;
+  is_hidden_for_class?: boolean;
 }
 
 function hasCompletedAnalysis(book: Book) {
@@ -82,6 +83,7 @@ export default function ContentManager() {
   const [books, setBooks] = useState<TeacherBook[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [selectedBookId, setSelectedBookId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [content, setContent] = useState<TeacherHiddenContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [contentLoading, setContentLoading] = useState(false);
@@ -91,6 +93,8 @@ export default function ContentManager() {
   const [showContentForm, setShowContentForm] = useState(false);
   const [editingContent, setEditingContent] = useState<HiddenContent | null>(null);
   const [deleteContentConfirm, setDeleteContentConfirm] = useState<string | null>(null);
+  const [movingContent, setMovingContent] = useState<TeacherHiddenContent | null>(null);
+  const [moveTargetBookId, setMoveTargetBookId] = useState('');
 
   const [showBookForm, setShowBookForm] = useState(false);
   const [editingBook, setEditingBook] = useState<TeacherBook | null>(null);
@@ -135,6 +139,12 @@ export default function ContentManager() {
 
       setBooks(nextBooks);
       setClasses(nextClasses);
+      setSelectedClassId((prev) => {
+        if (prev && nextClasses.some((item) => item.id === prev)) {
+          return prev;
+        }
+        return nextClasses[0]?.id ?? '';
+      });
 
       const defaultClassName = nextClasses[0]?.class_name ?? '기본반';
       setBookForm((prev) => ({
@@ -154,7 +164,7 @@ export default function ContentManager() {
     }
   }, []);
 
-  const fetchContent = useCallback(async (bookId: string) => {
+  const fetchContent = useCallback(async (bookId: string, classId?: string) => {
     if (!bookId) {
       setContent([]);
       return;
@@ -162,7 +172,11 @@ export default function ContentManager() {
 
     setContentLoading(true);
     try {
-      const res = await fetch(`/api/teacher/content?bookId=${bookId}`);
+      const params = new URLSearchParams({ bookId });
+      if (classId) {
+        params.set('classId', classId);
+      }
+      const res = await fetch(`/api/teacher/content?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -226,8 +240,8 @@ export default function ContentManager() {
       return;
     }
 
-    fetchContent(selectedBookId);
-  }, [fetchContent, selectedBookId]);
+    fetchContent(selectedBookId, selectedClassId);
+  }, [fetchContent, selectedBookId, selectedClassId]);
 
   const openCreateBookForm = () => {
     setEditingBook(null);
@@ -403,6 +417,69 @@ export default function ContentManager() {
 
       setDeleteContentConfirm(null);
       setContent((prev) => prev.filter((item) => item.id !== contentId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    }
+  };
+
+  const handleToggleContentVisibility = async (item: TeacherHiddenContent) => {
+    if (!selectedClassId) {
+      setError('자료를 조정할 학급을 선택해주세요');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/teacher/content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          classId: selectedClassId,
+          hiddenForClass: !item.is_hidden_for_class,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '표시 상태 변경에 실패했습니다');
+      }
+
+      setContent((prev) => prev.map((contentItem) => (
+        contentItem.id === item.id
+          ? { ...contentItem, is_hidden_for_class: !item.is_hidden_for_class }
+          : contentItem
+      )));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    }
+  };
+
+  const handleMoveContent = async () => {
+    if (!movingContent || !moveTargetBookId) {
+      setError('이동할 도서를 선택해주세요');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/teacher/content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: movingContent.id,
+          targetBookId: moveTargetBookId,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '자료 이동에 실패했습니다');
+      }
+
+      setMovingContent(null);
+      setMoveTargetBookId('');
+      if (selectedBookId) {
+        await fetchContent(selectedBookId, selectedClassId);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다');
     }
@@ -670,6 +747,24 @@ export default function ContentManager() {
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">Selected Book</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{selectedBook.title}</p>
                 <p className="mt-1 text-xs text-muted">{getCountryLabel(selectedBook.country_id)}</p>
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs font-medium text-muted">학급별 표시 상태</label>
+                  <select
+                    value={selectedClassId}
+                    onChange={(event) => setSelectedClassId(event.target.value)}
+                    className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/15"
+                  >
+                    {classes.length === 0 ? (
+                      <option value="">기본반</option>
+                    ) : (
+                      classes.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.grade}학년 {item.class_name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
               </div>
 
               {contentLoading ? (
@@ -707,6 +802,11 @@ export default function ContentManager() {
                             <span className="text-lg">{getContentTypeIcon(item.type)}</span>
                             <h4 className="truncate text-sm font-semibold text-foreground">{item.title}</h4>
                             {getContentStatusBadge(item)}
+                            {item.is_hidden_for_class && (
+                              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
+                                선택 학급 숨김
+                              </span>
+                            )}
                           </div>
                           <p className="truncate text-xs text-muted">{item.url}</p>
                           {item.approval_status === 'rejected' && item.scope === 'global' && !item.approved && (
@@ -716,8 +816,23 @@ export default function ContentManager() {
                           )}
                         </div>
 
-                        {item.can_manage && (
-                          <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {selectedClassId && item.approved && (
+                            <button
+                              onClick={() => handleToggleContentVisibility(item)}
+                              className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs hover:bg-muted-light"
+                            >
+                              {item.is_hidden_for_class ? (
+                                <Eye className="h-3.5 w-3.5" />
+                              ) : (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              )}
+                              {item.is_hidden_for_class ? '보이기' : '가리기'}
+                            </button>
+                          )}
+
+                          {item.can_manage && (
+                            <>
                             <button
                               onClick={() => {
                                 setEditingContent(item);
@@ -726,6 +841,17 @@ export default function ContentManager() {
                               className="rounded-xl border border-border px-3 py-1.5 text-xs hover:bg-muted-light"
                             >
                               수정
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setMovingContent(item);
+                                setMoveTargetBookId(books.find((book) => book.id !== item.book_id)?.id ?? '');
+                              }}
+                              className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs hover:bg-muted-light"
+                            >
+                              <MoveRight className="h-3.5 w-3.5" />
+                              옮기기
                             </button>
 
                             {deleteContentConfirm === item.id ? (
@@ -751,8 +877,9 @@ export default function ContentManager() {
                                 삭제
                               </button>
                             )}
-                          </div>
-                        )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -775,6 +902,65 @@ export default function ContentManager() {
           }}
           onSave={handleContentSave}
         />
+      )}
+
+      {movingContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold">다른 책으로 자료 옮기기</h3>
+                <p className="mt-1 text-sm text-muted">{movingContent.title}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setMovingContent(null);
+                  setMoveTargetBookId('');
+                }}
+                className="text-xl text-muted hover:text-foreground"
+              >
+                ×
+              </button>
+            </div>
+
+            <label className="mb-2 block text-sm font-medium text-foreground">이동할 도서</label>
+            <select
+              value={moveTargetBookId}
+              onChange={(event) => setMoveTargetBookId(event.target.value)}
+              className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/15"
+            >
+              <option value="">도서 선택</option>
+              {books
+                .filter((book) => book.id !== movingContent.book_id)
+                .map((book) => (
+                  <option key={book.id} value={book.id}>
+                    {book.title} · {getCountryLabel(book.country_id)}
+                  </option>
+                ))}
+            </select>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMovingContent(null);
+                  setMoveTargetBookId('');
+                }}
+                className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-muted-light"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleMoveContent}
+                disabled={!moveTargetBookId}
+                className="flex-1 rounded-xl bg-foreground px-4 py-3 text-sm font-medium text-white hover:bg-foreground/90 disabled:opacity-50"
+              >
+                옮기기
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showBookForm && (

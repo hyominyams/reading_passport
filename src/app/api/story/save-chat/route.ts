@@ -4,10 +4,26 @@ import { createServiceClient } from '@/lib/supabase/service';
 
 export async function POST(request: NextRequest) {
   try {
-    const { storyId, chatLog } = await request.json();
+    const { storyId, chatLog, docentChatLog } = (await request.json()) as {
+      storyId?: unknown;
+      chatLog?: unknown;
+      docentChatLog?: unknown;
+    };
 
-    if (!storyId || !chatLog) {
+    if (typeof storyId !== 'string' || !storyId.trim()) {
       return Response.json({ error: 'Missing params' }, { status: 400 });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (Array.isArray(chatLog)) {
+      updates.chat_log = chatLog;
+    }
+    if (Array.isArray(docentChatLog)) {
+      updates.docent_chat_log = docentChatLog;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return Response.json({ error: 'Missing chat payload' }, { status: 400 });
     }
 
     const authClient = await createClient();
@@ -23,7 +39,7 @@ export async function POST(request: NextRequest) {
     const { data: story, error: storyError } = await supabase
       .from('stories')
       .select('id, student_id')
-      .eq('id', storyId)
+      .eq('id', storyId.trim())
       .maybeSingle();
 
     if (storyError || !story) {
@@ -36,8 +52,8 @@ export async function POST(request: NextRequest) {
 
     const { error: updateError } = await supabase
       .from('stories')
-      .update({ chat_log: chatLog })
-      .eq('id', storyId);
+      .update(updates)
+      .eq('id', storyId.trim());
 
     if (updateError) {
       throw updateError;

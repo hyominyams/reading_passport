@@ -15,7 +15,7 @@ interface WorldMapSectionProps {
   selectedCountry: string | null;
 }
 
-/* ── Pin coordinates (calibrated to world_map.png pixel data) ── */
+/* ── Pin coordinates (calibrated to the generated world-map asset) ── */
 const PIN_COORDS: Record<string, { x: number; y: number }> = {
   colombia: { x: 294, y: 330 },
   rwanda:   { x: 580, y: 330 },
@@ -97,7 +97,7 @@ export default function WorldMapSection({
         >
           {/* ── World map background image ── */}
           <image
-            href="/images/world_map.png"
+            href="/generated-copyright-safe/world-map.jpg"
             x="0"
             y="0"
             width={MAP_VIEWBOX.w}

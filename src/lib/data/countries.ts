@@ -13,7 +13,7 @@ export const countries: Country[] = [
     name: '콜롬비아',
     flag: '🇨🇴',
     region: 'south-america',
-    image_url: '/images/countries/colombia.jpg',
+    image_url: '/generated-copyright-safe/country-colombia.jpg',
     description: '커피와 음악의 나라',
   },
   {
@@ -21,7 +21,7 @@ export const countries: Country[] = [
     name: '탄자니아',
     flag: '🇹🇿',
     region: 'africa',
-    image_url: '/images/countries/tanzania.jpg',
+    image_url: '/generated-copyright-safe/country-tanzania.jpg',
     description: '킬리만자로의 나라',
   },
   {
@@ -29,7 +29,7 @@ export const countries: Country[] = [
     name: '캄보디아',
     flag: '🇰🇭',
     region: 'asia',
-    image_url: '/images/countries/cambodia.jpg',
+    image_url: '/generated-copyright-safe/country-cambodia.jpg',
     description: '앙코르와트의 나라',
   },
   {
@@ -37,7 +37,7 @@ export const countries: Country[] = [
     name: '네팔',
     flag: '🇳🇵',
     region: 'asia',
-    image_url: '/images/countries/nepal.jpg',
+    image_url: '/generated-copyright-safe/country-nepal.jpg',
     description: '히말라야의 나라',
   },
   {
@@ -45,7 +45,7 @@ export const countries: Country[] = [
     name: '르완다',
     flag: '🇷🇼',
     region: 'africa',
-    image_url: '/images/countries/rwanda.jpg',
+    image_url: '/generated-copyright-safe/country-rwanda.jpg',
     description: '천 개의 언덕 나라',
   },
   {
@@ -53,7 +53,7 @@ export const countries: Country[] = [
     name: '케냐',
     flag: '🇰🇪',
     region: 'africa',
-    image_url: '/images/countries/kenya.jpg',
+    image_url: '/generated-copyright-safe/country-kenya.jpg',
     description: '사파리의 나라',
   },
 ];

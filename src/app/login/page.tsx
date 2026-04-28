@@ -8,6 +8,18 @@ import { createClient } from '@/lib/supabase/client';
 
 type TabType = 'teacher' | 'student';
 
+function getSafeRedirect(value: string | null, fallback: string): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return fallback;
+  }
+
+  if (value.startsWith('/login')) {
+    return fallback;
+  }
+
+  return value;
+}
+
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<TabType>('student');
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +45,15 @@ export default function LoginPage() {
     router.refresh();
   };
 
+  const getCurrentRedirect = (fallback: string) => {
+    if (typeof window === 'undefined') {
+      return fallback;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    return getSafeRedirect(params.get('redirect'), fallback);
+  };
+
   const handleTeacherSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -40,7 +61,8 @@ export default function LoginPage() {
       await clearClientSession();
       const result = await teacherLogin(email, password);
       if (result.success) {
-        completeLogin(result.redirectTo || '/teacher');
+        const fallback = result.redirectTo || '/teacher';
+        completeLogin(getCurrentRedirect(fallback));
       } else {
         setError(result.error || '로그인에 실패했습니다.');
       }
@@ -58,7 +80,8 @@ export default function LoginPage() {
       await clearClientSession();
       const result = await studentLogin(studentCode);
       if (result.success) {
-        completeLogin(result.redirectTo || '/map');
+        const fallback = result.redirectTo || '/map';
+        completeLogin(getCurrentRedirect(fallback));
       } else {
         setError(result.error || '로그인에 실패했습니다.');
       }

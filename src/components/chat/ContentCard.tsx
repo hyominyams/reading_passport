@@ -19,15 +19,7 @@ const typeConfig: Record<ContentType, { icon: string; label: string; color: stri
   link: { icon: '🔗', label: '링크', color: 'bg-purple-50 text-purple-600 border-purple-200' },
 };
 
-function getYouTubeThumbnail(url: string): string | null {
-  const match = url.match(
-    /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]+)/
-  );
-  if (match?.[1]) {
-    return `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg`;
-  }
-  return null;
-}
+const CONTENT_VIDEO_THUMBNAIL = '/generated-copyright-safe/content-video-thumb.jpg';
 
 export default function ContentCard({
   type,
@@ -37,10 +29,10 @@ export default function ContentCard({
   onClick,
 }: ContentCardProps) {
   const config = typeConfig[type];
-  const ytThumb = type === 'video' ? getYouTubeThumbnail(url) : null;
-  const imageStyle = ytThumb || type === 'image'
+  const previewImage = type === 'video' ? CONTENT_VIDEO_THUMBNAIL : type === 'image' ? url : null;
+  const imageStyle = previewImage
     ? {
-        backgroundImage: `url(${ytThumb ?? url})`,
+        backgroundImage: `url(${previewImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }
@@ -57,13 +49,7 @@ export default function ContentCard({
     >
       {/* Thumbnail area */}
       <div className="relative w-full h-36 bg-muted-light flex items-center justify-center overflow-hidden">
-        {ytThumb ? (
-          <div
-            aria-label={title}
-            className="absolute inset-0 transition-transform duration-300 group-hover:scale-105"
-            style={imageStyle}
-          />
-        ) : type === 'image' ? (
+        {previewImage ? (
           <div
             aria-label={title}
             className="absolute inset-0 transition-transform duration-300 group-hover:scale-105"

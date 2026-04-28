@@ -357,7 +357,7 @@ export default function CompletePageContent({ storyId }: { storyId: string | nul
       {!isHistoryView && (
         <MyStoryStepSidebar currentStep={8} busy={saving} onStepSelect={handleStepSelect} />
       )}
-      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto">
+      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto xl:ml-auto xl:mr-[25rem]">
         {completed ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

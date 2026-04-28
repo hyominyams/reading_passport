@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import StoryPurposeCoach from '@/components/story/StoryPurposeCoach';
 import { createClient } from '@/lib/supabase/client';
 import { getDetailStepProgressLabel } from '@/lib/mystory-steps';
 import type { Story, CountryFact } from '@/types/database';
@@ -338,7 +339,8 @@ export default function CreatingPageContent({
 
   return (
     <>
-      <main className="flex-1 px-4 py-8 max-w-lg mx-auto flex flex-col items-center">
+      <StoryPurposeCoach storyId={storyId} />
+      <main className="flex-1 px-4 py-8 max-w-lg mx-auto flex flex-col items-center lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
       {/* Animated book icon */}
       <motion.div
         animate={{ rotate: [0, -5, 5, -5, 0] }}

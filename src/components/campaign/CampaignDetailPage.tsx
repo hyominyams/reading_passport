@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import type { Campaign, CampaignAssetMeta, CampaignContentType, SubmissionStatus } from '@/types/database';
 import { isSampleCampaignId, getSampleCampaign, getSampleSubmissions } from '@/lib/data/dummyCampaign';
+import { isCampaignParticipationOpen, isCampaignPastDeadline } from '@/lib/campaign-deadline';
 import CampaignStatusBadge from './CampaignStatusBadge';
 import SubmissionCard from './SubmissionCard';
 import SubmissionViewerModal from './SubmissionViewerModal';
@@ -184,8 +185,8 @@ export default function CampaignDetailPage({ campaignId }: { campaignId: string 
   const sortedSubmissions = [...featuredSubmissions, ...otherSubmissions];
 
   const deadlineStr = formatDeadline(campaign.deadline);
-  const isActive = campaign.status === 'active';
-  const isPastDeadline = campaign.deadline && new Date(campaign.deadline) < new Date();
+  const canParticipate = isCampaignParticipationOpen(campaign);
+  const isPastDeadline = isCampaignPastDeadline(campaign.deadline);
 
   return (
     <>
@@ -206,11 +207,11 @@ export default function CampaignDetailPage({ campaignId }: { campaignId: string 
         {/* Campaign info */}
         <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            <CampaignStatusBadge status={campaign.status} />
+            <CampaignStatusBadge status={campaign.status} deadline={campaign.deadline} />
             {deadlineStr && (
               <span className="text-xs text-slate-400">
                 마감: {deadlineStr}
-                {isPastDeadline && ' (지남)'}
+                {isPastDeadline && ' (마감)'}
               </span>
             )}
           </div>
@@ -238,7 +239,7 @@ export default function CampaignDetailPage({ campaignId }: { campaignId: string 
           {/* Actions */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             {/* Student submit CTA */}
-            {!isTeacher && isActive && !isPastDeadline && (
+            {!isTeacher && canParticipate && (
               <Link
                 href={`/campaign/${campaignId}/submit`}
                 className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
@@ -248,6 +249,11 @@ export default function CampaignDetailPage({ campaignId }: { campaignId: string 
                 </svg>
                 나의 작품 제출
               </Link>
+            )}
+            {!isTeacher && !canParticipate && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-500">
+                참여 접수 마감
+              </div>
             )}
 
             {/* Teacher controls */}

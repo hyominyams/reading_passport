@@ -16,6 +16,17 @@ function getBookPreviewRedirect(pathname: string) {
   return `/book/${match[1]}`;
 }
 
+function getLoginRedirect(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  const destination = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+
+  url.pathname = '/login';
+  url.search = '';
+  url.searchParams.set('redirect', destination);
+
+  return url;
+}
+
 export async function proxy(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request);
   const pathname = request.nextUrl.pathname;
@@ -31,10 +42,7 @@ export async function proxy(request: NextRequest) {
 
   // Redirect unauthenticated users to login
   if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(getLoginRedirect(request));
   }
 
   // Check role-based access using service role (bypasses RLS)

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import type {
   Story, LibraryItem, Visibility, StoryType, Language, CharacterRef,
-  GuideAnswers, AiDraftPage, CoverDesign, IllustrationStyle, ProductionStatus,
+  GuideAnswers, PurposeAnswers, AiDraftPage, CoverDesign, IllustrationStyle, ProductionStatus,
   CharacterDesign, CountryFact, StoryTranslationMap, StoryTranslatedPdfMap, StoryStatus,
 } from '@/types/database';
 
@@ -98,6 +98,7 @@ export async function updateStory(
     story_type: StoryType;
     custom_input: string | null;
     guide_answers: GuideAnswers | null;
+    purpose_answers: PurposeAnswers | null;
     student_freewrite: string | null;
     ai_draft: AiDraftPage[] | null;
     final_text: string[] | null;

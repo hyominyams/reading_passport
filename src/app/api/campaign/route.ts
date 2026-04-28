@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createCampaign, getActiveCampaigns, getTeacherCampaigns } from '@/lib/queries/campaign';
+import { normalizeCampaignDeadlineInput } from '@/lib/campaign-deadline';
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const result = await createCampaign({
     ...body,
+    deadline: normalizeCampaignDeadlineInput(body.deadline),
     created_by: user.id,
   });
 

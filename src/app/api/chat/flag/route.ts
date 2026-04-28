@@ -44,7 +44,9 @@ export async function POST(request: NextRequest) {
       ],
       {
         model: 'gpt-5-nano',
-        maxTokens: 256,
+        maxTokens: 800,
+        reasoningEffort: 'minimal',
+        jsonMode: true,
       }
     );
 

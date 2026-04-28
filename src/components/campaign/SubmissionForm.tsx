@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { isCampaignParticipationOpen } from '@/lib/campaign-deadline';
 import type { Campaign, CampaignAssetMeta, CampaignContentType } from '@/types/database';
 
 const contentTypeLabels: Record<CampaignContentType, string> = {
@@ -38,6 +39,7 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
   );
   const [assets, setAssets] = useState<UploadedAsset[]>([]);
   const [uploading, setUploading] = useState(false);
+  const participationOpen = isCampaignParticipationOpen(campaign);
 
   // Revoke blob URLs on unmount
   useEffect(() => {
@@ -51,6 +53,11 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
   const handleFileUpload = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0) return;
+      if (!isCampaignParticipationOpen(campaign)) {
+        setError('참여 접수가 마감되었습니다.');
+        return;
+      }
+
       const fileArray = Array.from(files);
 
       if (assets.length + fileArray.length > campaign.max_files_per_submission) {
@@ -105,7 +112,7 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
         setUploading(false);
       }
     },
-    [assets.length, campaign.id, campaign.max_file_size_mb, campaign.max_files_per_submission]
+    [assets.length, campaign]
   );
 
   const removeAsset = (assetId: string) => {
@@ -119,6 +126,11 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
   };
 
   const handleSubmit = () => {
+    if (!isCampaignParticipationOpen(campaign)) {
+      setError('참여 접수가 마감되었습니다.');
+      return;
+    }
+
     if (!title.trim()) {
       setError('제목을 입력해주세요.');
       return;
@@ -185,6 +197,12 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
         <p className="mt-1 text-sm text-slate-500">
           &quot;{campaign.title}&quot; 캠페인에 나의 작품을 제출하세요
         </p>
+
+        {!participationOpen && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            참여 접수가 마감되었습니다.
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">
@@ -259,10 +277,15 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
+                if (!participationOpen) return;
                 void handleFileUpload(e.dataTransfer.files);
               }}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center transition hover:border-slate-300"
+              onClick={() => {
+                if (participationOpen) fileInputRef.current?.click();
+              }}
+              className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center transition ${
+                participationOpen ? 'cursor-pointer hover:border-slate-300' : 'cursor-not-allowed opacity-70'
+              }`}
             >
               {uploading ? (
                 <LoadingSpinner size="sm" message="업로드 중..." />
@@ -285,6 +308,7 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
                 accept="image/*,application/pdf"
                 multiple
                 className="hidden"
+                disabled={!participationOpen || busy}
                 onChange={(e) => {
                   void handleFileUpload(e.target.files);
                   e.target.value = '';
@@ -335,7 +359,7 @@ export default function SubmissionForm({ campaign }: { campaign: Campaign }) {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={busy}
+              disabled={busy || !participationOpen}
               className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
               {isPending ? <LoadingSpinner size="sm" /> : '제출하기'}

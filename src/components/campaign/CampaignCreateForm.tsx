@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/common/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { normalizeCampaignDeadlineInput } from '@/lib/campaign-deadline';
 import type { CampaignContentType, ContentScope } from '@/types/database';
 
 const contentTypeOptions: { key: CampaignContentType; label: string }[] = [
@@ -64,7 +65,7 @@ export default function CampaignCreateForm() {
               .map((t) => t.trim())
               .filter(Boolean)
               .slice(0, 5),
-            deadline: deadline || null,
+            deadline: normalizeCampaignDeadlineInput(deadline),
             max_files_per_submission: maxFiles,
             max_file_size_mb: maxSizeMb,
             scope,

@@ -1,0 +1,106 @@
+{
+  "kenya": {
+    "html": {
+      "title": "케냐 나라 정보지 — 적도, 사바나, 사람들의 이야기",
+      "file": "kenya-bees-climate.html",
+      "summary": "케냐의 지리(다섯 풍경), 역사 타임라인, 문화·경제·일상생활을 한 번에 읽고 그림책 「비가 오기 전에 꿀벌이 알려준 것」과 연결합니다."
+    },
+    "cards": [
+      {
+        "title": "꽃가루받이를 돕는 생물",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=reJLqMuHcW0",
+        "summary": "한국어 영상으로 수분 서비스 개념을 확인합니다."
+      },
+      {
+        "title": "비가 늦은 해의 농장",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=Ypomz75hHn4",
+        "summary": "가뭄과 농업 변화를 해결책 중심으로 읽습니다."
+      }
+    ]
+  },
+  "tanzania": {
+    "html": {
+      "title": "탄자니아 나라 정보지 — 산, 호수, 바다가 한 나라 안에",
+      "file": "tanzania-hero-community.html",
+      "summary": "탄자니아의 지리(킬리만자로 단면), 역사(우자마와 연합공화국), 문화·경제·일상을 읽고 「진짜 영웅을 찾는 북소리」와 연결합니다."
+    },
+    "cards": [
+      {
+        "title": "킬리만자로, 한 산 안의 여러 세계",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=__kBaUotmaA",
+        "summary": "킬리만자로를 생태계의 층으로 살펴봅니다."
+      },
+      {
+        "title": "하쿠나 마타타 너머의 스와힐리어",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=Gq4Z_pTbQco",
+        "summary": "스와힐리어 인사말과 관계의 문화를 익힙니다."
+      },
+      {
+        "title": "책임의 말: Polepole, Tafadhali, Asante",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=wtET38LFcc8",
+        "summary": "천천히, 부탁해요, 고마워요를 관계를 지키는 말로 연습합니다."
+      }
+    ]
+  },
+  "nepal": {
+    "html": {
+      "title": "네팔 나라 정보지 — 히말라야 아래 천 개의 마을",
+      "file": "nepal-school-road.html",
+      "summary": "네팔의 지리(테라이·언덕·히말라야 단면), 역사(룸비니에서 공화국까지), 문화·일상·경제를 읽고 「구름 위 학교의 빨간 공책」과 연결합니다."
+    },
+    "cards": [
+      {
+        "title": "산골 마을의 학교 가는 길",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=0qr5F-YaPcM",
+        "summary": "등굣길을 이동권과 배움의 조건으로 읽습니다."
+      },
+      {
+        "title": "네팔 시골마을 아이들",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=7b5UgNIRRCM",
+        "summary": "산악 마을의 일상과 학교생활을 함께 살펴봅니다."
+      }
+    ]
+  },
+  "cambodia": {
+    "html": {
+      "title": "캄보디아 나라 정보지 — 메콩과 톤레삽이 만든 나라",
+      "file": "cambodia-mekong-memory.html",
+      "summary": "캄보디아의 지리(메콩·톤레삽), 역사(크메르 제국에서 오늘까지), 문화·경제·일상을 읽고 「메콩강에 띄운 파란 연」과 연결합니다."
+    },
+    "cards": [
+      {
+        "title": "거꾸로 흐르는 강, 톤레삽",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=wND3RkMRqk4",
+        "summary": "강과 호수의 움직임이 생활 리듬을 만드는 과정을 봅니다."
+      },
+      {
+        "title": "삶을 품은 호수 톤레삽",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=5vfmAKoH4YY",
+        "summary": "물 위 마을의 생활과 배움을 살펴봅니다."
+      },
+      {
+        "title": "앙코르의 물길과 기억",
+        "type": "video",
+        "url": "https://www.youtube.com/watch?v=-SLA203LKj8",
+        "summary": "앙코르를 사원, 도시, 물길, 관리의 관점으로 읽습니다."
+      }
+    ]
+  },
+  "rwanda": {
+    "html": {
+      "title": "르완다 나라 정보지 — 천 개의 언덕, 하나의 다짐",
+      "file": "rwanda-thousand-hills.html",
+      "summary": "르완다의 지리(천 개의 언덕·키부 호수), 역사(상처와 회복), 문화(이미공고·아가세케·우무간다), 경제·일상·오늘의 변화를 한 번에 읽습니다."
+    },
+    "cards": []
+  }
+}

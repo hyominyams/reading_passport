@@ -3,6 +3,7 @@ import { chatCompletion } from '@/lib/ai/openai';
 import { buildBookAnalysisPromptContext } from '@/lib/book-analysis';
 import { getLatestCompletedBookAnalysis } from '@/lib/queries/book-analyses';
 import { createClient } from '@/lib/supabase/server';
+import type { DocentActivityRecommendation } from '@/types/database';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -24,7 +25,6 @@ interface BookContext {
 type FocusField = 'character' | 'setting' | 'conflict' | 'ending';
 
 const GUIDE_CHAT_FALLBACK_REPLY = '오호, 그 부분을 조금만 더 또렷하게 들려주면 좋겠어.';
-const MAX_CONTEXT_MESSAGES = 6;
 const COMMON_UNCLEAR_INPUTS = new Set([
   'ㅇ',
   'ㅇㅇ',
@@ -50,10 +50,40 @@ const COMMON_UNCLEAR_INPUTS = new Set([
   '그냥',
 ]);
 
+function normalizeForSimilarity(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s"'“”‘’`~!@#$%^&*()_\-+=[\]{}\\|;:,.<>/?，。！？…·]/g, '');
+}
+
+function countSentences(text: string): number {
+  return text
+    .split(/[.!?。！？\n]+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .length;
+}
+
+function hasLongSharedPhrase(reply: string, latestUserMessage: string): boolean {
+  const normalizedLatest = normalizeForSimilarity(latestUserMessage);
+  const normalizedReply = normalizeForSimilarity(reply);
+
+  if (normalizedLatest.length < 18) return false;
+
+  const chunkSize = 12;
+  for (let index = 0; index <= normalizedLatest.length - chunkSize; index += 1) {
+    const chunk = normalizedLatest.slice(index, index + chunkSize);
+    if (normalizedReply.includes(chunk)) return true;
+  }
+
+  return false;
+}
+
 async function generateGuideReply(apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]) {
   const reply = await chatCompletion(apiMessages, {
     model: 'gpt-5-mini',
     maxTokens: 2200,
+    reasoningEffort: 'minimal',
   });
 
   return reply.trim() || '';
@@ -73,7 +103,6 @@ async function generateFocusedFollowup(
     .find((message) => message.role === 'user')?.content ?? '';
   const transcript = messages
     .filter((message) => message.role === 'user' || message.role === 'assistant')
-    .slice(-8)
     .map((message) => `${message.role === 'user' ? '학생' : '토리'}: ${message.content}`)
     .join('\n');
 
@@ -125,7 +154,7 @@ ${transcript}`;
 
   const primaryReply = await chatCompletion(
     [{ role: 'system', content: prompt }],
-    { model: 'gpt-5-mini', maxTokens: 260 }
+    { model: 'gpt-5-mini', maxTokens: 260, reasoningEffort: 'minimal' }
   );
 
   if (primaryReply.trim()) {
@@ -138,10 +167,94 @@ ${transcript}`;
 
   const retryReply = await chatCompletion(
     [{ role: 'system', content: `${prompt}\n\n[Retry]\n${retryPrompt}` }],
-    { model: 'gpt-5-mini', maxTokens: 220 }
+    { model: 'gpt-5-mini', maxTokens: 220, reasoningEffort: 'minimal' }
   );
 
   return retryReply.trim();
+}
+
+function isEchoingStudent(reply: string, latestUserMessage: string): boolean {
+  const latest = latestUserMessage.trim();
+
+  if (latest.length >= 12 && reply.includes(latest)) return true;
+
+  const normalizedLatest = normalizeForSimilarity(latest);
+  const normalizedReply = normalizeForSimilarity(reply);
+
+  if (normalizedLatest.length >= 14 && normalizedReply.includes(normalizedLatest)) {
+    return true;
+  }
+
+  if (hasLongSharedPhrase(reply, latest)) return true;
+
+  if (
+    latest.length >= 10
+    && /네가\s*(쓰고 싶은|말한|생각한|떠올린)\s*(건|것은)/.test(reply)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function isPoorGuideReply(reply: string, latestUserMessage: string, studentTurnCount: number): boolean {
+  if (isEchoingStudent(reply, latestUserMessage)) return true;
+
+  if (studentTurnCount >= 1 && studentTurnCount <= 4) {
+    if (reply.includes('?') || reply.includes('？')) return true;
+    if (
+      /(?:왜|어떤|누가|누구|어디|언제|무엇|뭐|어떻게|어느|몇|들려줄래|말해줄래|알려줄래|떠올려 봐|생각해 봐|골라 봐)/.test(reply)
+    ) {
+      return true;
+    }
+    if (reply.length > 180) return true;
+    if (countSentences(reply) > 2) return true;
+  }
+
+  return false;
+}
+
+function buildGuideFallbackReply(
+  language: string,
+  latestUserMessage: string,
+  selectedActivity: DocentActivityRecommendation | null,
+  studentTurnCount: number,
+): string {
+  if (language === 'en') {
+    if (studentTurnCount >= 7) {
+      return 'That seed is getting clearer. Choose one moment where the character changes most.';
+    }
+
+    return 'That gives the story a clear spark. The moment of courage can become the heart of your picture book.';
+  }
+
+  if (/몰라|모르겠|어려|뭘|뭐/.test(latestUserMessage)) {
+    return selectedActivity
+      ? `괜찮아. "${selectedActivity.title}"에서 가장 먼저 떠오르는 장면 하나만 작게 잡아도 돼.`
+      : '괜찮아. 인물, 장소, 사건 중 하나만 작게 떠올려도 이야기는 시작될 수 있어.';
+  }
+
+  if (studentTurnCount >= 7) {
+    return '좋아, 이야기 씨앗이 더 또렷해졌어. 이제 인물이 달라지는 가장 중요한 순간 하나를 잡으면 돼.';
+  }
+
+  if (/이름|주인공|민우|무서|겁|따뜻/.test(latestUserMessage)) {
+    return '좋아, 인물의 마음이 선명해졌어. 무서움과 따뜻함이 함께 있어서 이야기가 살아나.';
+  }
+
+  if (/비|골목|할머니|넘어|다친|발견/.test(latestUserMessage)) {
+    return '오호, 장면이 또렷해졌어. 비 오는 길에서 마주친 일이 인물의 선택을 더 크게 만들어.';
+  }
+
+  if (/사라마|기억|떠올|책|장면/.test(latestUserMessage)) {
+    return '좋아, 책에서 받은 기억이 인물의 용기로 이어지는 흐름이 좋아.';
+  }
+
+  if (/어른|도움|도와|편의점|뛰어|말해|요청/.test(latestUserMessage)) {
+    return '좋아, 혼자 해결하지 않고 도움을 부르는 선택이 이야기의 힘이 돼.';
+  }
+
+  return '와, 그 장면에 힘이 있어. 겁이 나도 도움을 찾는 순간이 네 이야기의 중요한 씨앗이 될 수 있어.';
 }
 
 function isLikelyUnclearInput(text: string): boolean {
@@ -171,6 +284,7 @@ function buildSystemPrompt(
   bookTitle: string,
   storyType: string,
   customInput: string | null,
+  selectedActivity: DocentActivityRecommendation | null,
   language: string,
   bookContext: BookContext | null,
   studentTurnCount: number,
@@ -180,6 +294,9 @@ function buildSystemPrompt(
   const typeLabel = storyType === 'custom' && customInput
     ? `기타: ${customInput}`
     : STORY_TYPE_LABELS[storyType] ?? storyType;
+  const activitySection = selectedActivity
+    ? `\n[도슨트와의 만남 결과]\n- 학생이 선택한 활동: ${selectedActivity.title}\n- 활동 설명: ${selectedActivity.description}\n- 시작 문장: ${selectedActivity.starter}\n\n토리는 이 활동을 이야기 씨앗을 찾는 렌즈로만 사용한다. 학생에게 활동을 그대로 수행하라고 몰아가지 말고, 그 활동에서 나온 감정, 장면, 인물 단서를 바탕으로 어떤 이야기를 쓰고 싶은지 듣는다. 학생이 직접 입력한 활동이라면 그 내용을 그대로 존중해.`
+    : '';
 
   let bookSection = `- 학생이 읽은 책: "${bookTitle}"`;
 
@@ -193,6 +310,7 @@ function buildSystemPrompt(
 ${bookSection}
 - 학생이 선택한 이야기 유형: ${typeLabel}
 - 대화 언어: ${language === 'en' ? '영어' : '한국어'}
+${activitySection}
 
 [핵심 역할]
 너는 학생이 들려주는 이야기 조각들을 모아서 나중에 더 좋은 초안을 만들게 도와주는 이야기 램프야.
@@ -250,6 +368,7 @@ export async function POST(request: NextRequest) {
       book_title,
       story_type,
       custom_input,
+      selected_activity,
       language = 'ko',
       student_turn_count = 0,
       focus_field = null,
@@ -260,6 +379,7 @@ export async function POST(request: NextRequest) {
       book_title: string;
       story_type: string;
       custom_input?: string | null;
+      selected_activity?: DocentActivityRecommendation | null;
       language?: string;
       student_turn_count?: number;
       focus_field?: FocusField | null;
@@ -312,6 +432,7 @@ export async function POST(request: NextRequest) {
       book_title,
       story_type,
       custom_input ?? null,
+      selected_activity ?? null,
       language,
       bookContext,
       student_turn_count,
@@ -320,8 +441,7 @@ export async function POST(request: NextRequest) {
     );
 
     const recentMessages = messages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .slice(-MAX_CONTEXT_MESSAGES);
+      .filter((m) => m.role === 'user' || m.role === 'assistant');
 
     const apiMessages = [
       { role: 'system' as const, content: systemPrompt },
@@ -338,18 +458,35 @@ export async function POST(request: NextRequest) {
         focus_field,
         validation_feedback ?? '',
       );
+
       if (focusedReply.trim()) {
-        return Response.json({ reply: focusedReply });
+        const safeFocusedReply = isPoorGuideReply(focusedReply, latestUserMessage, student_turn_count)
+          ? buildGuideFallbackReply(language, latestUserMessage, selected_activity ?? null, student_turn_count)
+          : focusedReply;
+
+        return Response.json({ reply: safeFocusedReply });
       }
 
       const retryReply = await generateGuideReply(apiMessages);
-      return Response.json({ reply: retryReply || GUIDE_CHAT_FALLBACK_REPLY });
+      const safeRetryReply = retryReply && !isPoorGuideReply(retryReply, latestUserMessage, student_turn_count)
+        ? retryReply
+        : buildGuideFallbackReply(language, latestUserMessage, selected_activity ?? null, student_turn_count);
+
+      return Response.json({ reply: safeRetryReply || GUIDE_CHAT_FALLBACK_REPLY });
     }
 
     const reply = await generateGuideReply(apiMessages);
 
     if (!reply) {
-      return Response.json({ reply: GUIDE_CHAT_FALLBACK_REPLY });
+      return Response.json({
+        reply: buildGuideFallbackReply(language, latestUserMessage, selected_activity ?? null, student_turn_count),
+      });
+    }
+
+    if (isPoorGuideReply(reply, latestUserMessage, student_turn_count)) {
+      return Response.json({
+        reply: buildGuideFallbackReply(language, latestUserMessage, selected_activity ?? null, student_turn_count),
+      });
     }
 
     return Response.json({ reply });

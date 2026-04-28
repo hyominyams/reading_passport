@@ -53,12 +53,12 @@ const ACTIVITY_STEPS = [
 ];
 
 const CTA_AVATARS = [
-  { src: 'https://images.unsplash.com/photo-1536308037887-165852797016?w=400&h=400&fit=crop', alt: '콜롬비아' },
-  { src: 'https://images.unsplash.com/photo-1525535816528-974e4b19eb51?w=400&h=400&fit=crop', alt: '탄자니아' },
-  { src: 'https://images.unsplash.com/photo-1504639650150-bf773680d8c3?w=400&h=400&fit=crop', alt: '캄보디아' },
-  { src: 'https://images.unsplash.com/photo-1668966780359-78fe21493d9b?w=400&h=400&fit=crop', alt: '네팔' },
-  { src: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=400&h=400&fit=crop', alt: '르완다' },
-  { src: 'https://images.unsplash.com/photo-1554490752-6a232eca5e60?w=400&h=400&fit=crop', alt: '케냐' },
+  { src: '/generated-copyright-safe/country-colombia.jpg', alt: '콜롬비아' },
+  { src: '/generated-copyright-safe/country-tanzania.jpg', alt: '탄자니아' },
+  { src: '/generated-copyright-safe/country-cambodia.jpg', alt: '캄보디아' },
+  { src: '/generated-copyright-safe/country-nepal.jpg', alt: '네팔' },
+  { src: '/generated-copyright-safe/country-rwanda.jpg', alt: '르완다' },
+  { src: '/generated-copyright-safe/country-kenya.jpg', alt: '케냐' },
 ];
 
 export default function HomePage() {

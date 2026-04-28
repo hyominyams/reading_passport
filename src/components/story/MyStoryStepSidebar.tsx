@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { DETAIL_STEP_META, DETAIL_STEP_TOTAL, getDetailStepProgressLabel } from '@/lib/mystory-steps';
+import StoryPurposeCoach from '@/components/story/StoryPurposeCoach';
 
 interface MyStoryStepSidebarProps {
   currentStep: number;
@@ -15,25 +17,32 @@ export default function MyStoryStepSidebar({
   onStepSelect,
 }: MyStoryStepSidebarProps) {
   const [open, setOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const storyId = searchParams.get('storyId');
 
   const currentIndex = useMemo(
     () => DETAIL_STEP_META.findIndex((item) => item.step === currentStep),
     [currentStep]
   );
+  const showPurposeCoach = currentStep >= 3 && Boolean(storyId);
 
   return (
     <>
+      {showPurposeCoach && (
+        <StoryPurposeCoach storyId={storyId} autoOpen={currentStep === 3} />
+      )}
+
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="fixed right-4 top-24 z-40 inline-flex items-center gap-2 rounded-full border border-border bg-white/95 px-4 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur"
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-border bg-white/95 px-4 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur"
       >
         <span>{open ? '✕' : '☰'}</span>
         <span>{getDetailStepProgressLabel(currentStep)}</span>
       </button>
 
       <aside
-        className={`fixed right-4 top-36 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-3xl border border-border bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ${
+        className={`fixed bottom-20 right-6 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-3xl border border-border bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ${
           open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-6 opacity-0'
         }`}
       >

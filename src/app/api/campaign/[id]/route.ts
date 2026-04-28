@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getCampaign, updateCampaign, deleteCampaign } from '@/lib/queries/campaign';
+import { normalizeCampaignDeadlineInput } from '@/lib/campaign-deadline';
 
 export async function GET(
   _request: NextRequest,
@@ -50,7 +51,11 @@ export async function PUT(
   }
 
   const body = await request.json();
-  const result = await updateCampaign(id, body);
+  const updateBody =
+    'deadline' in body
+      ? { ...body, deadline: normalizeCampaignDeadlineInput(body.deadline) }
+      : body;
+  const result = await updateCampaign(id, updateBody);
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 500 });

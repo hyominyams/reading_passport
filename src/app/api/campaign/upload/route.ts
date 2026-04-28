@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { uploadCampaignAsset } from '@/lib/storage/campaign-assets';
 import { getCampaign } from '@/lib/queries/campaign';
+import { isCampaignParticipationOpen } from '@/lib/campaign-deadline';
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -38,6 +39,13 @@ export async function POST(request: NextRequest) {
   const campaign = await getCampaign(campaignId);
   if (!campaign) {
     return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+  }
+
+  if (!isCampaignParticipationOpen(campaign)) {
+    return NextResponse.json(
+      { error: '이 캠페인은 참여할 수 없습니다.' },
+      { status: 400 }
+    );
   }
 
   const maxBytes = campaign.max_file_size_mb * 1024 * 1024;

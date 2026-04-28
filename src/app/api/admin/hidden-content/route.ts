@@ -93,10 +93,31 @@ export async function PUT(request: NextRequest) {
   if (typeof body.order === 'number' && Number.isFinite(body.order)) {
     updateData.order = Math.max(0, Math.round(body.order));
   }
-  if (typeof body.bookId === 'string') {
-    updateData.book_id = body.bookId;
-  }
-  if (typeof body.countryId === 'string') {
+  const targetBookId =
+    typeof body.targetBookId === 'string'
+      ? body.targetBookId
+      : typeof body.bookId === 'string'
+        ? body.bookId
+        : '';
+
+  if (targetBookId) {
+    const { data: targetBook, error: targetBookError } = await service
+      .from('books')
+      .select('id, country_id')
+      .eq('id', targetBookId)
+      .maybeSingle();
+
+    if (targetBookError) {
+      return NextResponse.json({ error: targetBookError.message }, { status: 500 });
+    }
+
+    if (!targetBook) {
+      return NextResponse.json({ error: '이동할 도서를 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    updateData.book_id = targetBook.id;
+    updateData.country_id = targetBook.country_id;
+  } else if (typeof body.countryId === 'string') {
     updateData.country_id = body.countryId.trim();
   }
 

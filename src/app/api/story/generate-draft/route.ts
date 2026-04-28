@@ -4,10 +4,16 @@ import { buildBookAnalysisPromptContext } from '@/lib/book-analysis';
 import { getLatestCompletedBookAnalysis } from '@/lib/queries/book-analyses';
 import { getLatestCompletedBookPdfText } from '@/lib/queries/book-pdf-texts';
 import { createClient } from '@/lib/supabase/server';
+import type { DocentActivityRecommendation } from '@/types/database';
 
 type DraftPage = {
   draft: string;
   advice: string;
+};
+
+type DocentChatMessage = {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
 };
 
 function buildStudentInput(params: {
@@ -39,6 +45,30 @@ function buildStudentInput(params: {
     sourceLabel: '학생 채팅에서 나온 이야기 재료',
     text: typeof all_student_messages === 'string' ? all_student_messages.trim() : '',
   };
+}
+
+function formatSelectedActivity(activity: DocentActivityRecommendation | null | undefined, customInput: string | null | undefined) {
+  if (activity?.title || activity?.description || activity?.starter) {
+    return [
+      activity.title ? `활동 이름: ${activity.title}` : '',
+      activity.description ? `활동 설명: ${activity.description}` : '',
+      activity.starter ? `시작 문장: ${activity.starter}` : '',
+    ].filter(Boolean).join('\n');
+  }
+
+  return typeof customInput === 'string' && customInput.trim()
+    ? `학생이 직접 정한 활동: ${customInput.trim()}`
+    : '';
+}
+
+function formatDocentConversation(messages: DocentChatMessage[] | null | undefined) {
+  if (!Array.isArray(messages)) return '';
+
+  return messages
+    .filter((message) => message.role === 'user' || message.role === 'assistant')
+    .slice(-12)
+    .map((message) => `${message.role === 'user' ? '학생' : '도슨트'}: ${message.content}`)
+    .join('\n');
 }
 
 function extractJsonObject(text: string): string | null {
@@ -145,6 +175,41 @@ function normalizePages(payload: unknown, language: string): DraftPage[] {
   return normalized;
 }
 
+function limitPromptContext(text: string, maxChars: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars)}\n\n[이하 생략: 초안 생성에는 앞부분과 구조화 요약을 우선 사용]`;
+}
+
+async function generateDraftPages(params: {
+  systemPrompt: string;
+  userPrompt: string;
+  language: string;
+  maxTokens?: number;
+}) {
+  const result = await chatCompletion(
+    [
+      { role: 'system', content: params.systemPrompt },
+      { role: 'user', content: params.userPrompt },
+    ],
+    {
+      model: 'gpt-5-mini',
+      maxTokens: params.maxTokens ?? 4500,
+      jsonMode: true,
+      reasoningEffort: 'low',
+      timeoutMs: 90_000,
+    }
+  );
+
+  const jsonText = extractJsonObject(result);
+  const parsed = jsonText ? JSON.parse(jsonText) : {};
+  return {
+    pages: normalizePages(parsed, params.language),
+    hasResult: result.length > 0,
+    hasJsonText: Boolean(jsonText),
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -155,6 +220,8 @@ export async function POST(request: NextRequest) {
       country,
       story_summary,
       characters,
+      selected_activity,
+      docent_messages,
       // New 7-step fields
       guide_answers,
       student_freewrite,
@@ -176,6 +243,8 @@ export async function POST(request: NextRequest) {
       student_freewrite,
       all_student_messages,
     });
+    const selectedActivityText = formatSelectedActivity(selected_activity, custom_input);
+    const docentConversationText = formatDocentConversation(docent_messages);
 
     if (!studentSource.text) {
       return Response.json(
@@ -239,15 +308,15 @@ export async function POST(request: NextRequest) {
     }
 
     const bookContextSection = resolvedBookText
-      ? `[원문 텍스트]\n${resolvedBookText}`
+      ? `[원문 텍스트]\n${limitPromptContext(resolvedBookText, 9000)}`
       : resolvedPdfText
-        ? `[PDF 원문 텍스트]\n${resolvedPdfText}`
+        ? `[PDF 원문 텍스트]\n${limitPromptContext(resolvedPdfText, 9000)}`
         : resolvedAnalysisContext
-          ? `[도서 구조화 요약]\n${resolvedAnalysisContext}`
+          ? `[도서 구조화 요약]\n${limitPromptContext(resolvedAnalysisContext, 7000)}`
           : '[도서 맥락]\n(도서 요약을 불러오지 못했습니다.)';
 
     const analysisContextSection = resolvedAnalysisContext
-      ? `\n\n[도서 분석 보조 정보]\n${resolvedAnalysisContext}`
+      ? `\n\n[도서 분석 보조 정보]\n${limitPromptContext(resolvedAnalysisContext, 5000)}`
       : '';
 
     const finalBookContextSection = `${bookContextSection}${analysisContextSection}`;
@@ -265,6 +334,8 @@ export async function POST(request: NextRequest) {
 ${finalBookContextSection}
 
 [이야기 유형] ${storyTypeLabel[story_type] || story_type}
+${selectedActivityText ? `\n[도슨트와의 만남에서 선택한 활동]\n${selectedActivityText}` : ''}
+${docentConversationText ? `\n[도슨트와 학생의 대화 요약 재료]\n${docentConversationText}` : ''}
 
 [책 배경 정보]
 제목: ${resolvedBookTitle} / 국가: ${resolvedCountry}
@@ -278,13 +349,14 @@ ${studentSource.text}
 
 [초안 작성 규칙]
 1. 학생이 직접 말한 재료를 최우선으로 사용하세요.
-2. PDF 원문 텍스트가 있으면 원작의 사건 순서, 등장인물 관계, 핵심 선택을 정확히 참고하세요.
-3. 책의 배경과 분위기는 참고하되, 학생이 말하지 않은 핵심 사건을 멋대로 새로 만들지 마세요.
-4. 초안은 비어 있으면 안 됩니다. 각 장면마다 실제 문장으로 초안을 써 주세요.
-5. 일부 감정 묘사나 연결 문장은 일부러 덜 채워 학생이 다시 쓸 여백을 남기세요.
-6. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
-7. 정확히 5개 장면으로 나누세요: 발단(이야기의 시작, 배경과 인물 소개), 전개(사건이 펼쳐지며 이야기가 진행), 위기(갈등이나 어려움 등장), 절정(가장 긴장감 넘치는 순간), 결말(문제 해결과 마무리).
-8. 각 장면의 draft는 2~4문장으로 쓰세요.
+2. 도슨트와의 만남에서 선택한 활동이 있으면 그 활동 방향을 초안의 중심 조건으로 반영하세요.
+3. PDF 원문 텍스트가 있으면 원작의 사건 순서, 등장인물 관계, 핵심 선택을 정확히 참고하세요.
+4. 책의 배경과 분위기는 참고하되, 학생이 말하지 않은 핵심 사건을 멋대로 새로 만들지 마세요.
+5. 초안은 비어 있으면 안 됩니다. 각 장면마다 실제 문장으로 초안을 써 주세요.
+6. 일부 감정 묘사나 연결 문장은 일부러 덜 채워 학생이 다시 쓸 여백을 남기세요.
+7. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
+8. 정확히 5개 장면으로 나누세요: 발단(이야기의 시작, 배경과 인물 소개), 전개(사건이 펼쳐지며 이야기가 진행), 위기(갈등이나 어려움 등장), 절정(가장 긴장감 넘치는 순간), 결말(문제 해결과 마무리).
+9. 각 장면의 draft는 2~4문장으로 쓰세요.
 
 [조언 작성 규칙]
 1. 각 장면마다 학생이 이미 말한 내용 중 살릴 만한 요소를 하나씩 짚어 주세요.
@@ -297,29 +369,59 @@ ${studentSource.text}
 
 응답 언어: ${language === 'ko' ? '한국어' : 'English'}`;
 
-    const result = await chatCompletion(
-      [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: language === 'en'
-            ? 'Write the draft and advice as JSON only.'
-            : '이야기 초안과 조언을 JSON으로만 작성해 주세요.',
-        },
-      ],
-      {
-        model: 'gpt-5-mini',
-        maxTokens: 3500,
-        jsonMode: true,
-        timeoutMs: 90_000,
-      }
-    );
+    const userPrompt = language === 'en'
+      ? 'Write the draft and advice as JSON only.'
+      : '이야기 초안과 조언을 JSON으로만 작성해 주세요.';
 
-    const jsonText = extractJsonObject(result);
-    const parsed = jsonText ? JSON.parse(jsonText) : {};
-    const pages = normalizePages(parsed, language);
+    let { pages, hasResult, hasJsonText } = await generateDraftPages({
+      systemPrompt,
+      userPrompt,
+      language,
+      maxTokens: 4500,
+    });
 
     if (pages.length === 0) {
+      console.error('Draft generation returned no usable pages. Retrying with compact prompt.', {
+        hasResult,
+        hasJsonText,
+      });
+
+      const retrySystemPrompt = `당신은 초등학생의 그림책 창작을 돕는 아동 창작 교육 도우미입니다.
+
+[책 정보]
+제목: ${resolvedBookTitle}
+국가: ${resolvedCountry}
+줄거리: ${resolvedStorySummary}
+등장인물: ${resolvedCharacters}
+
+${selectedActivityText ? `[학생이 선택한 활동]\n${selectedActivityText}\n\n` : ''}[학생이 말한 이야기 재료]
+${studentSource.text}
+
+[규칙]
+1. 학생이 말한 재료를 최우선으로 사용한다.
+2. 선택한 활동이 있으면 그 방향을 반드시 반영한다.
+3. 정확히 5개 장면을 만든다: 발단, 전개, 위기, 절정, 결말.
+4. 각 draft는 2~4문장, 각 advice는 1~2문장으로 쓴다.
+5. 초등학생이 이해할 수 있는 문장으로 쓴다.
+
+출력은 JSON 객체만 허용한다.
+{"pages":[{"draft":"발단 초안","advice":"발단 조언"},{"draft":"전개 초안","advice":"전개 조언"},{"draft":"위기 초안","advice":"위기 조언"},{"draft":"절정 초안","advice":"절정 조언"},{"draft":"결말 초안","advice":"결말 조언"}]}
+
+응답 언어: ${language === 'ko' ? '한국어' : 'English'}`;
+
+      ({ pages, hasResult, hasJsonText } = await generateDraftPages({
+        systemPrompt: retrySystemPrompt,
+        userPrompt,
+        language,
+        maxTokens: 3500,
+      }));
+    }
+
+    if (pages.length === 0) {
+      console.error('Draft generation failed after retry.', {
+        hasResult,
+        hasJsonText,
+      });
       return Response.json(
         { error: '초안 생성 결과를 해석하지 못했습니다.' },
         { status: 502 }

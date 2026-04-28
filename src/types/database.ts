@@ -29,6 +29,12 @@ export interface GuideAnswers {
   world: string;
 }
 
+export interface PurposeAnswers {
+  reader: string;
+  message: string;
+  reason: string;
+}
+
 export interface AiDraftPage {
   draft: string;
   advice: string;
@@ -230,6 +236,16 @@ export interface HiddenContent {
   approved: boolean;
 }
 
+export interface HiddenContentClassOverride {
+  id: string;
+  hidden_content_id: string;
+  teacher_id: string;
+  class_id: string;
+  hidden: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Activity {
   id: string;
   student_id: string;
@@ -257,6 +273,12 @@ export interface ChatMessage {
   role: string;
   content: string;
   timestamp: string;
+}
+
+export interface DocentActivityRecommendation {
+  title: string;
+  description: string;
+  starter: string;
 }
 
 export interface ChatLog {
@@ -287,6 +309,9 @@ export interface Story {
   story_status: StoryStatus;
   story_type: StoryType;
   custom_input: string | null;
+  docent_chat_log: ChatMessage[] | null;
+  docent_recommendations: DocentActivityRecommendation[] | null;
+  selected_activity: DocentActivityRecommendation | null;
   // Legacy fields (kept for old stories)
   chat_log: Record<string, unknown>;
   all_student_messages: string | null;
@@ -295,6 +320,7 @@ export interface Story {
   // New 7-step fields
   current_step: number;
   guide_answers: GuideAnswers | null;
+  purpose_answers: PurposeAnswers | null;
   student_freewrite: string | null;
   ai_draft: AiDraftPage[] | null;
   final_text: string[] | null;

@@ -146,6 +146,18 @@ export default async function MyStoryPage({
         userId={user.id}
         storyId={story.id}
         initialStoryType={story.story_type}
+        initialCustomInput={story.custom_input}
+        initialDocentChatLog={
+          Array.isArray(story.docent_chat_log) && story.docent_chat_log.length > 0
+            ? (story.docent_chat_log as { role: 'user' | 'assistant' | 'system'; content: string; timestamp: string }[])
+            : null
+        }
+        initialDocentRecommendations={
+          Array.isArray(story.docent_recommendations) && story.docent_recommendations.length > 0
+            ? story.docent_recommendations
+            : null
+        }
+        initialSelectedActivity={story.selected_activity}
         initialCurrentStep={story.current_step}
         requiredTurns={requiredTurns}
         hasExistingDraft={Array.isArray(story.ai_draft) && story.ai_draft.length > 0}

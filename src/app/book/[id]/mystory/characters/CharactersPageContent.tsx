@@ -316,7 +316,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
   return (
     <>
       <MyStoryStepSidebar currentStep={5} busy={saving || generatingIndex !== null} onStepSelect={handleStepSelect} />
-      <div className="flex-1 flex justify-center">
+      <div className="flex-1 flex justify-center lg:mr-[22rem] xl:mr-[25rem]">
       <main className="flex-1 px-4 py-6 max-w-3xl">
       {/* Step Progress */}
       <StepProgress currentStep={5} />

@@ -91,11 +91,11 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
 ];
 
 const sampleImages = [
-  'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=600&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1577896851231-70ef18881754?w=600&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=600&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&h=400&fit=crop',
+  '/generated-copyright-safe/campaign-world-market-poster.jpg',
+  '/generated-copyright-safe/campaign-card-news.jpg',
+  '/generated-copyright-safe/campaign-classroom-gallery.jpg',
+  '/generated-copyright-safe/campaign-library-research.jpg',
+  '/generated-copyright-safe/campaign-food-culture.jpg',
 ];
 
 const SAMPLE_SUBMISSIONS: Record<string, SampleSubmission[]> = {

@@ -1,1211 +1,648 @@
-# 🌍 World Docent — 개발 PRD
+# World Stories / World Docent — 개발 PRD
+
 > 글로벌 독서교육 웹앱 / 솔로 개발 / 무료 교육용
-> 작성일: 2026.04 / 기술스택: Next.js + Supabase + Vercel
+> 최초 작성: 2026.04 / 로컬 코드 기준 갱신: 2026.04.27
+> 기준 소스: `/Users/user/task/reading_passport` 로컬 폴더
 
 ---
 
-# 1. 프로젝트 개요
+## 0. 로컬 코드 기준 변경 요약
 
-## 한 줄 정의
-제3세계 그림책을 읽고, 탐색하고, 자신만의 이야기를 창작하는 글로벌 독서교육 웹앱.
+현재 로컬 구현은 초기 PRD와 아래 지점이 달라졌다. 이 문서는 로컬 코드 상태를 우선 기준으로 한다.
 
-## 핵심 철학
-AI가 답을 주는 게 아니라, 학생이 스스로 생각하게 만드는 것.
-
-## 기술 스택
-- **프레임워크**: Next.js (App Router)
-- **DB/인증**: Supabase
-- **배포**: Vercel
-- **스타일**: Tailwind CSS + Framer Motion
-- **텍스트 AI**: GPT-5-mini (소형모델 병용)
-- **이미지 AI**: Nanobanana2 (cref 지원)
+| 영역 | 기존 PRD | 현재 로컬 코드 |
+|------|----------|----------------|
+| 서비스명 | World Docent 중심 | UI 브랜드는 `World Stories`, 프로젝트 맥락은 World Docent 병행 |
+| 핵심 활동 | Story Read / Hidden Stories / Talk with Character / My Story | `Story Read` / `Hidden Stories` / `질문 만들기` / `My World` 4도장 |
+| Step 3 | 캐릭터 대화 도장 | 질문 만들기 완료 후 `World Smart` 질문게시판으로 확장 |
+| `/book/[id]/chat` | 핵심 도장 흐름 | 레거시/보조 라우트로 남아 있음. 현재 4도장 완료 조건에는 포함하지 않음 |
+| My World | `/mystory/write` 자유 작성 단계 포함 | 자유 작성 단계 제거. 유형 선택 + 토리 채팅 → AI 초안 → 학생 재작성 흐름 |
+| My World 라우트 | `/mystory/write`, `/finish` 중심 | `/mystory`, `/draft`, `/scenes`, `/characters`, `/style`, `/creating`, `/finish`, `/complete` |
+| My World 페이지 수 | 기본 3장, 최대 6장 | AI 초안은 5장면 고정, 학생은 최소 5장 작성, 최대 6장 |
+| 이미지 AI | Nanobanana2 | OpenAI 이미지 API, 기본 모델 `gpt-image-2`, 환경변수 `OPENAI_IMAGE_MODEL`로 대체 가능 |
+| 언어 | 한국어/영어 중심 | `pdf_urls` 기반 다국어. 현재 지원 목록: ko, en, vi, zh, ja, es, fr, ar, sw, hi |
+| 도서 분석 | books 컬럼 직접 저장 일부 | `book_pdf_texts`, `book_analyses` 분리 |
+| Hidden Stories | 탐색 완료만 저장 | 자료별 열람 조건 + `자료 한 줄 정리` + `새로 생긴 궁금증` 저장 후 도장 |
+| 서재 | 공개/비밀 중심 | `library` 메타데이터, 뷰어, 좋아요, 읽기 완료 후 댓글, 공개 범위 관리 |
+| 추가 기능 | 없음 | 캠페인 보드, 마이페이지, 여권, 세계 상식 관리, World Smart 관리 패널 |
 
 ---
 
-# 2. 전체 사용자 흐름
+## 1. 프로젝트 개요
 
+### 한 줄 정의
+
+제3세계 그림책을 읽고, 배경 세계를 탐색하고, 질문을 만들고, 자신만의 그림책을 완성하는 디지털 독서 여권 웹앱.
+
+### 핵심 철학
+
+AI가 정답을 대신 주기보다 학생이 읽고, 묻고, 상상하고, 다시 쓰게 만든다.
+
+### 기술 스택
+
+- 프레임워크: Next.js App Router (`next@16.2.2`)
+- UI: React 19, Tailwind CSS 4, Framer Motion, lucide-react
+- DB/인증/스토리지: Supabase
+- 배포: Vercel
+- 텍스트 AI: OpenAI `gpt-5-mini`, `gpt-5-nano`
+- 이미지 AI: OpenAI 이미지 API, 기본 `gpt-image-2`
+- PDF: `pdfjs-dist`
+
+---
+
+## 2. 전체 사용자 흐름
+
+```text
+홈 /
+  ↓
+로그인 /login
+  ├─ 교사/관리자: 이메일 + 비밀번호
+  └─ 학생: 6자리 코드
+  ↓
+국가/책 선택 /map
+  ↓
+언어 선택 → 책 소개 /book/[id]
+  ↓
+활동 선택 /book/[id]/activity
+  ├─ Step 1 Story Read       /book/[id]/read
+  ├─ Step 2 Hidden Stories   /book/[id]/explore
+  ├─ Step 3 질문 만들기       /book/[id]/questions
+  │     └─ 완료 후 World Smart /book/[id]/world-smart
+  └─ Step 4 My World         /book/[id]/mystory
+        ├─ 토리 채팅
+        ├─ /draft      AI 초안 기반 재작성
+        ├─ /scenes     장면 상상/업로드
+        ├─ /characters 주인공 설정 + 스타일
+        ├─ /style      표지 디자인 + 판형
+        ├─ /creating   이미지 제작 대기
+        ├─ /finish     완성본 편집/번역/공개 설정
+        └─ /complete   최종 확인/공유/PDF 다운로드
+  ↓
+도서관 /library, 여권 /passport, 마이페이지 /mypage
 ```
-[로그인]
-    ↓
-[국가 선택]
-    ↓
-[책 선택 + 언어 선택 (한국어 / 영어)]
-    ↓
-[책 표지 & 소개]
-    ↓
-[3분할 카드 선택 화면]
-  ↙         ↓          ↘
-[Story    [Hidden     [Talk with
- Read]    Stories]    Character]
- 도장1      도장2        도장3
-      ↓ (3개 완료 후)
-[My Story]
-  → Step 1: 활동 선택 + 토리 챗봇 대화 (이야기 재료 수집, gpt-5-nano)
-           5회 대화 → 자동 검증 → 통과 시 제출 → AI 초안 직행
-           ※ Step 2(자유 작성) 제거됨 — 토리 대화가 brainstorming 대체
-  → Step 3: AI 초안 기반 작성 (6장면, 좌:초안 / 우:편집+피드백)
-  → Step 4: 장면 상상하기 ("이 장면을 그림으로 그린다면?")
-  → Step 5: 주인공 설정 (캐릭터 디자인 + 아트 스타일 선택)
-  → Step 6: 표지 디자인
-  → Step 7: 제작 (대기 화면 + 세계 상식)
-  → Step 8: 완성 (텍스트 수정 가능) → 서재 등록 → 도장4 획득
-```
 
 ---
 
-# 3. 권한 구조
-
-## 3단계 역할
+## 3. 권한 구조
 
 | 권한 | 관리자 | 교사 | 학생 |
 |------|--------|------|------|
-| 전역 콘텐츠 등록 | ✅ 즉시 | 승인 요청만 | ❌ |
-| 반 콘텐츠 등록 | ✅ | ✅ 즉시 | ❌ |
-| 학생 계정 발급 | ✅ | ✅ 담당 반만 | ❌ |
-| 전역 승인 검토 | ✅ | ❌ | ❌ |
-| 서재 전체 관리 | ✅ | ❌ | ❌ |
-| 담당 반 서재 관리 | ✅ | ✅ | ❌ |
-| 서재 공개범위 설정 | ✅ 전체 작품 | ✅ 담당 학생 작품 | ✅ 본인 작품 |
-| 서재 좋아요 | ✅ | ✅ | ✅ |
-| 서재 댓글 | ✅ 타인 작품 읽기 완료 시 | ✅ 타인 작품 읽기 완료 시 | ✅ 타인 작품 읽기 완료 시 |
-| 창작 활동 | ❌ | ❌ | ✅ |
+| 이메일/비밀번호 로그인 | 가능 | 가능 | 불가 |
+| 6자리 코드 로그인 | 불가 | 불가 | 가능 |
+| 도서 전역 등록/수정 | 가능 | 승인 요청 또는 반 범위 | 불가 |
+| Hidden Stories 관리 | 전역 관리 | 담당 반/승인 요청 | 불가 |
+| 학생 계정 발급 | 가능 | 담당 학생 | 불가 |
+| 질문 게시판 관리 | 전체 | 담당 반 | 본인 질문/답변 |
+| 캠페인 생성 | 가능 | 가능 | 불가 |
+| 캠페인 참여 | 가능 | 가능 | 가능 |
+| My World 창작 | 불가 | 불가 | 가능 |
+| 서재 공개 범위 변경 | 전체 | 담당 학생 작품 | 본인 작품 |
 
-## 가입 및 계정 흐름
+### 로그인/계정 흐름
 
-```
-관리자 계정 (시드 데이터로 고정 생성)
-    ↓
-교사 이메일 가입 → 자동 승인 → 학교/학년/반 설정
-    ↓
-교사가 학생 계정 일괄 발급 (닉네임 + 6자리 코드)
-    ↓
-학생은 6자리 코드로만 로그인 (별도 가입 없음)
+```text
+관리자 계정
+  ↓
+관리자가 교사 계정 생성/관리
+  ↓
+교사가 학생 계정 일괄 발급
+  ↓
+학생은 6자리 코드로 로그인
+  ↓
+닉네임/아바타가 없으면 자동 닉네임을 보완하거나 온보딩에서 설정
 ```
 
-## 콘텐츠 업로드 승인 로직
-
-```
-교사가 콘텐츠 업로드
-    ↓
-[배포 범위 선택]
-  ├── 우리 반만 → 즉시 배포 ✅
-  └── 전체 공개 → 관리자 승인 요청 발송
-                      ↓
-                관리자 검토 → 승인/반려
-                      ↓
-                승인 시 전체 배포
-```
+현재 코드의 학생 로그인은 Supabase service role로 학생 코드를 조회한 뒤 magic link OTP 세션을 생성한다.
 
 ---
 
-# 4. 언어 선택 구조
+## 4. 실제 라우트 구조
 
-## 책 선택 시 흐름
+### 공통/학생
 
+```text
+/
+/login
+/onboarding
+/map
+/book/[id]
+/book/[id]/activity
+/book/[id]/read
+/book/[id]/explore
+/book/[id]/questions
+/book/[id]/world-smart
+/book/[id]/chat              # 레거시/보조 캐릭터 대화
+/book/[id]/mystory
+/book/[id]/mystory/draft
+/book/[id]/mystory/scenes
+/book/[id]/mystory/characters
+/book/[id]/mystory/style
+/book/[id]/mystory/creating
+/book/[id]/mystory/finish
+/book/[id]/mystory/complete
+/library
+/passport
+/mypage
+/campaign
+/campaign/[id]
+/campaign/[id]/submit
+/guide/prompt-tips
+/guide/character-tips
 ```
-책 클릭 → 언어 선택 모달
-  ┌────────────────────┐
-  │ 이 책의 언어를      │
-  │ 선택해주세요        │
-  │                    │
-  │  [🇰🇷 한국어]       │
-  │  [🇺🇸 English]     │
-  └────────────────────┘
-    ↓
-선택한 언어의 PDF 로드
-+ AI 대화/채팅 전체 해당 언어로 진행
+
+### 교사/관리자
+
+```text
+/teacher
+/admin
+/campaign/create
 ```
 
-## 언어 설정이 영향을 주는 범위
-
-| 영역 | 언어 따라감 |
-|------|------------|
-| 그림책 PDF | ✅ |
-| 질문 만들기 | ✅ |
-| My Story 게이지 채팅 | ✅ |
-| 이야기 초안 생성 | ✅ |
-| UI 텍스트 | ❌ 한국어 고정 (추후 확장 가능) |
-
-## 언어별 PDF 관리
-
-```
-books 테이블
-  - pdf_url_ko  (한국어 PDF)
-  - pdf_url_en  (영어 PDF)
-  - languages_available: ['ko', 'en']
-```
-한국어 PDF만 있어도 등록 가능. 영어 PDF 추가 시 영어 선택지 활성화.
+`proxy.ts` 기준으로 `/book/[id]/activity|read|explore|questions|world-smart|mystory`와 `/passport`는 학생 전용이다.
 
 ---
 
-# 5. 페이지별 상세 설계
-
----
-
-## Page 1 — 로그인 (/login)
-
-- 교사 탭: 이메일 + 비밀번호
-- 학생 탭: 6자리 코드 입력
-- 최초 접속 학생 → 온보딩(닉네임, 아바타) → 국가 선택
-- 재접속 학생 → 바로 국가 선택
-
----
-
-## Page 2 — 국가/책 선택 (/map)
-
-- 세계 지도 or 카드 그리드
-- 열려있는 국가에 마커 표시
-- 국가 클릭 → 해당 국가 책 목록
-- 책 클릭 → 언어 선택 모달 → 표지 & 소개 페이지
-
----
-
-## Page 3 — 책 표지 & 소개 (/book/[id])
-
-- 그림책 표지 이미지
-- 책 제목, 짧은 소개글, 배경 국가 정보
-- 현재 내 도장 현황 미리보기 (0/4)
-- [탐험 시작하기] → 3분할 카드 선택 화면
-
----
-
-## Page 4 — 3분할 카드 선택 (/book/[id]/activity)
-
-**인터랙션:**
-- 3개 카드 가로 배치
-- 기본 상태: 전체 채도 낮음 (흑백/투명)
-- 호버 시: 해당 카드만 컬러, 나머지 더 투명
-- 완료한 탭: 도장 표시
-- My Story: 3개 완료 후 하단에 별도 버튼으로 등장
-
-| 카드 | 이름 | 도장 |
-|------|------|------|
-| 📖 | Story Read | 책 끝까지 읽기 시 도장 1 |
-| 🌍 | Hidden Stories | 탐색 완료 시 도장 2 |
-| ❓ | 질문 만들기 | 내용/인물/세계 질문 작성 시 도장 3 |
-| ✏️ | My Story | 완성 시 도장 4 |
-
----
-
-## Page 5 — Story Read (/book/[id]/read)
-
-- PDF → 페이지 단위 파싱 → 좌우 슬라이더 (책 넘기듯)
-- 구성: 표지 → 그림1 → 텍스트1 → 그림2 → 텍스트2 ...
-- 마지막 페이지 도달 시:
-  - 감정 스티커 5개 (기쁨/슬픔/용기/놀람/화남)
-  - 드래그앤드롭으로 감정 선택
-  - 한 줄 감상 텍스트 입력
-  - 저장 → 도장 1 획득
-
----
-
-## Page 6 — Hidden Stories (/book/[id]/explore)
-
-교사/관리자가 책별로 등록한 탐색 콘텐츠 카드 피드.
-
-**콘텐츠 타입별 처리:**
-
-| 타입 | 처리 방식 |
-|------|-----------|
-| 📹 유튜브 | 앱 안 iframe 재생 |
-| 📄 PDF | 앱 안 뷰어 |
-| 🖼️ 이미지 | 앱 안 확대 보기 |
-| 🔗 외부링크/기사 | 새 탭으로 열기 |
-
-- 일정 수 이상 탐색 완료 시 → 도장 2 획득
-
----
-
-## Page 7 — 질문 만들기 (/book/[id]/questions)
-
-책을 읽고 나서 내용/인물/세계에 대한 질문을 직접 만드는 활동.
-단순한 퀴즈가 아니라, 학생이 스스로 질문을 설계하는 것이 핵심.
-
-### 질문 카테고리 (3개)
-
-```
-┌─────────────────────────────────────────────┐
-│  📖 내용에 대한 질문                          │
-│  "이야기의 내용에 대해 질문을 만들어 보세요"     │
-│                                             │
-│  질문 1: [                              ]    │
-│  [+ 질문 추가] (최대 3개)                     │
-├─────────────────────────────────────────────┤
-│  👤 인물에 대한 질문                          │
-│  "등장인물에 대해 궁금한 것을 질문해 보세요"     │
-│                                             │
-│  질문 1: [                              ]    │
-│  [+ 질문 추가] (최대 3개)                     │
-├─────────────────────────────────────────────┤
-│  🌍 세계(나라)에 대한 질문                     │
-│  "이 나라/문화에 대해 질문을 만들어 보세요"      │
-│                                             │
-│  질문 1: [                              ]    │
-│  [+ 질문 추가] (최대 3개)                     │
-└─────────────────────────────────────────────┘
-```
-
-**도장 3 획득 조건:**
-- 3개 카테고리에 각각 최소 1개 이상 질문 작성
-- [완료하기] 클릭 → 도장 3 획득 → 활동 선택 화면 복귀
-
-**저장:** chat_logs 테이블에 chat_type = 'questions'로 저장
-교사 대시보드에서 학생이 만든 질문 열람 가능
-
----
-
-## Page 8 — My Story: Step 1 질문 만들기 (/book/[id]/mystory)
-
-### 이야기 유형 선택
-```
-[이야기 이어쓰기]
-[주인공으로 새 이야기 써보기]
-[엑스트라 주인공의 뒷이야기 쓰기]
-[결말 바꾸기]
-[기타: 직접 입력]
-```
-
-### 가이드 질문 (챗봇 아님, 구조화된 입력 폼)
-
-유형 선택 후 3가지 가이드 질문을 순서대로 제시한다.
-각 질문에는 짧은 도움말과 예시를 함께 보여준다.
-
-```
-┌─────────────────────────────────────────────┐
-│  📖 내용에 대한 질문                          │
-│                                             │
-│  "이 이야기에서 어떤 부분이 가장 기억에          │
-│   남았나요? 그 장면을 떠올리며 적어보세요."      │
-│                                             │
-│  예시: "루시아가 할머니와 모칠라를 짜는 장면"     │
-│                                             │
-│  [텍스트 입력 영역                        ]    │
-│                                   [다음 →]   │
-├─────────────────────────────────────────────┤
-│  👤 인물에 대한 질문                          │
-│                                             │
-│  "내 이야기에는 누가 나오나요?                  │
-│   어떤 성격인지도 적어보세요."                  │
-│                                             │
-│  [텍스트 입력 영역                        ]    │
-│                                   [다음 →]   │
-├─────────────────────────────────────────────┤
-│  🌍 세계(나라)에 대한 질문                     │
-│                                             │
-│  "이야기가 어디에서 일어나나요?                  │
-│   그곳은 어떤 곳인가요?"                       │
-│                                             │
-│  [텍스트 입력 영역                        ]    │
-│                           [이야기 쓰러 가기 →] │
-└─────────────────────────────────────────────┘
-```
-
-**저장:** 각 답변은 즉시 DB에 저장 (guide_answers). 중간 이탈 후 재진입 시 이어서 작성 가능.
-
----
-
-## Page 9 — My Story: Step 2 이야기 쓰기 (/book/[id]/mystory/write)
-
-### 학생 자유 작성 (챗봇 아님)
-
-학생이 일방적으로 이야기를 써 내려가는 에디터.
-시스템은 주기적으로 상태 피드백을 제공한다.
-
-```
-┌─────────────────────────────────────────────┐
-│  ✏️ 나만의 이야기를 써보세요                    │
-│                                             │
-│  [                                          │
-│   큰 텍스트 입력 영역                         │
-│   학생이 자유롭게 이야기를 써 내려감             │
-│                                          ]  │
-│                                             │
-│  ┌─ 💬 시스템 피드백 ─────────────────────┐  │
-│  │ ✅ 저장되었습니다.                      │  │
-│  │ 💡 장소에 대한 설명을 더 써보면 좋겠어요! │  │
-│  └────────────────────────────────────────┘ │
-│                                             │
-│                       [저장] [이야기 만들기 →] │
-└─────────────────────────────────────────────┘
-```
-
-**시스템 피드백 로직:**
-- [저장] 버튼 클릭 시 자동 저장 + 피드백 1회 생성 (API 호출)
-- 피드백 종류:
-  - "저장되었습니다."
-  - "인물의 감정이나 행동을 더 써보면 좋겠어요."
-  - "장소에 대한 설명을 더 추가해보세요."
-  - "글이 아직 짧아요. 조금 더 써볼까요?"
-  - "좋아요! 이제 이야기를 만들어볼까요?"
-- 충분히 작성되면 [이야기 만들기 →] 버튼 활성화
-
-**[이야기 만들기 →] 클릭 시:**
-- 소형모델 1회 검증 (Step 1 가이드 답변 + Step 2 자유 작성 내용)
-- 통과 → AI 초안 + 조언 동시 생성 후 Step 3으로 이동
-- 미달 → "이런 내용을 조금 더 써보면 좋겠어요" 안내 후 계속 작성
-
----
-
-## Page 10 — My Story: Step 3 AI 초안 기반 이야기 작성 (/book/[id]/mystory/draft)
-
-### AI 초안 + 조언 (1회 생성, 동시에)
-
-Step 2의 학생 자유 작성 내용을 바탕으로 AI가 한 번에 생성:
-- AI 초안: #1 ~ 최대 #6 페이지 (읽기전용)
-- 페이지별 조언: 학생이 쓴 내용에서 더 살릴 수 있는 부분 안내
-
-```
-┌──────────────────────┬──────────────────────────┐
-│  #1 도입              │                          │
-│  AI 초안 (읽기전용)    │  학생 작성 영역            │
-│                      │                          │
-│  옛날 옛적 케냐의      │  [학생이 자유롭게 작성]     │
-│  작은 마을에...        │                          │
-│                      ├──────────────────────────┤
-│                      │  💡 조언                  │
-│                      │  네가 쓴 주인공의 용기에     │
-│                      │  대해 더 자세히 적어봐!     │
-├──────────────────────┼──────────────────────────┤
-│  #2 전개              │                          │
-│  AI 초안 (읽기전용)    │  학생 작성 영역            │
-│                      │                          │
-│  ...                 │  ...                     │
-│                      ├──────────────────────────┤
-│                      │  💡 조언                  │
-│                      │  이 장면에서 주인공이 뭘     │
-│                      │  느꼈는지 써보면 좋겠어!    │
-├──────────────────────┴──────────────────────────┤
-│            [+ 페이지 추가] (최대 6장)              │
-│                                                 │
-│                       [그림 만들러 가기 →]         │
-└─────────────────────────────────────────────────┘
-```
-
-**페이지 관리:**
-- AI가 기본 3장 생성. 학생이 [+] 버튼으로 최대 6장까지 추가 가능
-- 추가된 페이지에는 AI 초안/조언 없이 빈 작성 영역만 제공
-- 최소 3장 유지 (삭제 불가)
-- 각 페이지 작성 내용은 자동 저장 (final_text 배열)
-
-**[그림 만들러 가기 →] 조건:**
-- 최소 3장 이상 작성 완료
-
----
-
-## Page 11 — My Story: Step 4 장면 상상하기 (/book/[id]/mystory/scenes)
-
-각 장면에 대해 "이 장면을 그림으로 그린다면?" 관점으로 학생이 상상을 입력한다.
-프롬프트가 아니라 자유로운 상상 설명 방식.
-
-```
-┌─────────────────────────────────────────────┐
-│  🎨 #1 도입 — 이 장면을 그림으로 그린다면?      │
-│                                             │
-│  [학생이 쓴 텍스트 미리보기]                    │
-│                                             │
-│  ○ 장면을 상상해 보세요                        │
-│    [텍스트 입력: "주인공이 시장에서 놀고 있음,    │
-│     비가 오고 있고 어두운 분위기"]               │
-│                                             │
-│  ○ 내가 그린 그림 올리기 (선택)                 │
-│    [파일 선택] (JPG/PNG, 최대 5MB)            │
-│                                             │
-│                                    [다음 →]  │
-├─────────────────────────────────────────────┤
-│  🎨 #2 전개 — 이 장면을 그림으로 그린다면?      │
-│  ...                                        │
-├─────────────────────────────────────────────┤
-│  ... (6장면)                                 │
-│                                             │
-│                       [주인공 설정하러 가기 →]   │
-└─────────────────────────────────────────────┘
-```
-
-**저장:** 각 페이지의 장면 설명과 업로드 이미지가 즉시 저장됨 (scene_descriptions, uploaded_images 배열).
-중간 이탈 후 재진입 시 이전 상태 유지.
-
----
-
-## Page 11-1 — My Story: Step 5 주인공 설정 (/book/[id]/mystory/characters)
-
-이미지 생성 전 별도 단계. 캐릭터 참조 시트를 만들어 이후 모든 이미지의 일관성 기준으로 사용.
-
-### 아트 스타일 선택 (주인공 설정과 함께)
-```
-┌─────────────────────────────────────────────┐
-│  🖌️ 그림 스타일을 먼저 골라주세요               │
-│                                             │
-│  [🖍️ 색연필]  [🎨 수채화]  [🪵 판화]  [🌸 파스텔] │
-│                                             │
-│  미리보기: [선택한 스타일의 샘플 이미지]          │
-└─────────────────────────────────────────────┘
-```
-
-### 주인공 설정 (최대 3명)
-```
-┌─────────────────────────────────────────────┐
-│  👤 주인공 1                                  │
-│                                             │
-│  이름: [필수 입력]                             │
-│  외형: [쉬운 말로 설명]                         │
-│    예: "갈색 피부, 긴 머리, 전통 옷 입은 소녀"   │
-│  성격/특징: [선택 입력]                         │
-│    예: "용감하고 호기심이 많음"                   │
-│                                             │
-│  [캐릭터 시트 생성하기]                         │
-│  → 결과: [흰 배경, 전신/반신 캐릭터 이미지]      │
-│                                             │
-├─────────────────────────────────────────────┤
-│  👤 주인공 2 (선택)                            │
-│  ...                                        │
-├─────────────────────────────────────────────┤
-│  [+ 주인공 추가] (최대 3명)                     │
-│                                             │
-│                          [표지 만들러 가기 →]   │
-└─────────────────────────────────────────────┘
-```
-
-**캐릭터 시트 생성 프로세스:**
-1. 학생 외형 설명 → GPT-5-mini가 Nanobanana2용 프롬프트로 고도화
-2. 고정 조건: 흰 배경, 캐릭터만, 전신 또는 반신, 선택한 아트 스타일
-3. Nanobanana2로 이미지 생성 → character_refs에 저장
-4. 이후 모든 장면 이미지 생성 시 이 캐릭터 시트를 참조(cref)
-
-**저장:** illustration_style, character_designs (이름/외형/성격/이미지URL) DB 저장.
-
----
-
-## Page 12-1 — My Story: Step 6 표지 디자인 (/book/[id]/mystory/style)
-
-### 표지 디자인
-```
-┌─────────────────────────────────────────────┐
-│  📕 표지를 만들어 볼까요?                      │
-│                                             │
-│  제목: [학생이 입력]                           │
-│  작가: [학생 닉네임 자동 입력]                  │
-│                                             │
-│  표지 그림:                                   │
-│  ○ 내가 그린 그림 올리기                       │
-│  ○ 표지 장면 설명하기                          │
-│    [텍스트 입력]                              │
-│                                             │
-│                            [제작하기! →]       │
-└─────────────────────────────────────────────┘
-```
-
-**저장:** cover_design (제목/작가/표지 이미지 또는 설명) DB 저장.
-아트 스타일은 Step 5에서 이미 선택됨.
-
----
-
-## Page 12-2 — My Story: Step 7 제작 대기 (/book/[id]/mystory/creating)
-
-### 제작 진행
-
-[제작하기!] 클릭 시 서버에서 이미지 생성 시작:
-- 표지 이미지 1장
-- 장면 설명이 있는 페이지의 삽화 (최대 6장)
-- 학생 업로드 그림은 그대로 사용, 비워둔 페이지는 스킵
-
-**제작 시간:** 장수에 따라 2~5분 소요
-
-### 대기 화면 — 세계 상식 카드
-
-```
-┌─────────────────────────────────────────────┐
-│                                             │
-│  📚 이야기를 만들고 있어요...                   │
-│  [■■■■■□□□□□] 3/7 완료                      │
-│                                             │
-│  ┌───────────────────────────────────────┐  │
-│  │  🌍 혹시 이거 알고 있나요?               │  │
-│  │                                       │  │
-│  │  케냐의 마사이족은 소의 수로             │  │
-│  │  부자인지 아닌지를 판단해요.             │  │
-│  │                                       │  │
-│  │              [← 이전]  [다음 →]        │  │
-│  └───────────────────────────────────────┘  │
-│                                             │
-│  ● ○ ○ ○ ○ (5초마다 자동 전환 or 수동 넘기기)  │
-│                                             │
-└─────────────────────────────────────────────┘
-```
-
-**세계 상식 데이터:**
-- 해당 책의 country_id에 맞는 나라 상식 10~20개
-- DB 테이블(country_facts) 또는 JSON 파일로 관리
-- 5초마다 자동 전환, 학생이 수동으로 넘길 수도 있음
-
-**진행 상태 확인:**
-- 5초마다 서버에 진행률 폴링 (GET /api/story/progress?storyId=xxx)
-- 완료 시 자동으로 Step 7 완성 화면으로 이동
-
----
-
-## Page 12-3 — My Story: Step 8 완성 (/book/[id]/mystory/finish)
-
-### 완성된 그림책 미리보기 + 텍스트 수정
-
-```
-┌─────────────────────────────────────────────┐
-│  🎉 이야기가 완성되었어요!                     │
-│                                             │
-│  [표지 이미지]                                │
-│  제목: 마을의 용감한 소녀                      │
-│  글/그림: 학생닉네임                           │
-│                                             │
-├─────────────────────────────────────────────┤
-│  [이미지 1]                                  │
-│  ┌─ 텍스트 1 ──────────────────────────────┐│
-│  │ 옛날 옛적 케냐의 작은 마을에              ││
-│  │ 용감한 소녀가 살았습니다.                  ││
-│  │                            [✏️ 수정]    ││
-│  └──────────────────────────────────────────┘│
-├─────────────────────────────────────────────┤
-│  [이미지 2]                                  │
-│  ┌─ 텍스트 2 ──────────────────────────────┐│
-│  │ 어느 날 소녀는 숲 속에서...               ││
-│  │                            [✏️ 수정]    ││
-│  └──────────────────────────────────────────┘│
-│  ...                                        │
-├─────────────────────────────────────────────┤
-│  공개 설정: [전체 공개 ▼] / [비밀]          │
-│                                             │
-│                    [서재에 등록하기! 🎊]       │
-└─────────────────────────────────────────────┘
-```
-
-**텍스트 수정:**
-- 학생이 쓴 텍스트가 그대로 출력됨
-- [수정] 클릭 시 해당 텍스트 영역이 편집 모드로 전환
-- 수정 후 즉시 저장
-
-**서재 등록 시:**
-- 폭죽 애니메이션
-- 도장 4 획득
-- 여권 해당 국가 페이지 완성
-- 서재 자동 등록
-- 등록 위치: `국가 책장 → 해당 원작 책 섹션 → 학생 작품`
-
-**서재 공개 설정 (학생 선택):**
-- 전체 공개 (기본값)
-- 비밀
-
-**PDF 다운로드:**
-- 작성 언어 버전
-- 번역본 (영어 ↔ 한국어) GPT-5-mini로 생성 후 다운로드
-- 서재에 원본 + 번역본 함께 등록, 언어 토글 버튼 제공
-
-### 중간 저장 & 이어하기
-
-모든 Step(1~7)은 학생 계정별로 즉시 저장된다.
-중간에 나가더라도 재진입 시 마지막 진행 단계로 자동 복귀.
-
-```
-stories.current_step 값 기반 라우팅:
-  1 → /book/[id]/mystory            (활동 선택 + 토리 챗봇 대화)
-  2 → (제거됨 — Step 1에서 직접 Step 3으로 이동)
-  3 → /book/[id]/mystory/draft      (AI 초안 기반 작성)
-  4 → /book/[id]/mystory/scenes     (장면 상상하기)
-  5 → /book/[id]/mystory/characters (주인공 설정 + 스타일)
-  6 → /book/[id]/mystory/style      (표지 디자인)
-  7 → /book/[id]/mystory/creating   (제작 대기)
-  8 → /book/[id]/mystory/finish     (완성)
-```
-
----
-
-## Page 13 — 서재 (/library)
-
-```
-국가/책별 서재
-  └── 콜롬비아 - 와유족 이야기
-        └── [작품A] [작품B] [작품C] ...
-```
-
-### 정보 구조
-```
-[국가 책장]
-  └── [원작 책 섹션]
-        ├── 원작 표지 / 제목 / 작품 수
-        └── [학생 작품] [학생 작품] [학생 작품] ...
-```
-
-- 1단계 계층: 국가별 책장
-- 2단계 계층: 원작 책별 섹션 (`book_id` 기준)
-- 3단계 계층: 해당 원작에서 나온 학생 작품 컬렉션
-- 같은 국가 안에서도 원작 책이 다르면 반드시 섹션을 분리한다
-
-### UX / 디자인 방향
-- Book Creator를 그대로 복제하지 않고, `전시형 그림책 서가` 톤으로 구현
-- 국가 섹션 상단에는 국가 이미지 스트립, 국기, 작품 수를 배치
-- 원작 책 섹션은 원작 표지를 대표 카드처럼 크게 보여준다
-- 학생 작품 카드는 첫 장면 이미지를 표지처럼 사용하고, 얇은 책등 그림자와 hover 모션으로 책 느낌을 준다
-- 모바일에서는 국가 섹션과 원작 책 섹션을 세로 스택으로 배치한다
-
-### 상호작용
-- 클릭 → 그림책 뷰어로 열림
-- 뷰어에서 마지막 페이지까지 도달하면 `읽기 완료`로 기록
-- 언어 토글 버튼 (원본 / 번역본)
-- 좋아요: 로그인 사용자 누구나 가능
-- 댓글: `타인 작품을 끝까지 읽은 사용자`만 가능
-- 자기 작품에는 댓글을 남길 수 없다
-- 댓글은 작품 마지막 페이지 하단에서 작성한다
-
-### 정렬 / 노출 기준
-- 기본 정렬은 원작 책 섹션 안에서 좋아요 순
-- 추후 옵션: 최신순 / 조회순
-- `public` 작품은 로그인 사용자의 도서관에 노출한다
-- `secret` 작품은 작성자, 담당 교사, 관리자에게만 노출한다
-
----
-
-## Page 14 — 교사 대시보드 (/teacher)
-
-### 1단계 — 반 전체 현황
-```
-이름      현재 책          도장   최근활동   알림
-────────────────────────────────────────────
-학생A     콜롬비아-와유족  2/4   오늘
-학생B     탄자니아         4/4✅  어제
-학생C     -               -     미시작
-⚠️학생D   콜롬비아-와유족  1/4   3일전      (플래그)
-```
-필터: 전체 / 진행중 / 완료 / 미시작
-정렬: 최근 활동순 / 완료율순
-
-### 2단계 — 학생 개인 현황 (클릭)
-```
-← 학생A의 활동 기록
-
-📚 콜롬비아 - 와유족    도장 2/4
-  ├── 📖 Story Read        ✅ 완료
-  ├── 🌍 Hidden Stories    ✅ 완료
-  ├── 💬 루시아와 대화     진행중 (3회)
-  │     └── [대화 보기]
-  ├── 💬 할머니와 대화     미시작
-  └── ✏️ My Story          미시작
-```
-
-### 3단계 — 대화 내역 상세 (클릭)
-```
-← 학생A × 루시아  2026.04.07  총 8턴
-
-루시아: 안녕! 나 루시아야. 넌 내 이야기 읽었어?
-학생A:  응 읽었어. 모칠라 짜는 거 신기했어.
-루시아: 맞아, 우리 할머니가 가르쳐줬거든...
-```
-
-### Hidden Stories 관리
-- 책별 콘텐츠 카드 추가/수정/삭제
-- 배포 범위 선택 (우리 반 / 전체 공개 요청)
-- 카드 순서 정렬
-
-### 갤러리
-- 학생 완성작 Masonry 그리드
-- 클릭 시 그림책 뷰어 모달
-- 하트 / 읽기 완료 후 코멘트
-
----
-
-## Page 15 — 관리자 페이지 (/admin)
-
-- 전체 교사 목록 및 관리
-- 전역 콘텐츠 승인 요청 검토 (승인/반려)
-- 전체 책/콘텐츠 직접 등록
-- 전체 서재 관리
-
----
-
-# 6. 독서 여권 & 도장 시스템
-
-```
-책 1권 기준 도장 4개:
-
-📖 도장 1 — Story Read 완료
-🌍 도장 2 — Hidden Stories 탐색 완료
-❓ 도장 3 — 질문 만들기 완료
-✏️ 도장 4 — My Story 완성 (메인 도장)
-```
-
-- 미완성: 점선 원
-- 완성: 채색 도장 + 국가 상징 이미지
-- 4개 모두 완성 → 해당 국가 여권 페이지 완성
-
----
-
-# 7. AI 프롬프트 설계
-
----
-
-## 7-1. 책 등록 시 등장인물 자동 스캔
-
-교사가 PDF 업로드 시 1회 실행. 결과를 DB 저장.
-
-```
-당신은 아동 그림책 분석 전문가입니다.
-아래 그림책 내용을 읽고 다음 항목을 JSON으로만 출력하세요.
-출력 외 다른 텍스트, 마크다운 백틱은 절대 포함하지 마세요.
-
-선별 기준: 감정선이 있고 이야기에서 비중이 큰 인물 2~3명
-조연이더라도 감정 표현이 풍부하면 포함 가능
-배경 인물, 언급만 되는 인물은 제외
-
-{
-  "story_summary": "줄거리 3~5줄",
-  "characters": [
-    {
-      "id": "character_1",
-      "name": "이름",
-      "role": "주인공/조연",
-      "age": "나이 또는 나이대",
-      "personality": ["키워드1", "키워드2", "키워드3"],
-      "speech_style": "말투 설명",
-      "background": "배경 2~3줄",
-      "core_emotion": "핵심 감정",
-      "key_moments": ["장면1", "장면2"],
-      "profile_prompt": "선택 카드용 한 줄 소개"
-    }
-  ],
-  "key_events": ["사건1", "사건2", "사건3"],
-  "emotional_keywords": ["감정1", "감정2", "감정3"],
-  "out_of_scope_topics": ["무관 주제1", "주제2", "주제3"]
-}
-
-[그림책 내용]
-{book_text}
-```
-
----
-
-## 7-2. Talk with Character 시스템 프롬프트
-
-```
-당신은 그림책 속 등장인물 {character.name}입니다.
-초등학생과 대화합니다.
-
-[캐릭터 정보]
-이름: {character.name}
-나이: {character.age}
-성격: {character.personality}
-말투: {character.speech_style}
-배경: {character.background}
-핵심 감정: {character.core_emotion}
-주요 장면: {character.key_moments}
-
-[이야기 배경]
-{story_summary}
-
-[대화 규칙]
-1. 항상 {character.name} 1인칭으로만 말합니다.
-   절대 "저는 AI입니다"라고 말하지 마세요.
-
-2. 감정 전달이 핵심입니다.
-   학생의 말에 캐릭터의 감정을 연결해 응답하세요.
-
-3. 반드시 질문으로 응답을 마무리하세요.
-   - "너라면 어떻게 했을 것 같아?"
-   - "나랑 비슷한 경험 있어?"
-   - "그 장면에서 뭐가 제일 기억에 남았어?"
-
-4. 이야기 밖 내용 대응 ({out_of_scope_topics})
-   상황A (처음 한 번): 모른 척 + 자연스럽게 화제 전환
-   상황B (반복 시도): 부드럽게 거절 + 이야기로 초대
-
-5. 응답 길이: 2~4문장
-
-6. 응답 언어: {language}
-
-[절대 금지]
-- 이야기의 정답/교훈 직접 말하기
-- AI임을 인정하거나 시스템 설명
-- 이야기 내용과 다른 사실 지어내기
-- 부정적이거나 무서운 표현
-```
-
----
-
-## 7-3. 이야기 쓰기 피드백 프롬프트 (Step 2 저장 시 1회)
-
-```
-당신은 초등학생의 이야기 창작을 돕는 친근한 도우미입니다.
-학생이 자유롭게 쓴 이야기 초안을 읽고, 짧은 피드백을 주세요.
-
-[학생이 선택한 이야기 유형]
-{story_type} / 기타: {custom_input}
-
-[Step 1 가이드 답변]
-내용: {guide_content}
-인물: {guide_character}
-세계: {guide_world}
-
-[학생이 자유롭게 쓴 이야기]
-{student_freewrite}
-
-[피드백 규칙]
-1. 칭찬 1문장 + 보완 제안 1문장으로만 응답하세요.
-2. 보완 제안은 아래 우선순위로 하나만 선택:
-   - 글이 50자 미만 → "글이 아직 짧아요. 조금 더 써볼까요?"
-   - 인물 묘사 부족 → "주인공이 어떤 표정이었는지 써보면 좋겠어요."
-   - 장소 묘사 부족 → "그곳이 어떤 곳인지 더 설명해보세요."
-   - 사건 부족 → "그래서 어떤 일이 일어났나요?"
-   - 충분히 작성됨 → "좋아요! 이제 이야기를 만들어볼까요?"
-3. 반드시 반말 사용. 친근한 톤.
-
-응답 언어: {language}
-```
-
----
-
-## 7-4. 소형모델 최종 검증 프롬프트 (Step 2 → Step 3 전환 시 1회)
-
-```
-아래 학생의 가이드 답변과 자유 작성 내용에서
-이야기 재료가 충분한지 판단하세요.
-JSON으로만 출력하세요.
-
-판단 기준:
-- character: 등장인물이 구체적으로 언급됐는가
-- setting:   배경/장소가 언급됐는가
-- conflict:  사건이나 갈등이 있는가
-- ending:    결말 방향이 있는가 (대략적이어도 됨)
-
-[Step 1 가이드 답변]
-내용: {guide_content}
-인물: {guide_character}
-세계: {guide_world}
-
-[Step 2 자유 작성 내용]
-{student_freewrite}
-
-{
-  "character": true/false,
-  "setting": true/false,
-  "conflict": true/false,
-  "ending": true/false,
-  "pass": true/false,
-  "feedback": "미달 항목 한 줄 안내 (없으면 빈 문자열)"
+## 5. 언어 선택 구조
+
+책은 `books.pdf_urls` 맵과 `languages_available` 배열을 기준으로 언어 선택지를 만든다.
+
+```ts
+pdf_urls: {
+  ko?: string;
+  en?: string;
+  vi?: string;
+  zh?: string;
+  ja?: string;
+  es?: string;
+  fr?: string;
+  ar?: string;
+  sw?: string;
+  hi?: string;
 }
 ```
 
----
+`pdf_url_ko`, `pdf_url_en`은 타입에 남아 있지만 deprecated 필드다. 새 구현은 `pdf_urls`를 우선 사용한다.
 
-## 7-5. 이야기 초안 + 조언 동시 생성 프롬프트 (Step 2 → Step 3 전환 시 1회)
-
-```
-당신은 아동 창작 교육 도우미입니다.
-
-[원문 이야기 전체]
-{book_full_text}
-
-[학생이 선택한 활동]
-{story_type} / 기타: {custom_input}
-
-[Step 1 가이드 답변]
-내용: {guide_content}
-인물: {guide_character}
-세계: {guide_world}
-
-[Step 2 학생 자유 작성 내용]
-{student_freewrite}
-
-위 내용을 바탕으로 이야기 초안과 페이지별 조언을 함께 작성하세요.
-
-[초안 작성 규칙]
-1. 의도적으로 부족하게 쓰세요.
-   감정 묘사, 장면 전환, 문장 어색한 곳을 남겨두세요.
-   학생이 직접 채워 넣을 여백이 반드시 있어야 합니다.
-
-2. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
-
-3. 3개 구역으로 나눠 작성하세요.
-
-4. 각 구역은 2~4문장으로만 구성하세요.
-
-[조언 작성 규칙]
-1. 각 구역마다 학생이 자유 작성에서 쓴 내용을 참고해
-   "네가 쓴 ~에 대해 더 자세히 적어봐!" 형태로 작성하세요.
-2. 학생이 쓴 내용에서 살릴 수 있는 부분을 구체적으로 언급하세요.
-3. 각 조언은 1~2문장. 반말, 친근한 톤.
-
-출력 형식 (반드시 JSON으로만 출력):
-{
-  "pages": [
-    {
-      "draft": "1구역 초안 텍스트",
-      "advice": "1구역 조언 텍스트"
-    },
-    {
-      "draft": "2구역 초안 텍스트",
-      "advice": "2구역 조언 텍스트"
-    },
-    {
-      "draft": "3구역 초안 텍스트",
-      "advice": "3구역 조언 텍스트"
-    }
-  ]
-}
-
-응답 언어: {language}
-```
+언어 선택은 책 PDF, 질문 활동, My World 채팅/초안/번역 흐름에 영향을 준다. UI 기본 언어는 한국어다.
 
 ---
 
-## 7-6. 장면 설명 → 이미지 프롬프트 변환 (Step 6 제작 시)
+## 6. 핵심 활동과 도장
 
-```
-학생이 아래와 같이 그림책 장면을 설명했습니다.
-이를 이미지 생성 AI(Nanobanana2)에 맞는 프롬프트로 변환하세요.
+책 1권 기준 도장은 4개다.
 
-[학생의 장면 설명]
-{scene_description}
+| 도장 | 라우트 | 획득 조건 |
+|------|--------|-----------|
+| `read` | `/book/[id]/read` | PDF 마지막까지 읽고 감정/한줄 감상/질문 씨앗 저장 |
+| `hidden` | `/book/[id]/explore` | 모든 Hidden Story 자료 열람 + 자료별 챌린지 기록 |
+| `questions` | `/book/[id]/questions` | 필수 질문 수 충족 + AI 질문 검증 통과 + World Smart 동기화 |
+| `mystory` | `/book/[id]/mystory/*` | 완성본 공유 시 `story_status=completed`, library 등록 |
 
-[학생 이야기 텍스트 (해당 페이지)]
-{page_text}
-
-[고정 조건 — 반드시 포함]
-- 아트 스타일: {illustration_style}
-  (색연필 → colored pencil illustration
-   수채화 → watercolor illustration
-   판화 → woodblock print style
-   파스텔 → soft pastel illustration)
-- 아동 그림책 일러스트 스타일
-- 따뜻하고 밝은 색감
-
-영어 프롬프트로만 출력하세요. 다른 텍스트 없이.
-```
+My World는 앞의 세 도장(`read`, `hidden`, `questions`)을 모두 얻은 뒤 진입 가능하다.
 
 ---
 
-## 7-7. 부적절 내용 플래그 스크리닝
+## 7. 페이지별 요구사항
 
-```
-아래 대화에서 다음 중 하나라도 해당하면 true, 아니면 false만 출력하세요.
-- 욕설 또는 폭력적 표현
-- 개인정보 (전화번호, 주소 등)
-- 성적 내용
-- 자해/위험 관련 내용
+### 7-1. 홈 (`/`)
 
-[대화 내용]
-{messages}
-```
+- 비디오 기반 히어로를 사용한다.
+- 서비스명은 UI에서 `World Stories`로 노출한다.
+- 네 가지 활동, 국가 캐러셀, 여권 쇼케이스, 시작 CTA를 제공한다.
+
+### 7-2. 로그인 (`/login`)
+
+- 학생 탭: 6자리 코드 입력.
+- 교사 탭: 이메일/비밀번호 입력.
+- 관리자 계정도 교사 탭에서 로그인하며 role에 따라 `/admin`으로 이동한다.
+
+### 7-3. 국가/책 선택 (`/map`)
+
+- 국가 카드 그리드와 세계지도 섹션을 함께 제공한다.
+- 국가별 책 수, 진행 중 책 수, 완료 책 수를 보여준다.
+- 책 클릭 시 언어 선택 모달을 연다.
+- 이어하기 배너로 진행 중 도서를 다시 열 수 있다.
+
+### 7-4. 책 소개 (`/book/[id]`)
+
+- 표지, 제목, 국가 정보, 도장 현황 0/4~4/4를 보여준다.
+- `탐험 시작하기`로 활동 선택 화면에 진입한다.
+
+### 7-5. 활동 선택 (`/book/[id]/activity`)
+
+- 3개 메인 카드: Story Read, Hidden Stories, 질문 만들기.
+- 질문 도장 획득 후 `World Smart` 버튼이 열린다.
+- `My World` 카드는 항상 보이지만 앞의 3도장 완료 전에는 잠금 상태다.
+
+### 7-6. Story Read (`/book/[id]/read`)
+
+- 선택 언어의 PDF를 그림책 뷰어로 연다.
+- 마지막 페이지 도달 후 감정, 한 줄 감상, 질문 씨앗을 받는다.
+- `/api/activities/read-complete`가 `activities`의 `read_question_seed`, `emotion`, `one_line`, `read` 도장을 저장한다.
+
+### 7-7. Hidden Stories (`/book/[id]/explore`)
+
+- 교사/관리자가 등록한 영상, PDF, 이미지, 링크 카드 피드.
+- 열람 조건:
+  - 이미지: 10초
+  - PDF: 60초
+  - 링크: 열기
+  - 영상: 콘텐츠 카드 기준 진행 처리
+- 자료별로 `자료 한 줄 정리`, `새로 생긴 궁금증`을 저장한다.
+- 모든 자료를 열람하고 모든 챌린지를 기록해야 `hidden` 도장을 획득한다.
+- 교사는 `hidden_content_class_overrides`로 담당 반에서 특정 전역 자료를 숨길 수 있다.
+
+### 7-8. 질문 만들기 (`/book/[id]/questions`)
+
+- 카테고리: 이야기, 인물, 세계(배경).
+- 각 카테고리 최대 3개 질문.
+- 필수 총 질문 수는 `classes.questions_required_count`로 설정하며 4~11개 사이로 보정된다. 단, 카테고리별 최대 3개 제한 때문에 실제 배분 가능한 필수 질문은 최대 9개다.
+- 기본 분배는 각 카테고리 1개 이상이고, 추가 필수 수는 이야기 → 인물 → 세계 순으로 분배한다.
+- 제출 시 `/api/story/validate-questions`로 질문 품질을 검증한다.
+- 검증 결과는 질문별 피드백 카드로 보여준다.
+- 통과 시 `chat_logs.chat_type='questions'`에 저장하고 `/api/world-smart/sync`로 질문 게시글을 만든다.
+- 완료 후 `/book/[id]/world-smart?posted=1`로 이동한다.
+
+### 7-9. World Smart (`/book/[id]/world-smart`)
+
+- 질문 만들기 결과가 책/반 단위 질문 게시판으로 올라간다.
+- 탭: 전체, 이야기, 인물, 세계.
+- 정렬: 최신순, 인기순, 채택 대기.
+- 다른 학생은 질문에 댓글을 남길 수 있다.
+- 질문 작성자는 마음에 드는 댓글을 채택할 수 있다.
+- 채택 완료 질문에는 새 댓글을 받지 않는다.
+- 내 질문은 채택 전 수정/삭제할 수 있다.
+- 마이페이지에서 채택된 답변 수와 World Smart 배지를 확인한다.
+- 교사/관리자는 관리 패널에서 질문과 답변을 확인하고 답변 숨김/해제 등 moderation을 수행한다.
+
+### 7-10. My World 단계
+
+`current_step`은 레거시 DB 값을 유지한다. 학생에게 보이는 단계는 7개 진행 단계 + 최종 완성 확인이다.
+
+| current_step | 라우트 | 학생 화면 |
+|--------------|--------|----------|
+| 1 | `/mystory` | 이야기 채팅 |
+| 3 | `/mystory/draft` | 이야기 바꿔 쓰기 |
+| 4 | `/mystory/scenes` | 장면 상상하기 |
+| 5 | `/mystory/characters` | 주인공 설정 |
+| 6 | `/mystory/style` | 표지 디자인 |
+| 7 | `/mystory/creating` 또는 `/finish` | 그림책 제작/제작본 편집 |
+| 8 | `/mystory/complete` | 완성하기 |
+
+#### Step 1: 이야기 채팅 (`/book/[id]/mystory`)
+
+- 이야기 유형: 이어쓰기, 주인공으로 새 이야기, 엑스트라 뒷이야기, 결말 바꾸기, 기타.
+- 토리 채팅은 `gpt-5-mini`를 사용한다.
+- `classes.mystory_required_turns` 이후 검증을 시작하고, 이후 3턴마다 재검증한다.
+- 검증은 `gpt-5-nano`와 로컬 휴리스틱을 함께 사용한다.
+- 현재 통과 조건은 `character`와 `conflict`가 true인 경우다. `setting`, `ending`은 참고 항목이다.
+- 부적절한 내용은 `chat_logs.chat_type='story_gauge'` 스냅샷으로 플래그 검사를 수행한다.
+- 통과 후 제출하면 `/api/story/generate-draft`가 5장면 초안을 만든다.
+
+#### Step 2: 이야기 바꿔 쓰기 (`/book/[id]/mystory/draft`)
+
+- AI 초안과 조언을 왼쪽에 보여주고, 학생이 오른쪽에 자기 문장으로 다시 쓴다.
+- 초안은 정확히 5장면: 발단, 전개, 위기, 절정, 결말.
+- 학생 작성은 최소 5장면을 채워야 다음 단계로 이동한다.
+- 최대 6장면까지 추가할 수 있다.
+- `final_text`에 자동 저장한다.
+
+#### Step 3: 장면 상상하기 (`/book/[id]/mystory/scenes`)
+
+- 각 장면별 선택지: 직접 그린 이미지 업로드, 장면 설명, 건너뛰기.
+- 업로드는 JPG/PNG, 5MB 이하.
+- `uploaded_images`, `scene_descriptions`를 저장한다.
+
+#### Step 4: 주인공 설정 (`/book/[id]/mystory/characters`)
+
+- 그림 스타일을 먼저 선택한다.
+- 지원 스타일: 수채화, 거친 드로잉, 파스텔, 콜라주, 판화, 카툰앤코믹, 일본 애니메이션, 2D 치비캐릭터, 캐리커처, 스톱모션 미니어처, 3D 클레이아트, 3D 애니메이션.
+- 주인공은 최대 3명.
+- 이름, 성별, 외형, 성격을 입력한다.
+- 캐릭터 시트 이미지는 `/api/story/generate-image`로 생성하고 `character_designs`에 저장한다.
+
+#### Step 5: 표지 디자인 (`/book/[id]/mystory/style`)
+
+- 제목, 글쓴이, 그림책 형태를 설정한다.
+- 판형: 가로형 4:3, 세로형 3:4, 정사각형 1:1.
+- 표지 이미지 선택지: 직접 업로드, 설명 후 생성, 이미지 없이 진행.
+- 설명 후 생성 모드는 먼저 표지 이미지를 생성해야 다음 단계로 이동한다.
+- 표지 생성 시 캐릭터 이름이 설명에 포함되면 해당 캐릭터 레퍼런스를 우선 사용한다.
+
+#### Step 6: 그림책 제작 (`/book/[id]/mystory/creating`)
+
+- `/api/story/produce`가 서버에서 이미지 제작을 시작한다.
+- `after()`를 사용해 백그라운드 작업으로 전환한다.
+- 장면 이미지는 최대 5개 동시 생성으로 처리한다.
+- 학생 업로드 이미지가 있는 장면은 AI 생성에서 제외한다.
+- 제작 상태는 `production_status`, `production_progress`, `production_heartbeat_at`, `production_error_message`에 저장한다.
+- 화면은 30초 간격으로 진행률을 폴링하고, 나라 상식 카드를 5초마다 전환한다.
+- watchdog은 오래 멈춘 제작 상태를 복구 대상으로 판단한다.
+
+#### Step 7: 제작본 편집 (`/book/[id]/mystory/finish`)
+
+- 표지, 장면 이미지, 텍스트를 책 넘김 형태로 확인한다.
+- 텍스트는 계속 수정할 수 있고 자동 저장된다.
+- 글꼴과 글자 크기를 선택할 수 있다.
+- 영어 번역은 한국어 원본 기준 자동으로 준비하며, 다른 언어 번역도 추가할 수 있다.
+- AI 생성 장면은 개별 재생성할 수 있다. 학생 업로드 이미지는 이 화면에서 재생성하지 않는다.
+- 공개 범위는 `public` 또는 `secret`이다.
+- 최종 확인 단계로 이동하면 `/mystory/complete`로 간다.
+
+#### Step 8: 완성하기 (`/book/[id]/mystory/complete`)
+
+- 원본 그림책과 번역본 다운로드 상태를 확인한다.
+- 원본/번역본 PDF 다운로드는 브라우저 print 기반으로 제공한다.
+- `도서관에 공유하기`를 누르면 `/api/story/publish`가 실행된다.
+- publish 결과:
+  - `stories.story_status='completed'`
+  - `stories.completed_at` 저장
+  - `library` row 생성/업데이트
+  - `activities`에 `mystory` 도장 추가
 
 ---
 
-# 8. DB 구조 (Supabase)
+## 8. 도서관, 여권, 마이페이지
 
-```sql
--- 사용자
+### 도서관 (`/library`)
+
+- 구조: 국가 → 원작 책 → 학생 작품.
+- 공개 작품은 로그인 사용자에게 노출한다.
+- 비밀 작품은 작성자, 담당 교사, 관리자에게만 노출한다.
+- 작품 뷰어에서 마지막 페이지까지 읽으면 `story_read_progress.completed=true`로 기록한다.
+- 좋아요는 로그인 사용자가 사용할 수 있다.
+- 댓글은 타인 작품을 끝까지 읽은 사용자만 작성할 수 있다.
+
+### 여권 (`/passport`)
+
+- 학생 전용 라우트.
+- 국가별로 4도장 상태를 보여준다.
+- 4도장이 모두 있으면 해당 국가 여권 페이지를 완료 상태로 표시한다.
+
+### 마이페이지 (`/mypage`)
+
+- 학생: 통계, 진행 중 My World 초안, 완성 작품, World Smart 배지/질문, 프로필 수정.
+- 교사: 담당 학생 수, 활동 학생, 완성 작품, 플래그 대화 수, 프로필 수정.
+- 학생은 본인 작품의 공개 범위를 관리할 수 있다.
+
+---
+
+## 9. 캠페인
+
+### 사용자 흐름
+
+```text
+/campaign
+  ├─ 캠페인 목록/필터
+  ├─ /campaign/[id] 상세/제출물
+  └─ /campaign/[id]/submit 학생 제출
+
+/campaign/create
+  └─ 교사/관리자 캠페인 생성
+```
+
+### 기능
+
+- 교사/관리자가 캠페인을 만든다.
+- 상태: draft, active, closed.
+- 범위: class, global.
+- 제출 유형: poster, card_news, impression, culture_intro, worksheet, other.
+- 제출 파일: 이미지 또는 PDF.
+- 캠페인별 최대 파일 수와 최대 파일 크기를 설정한다.
+- 학생은 캠페인당 한 번 제출한다.
+- 제출물은 좋아요를 받을 수 있고, 교사/관리자가 featured/hidden 상태를 관리한다.
+- 마감 시간이 지난 캠페인은 참여 접수를 닫는다.
+
+---
+
+## 10. 교사 대시보드 (`/teacher`)
+
+탭 구조:
+
+- 반 전체 현황: 학생별 활동, 도장 수, 플래그 여부.
+- 질문 게시판: World Smart 질문/답변 관리.
+- 계정 관리: 학생 계정 발급/관리.
+- 책/자료 관리: 도서, PDF, 표지, Hidden Stories CRUD, 승인 요청.
+- 도서관 관리: 담당 학생 작품 관리.
+- 캠페인: 캠페인 생성/상태 변경/제출물 확인.
+- 반 설정: My World 검증 시작 턴 수, 질문 필수 수.
+
+교사 도서/자료 관리는 `scope='class'`면 즉시 반에 배포하고, `scope='global'`이면 승인 요청 흐름을 탄다.
+
+---
+
+## 11. 관리자 페이지 (`/admin`)
+
+탭 구조:
+
+- 운영 현황
+- 교사 관리
+- 승인 검토
+- 도서 관리
+- 질문 게시판
+- Hidden Stories
+- 서재 관리
+- 세계 상식
+
+관리자는 전역 도서/Hidden Stories를 직접 관리하고, 교사 요청을 승인/반려하며, 세계 상식과 서재 노출을 운영한다.
+
+---
+
+## 12. DB 구조
+
+핵심 테이블과 현재 의미는 아래와 같다.
+
+```text
 users
-  id, email, role (admin/teacher/student)
-  school, grade, class
-  nickname, avatar        -- 학생
-  teacher_id              -- 학생 FK
-  created_at
+  id, email, role, school, grade, class
+  nickname, avatar, student_code, teacher_id
 
--- 수업
 classes
-  id, teacher_id, class_code
-  school, grade, class_name
+  id, teacher_id, class_code, school, grade, class_name
+  mystory_required_turns
+  questions_required_count
 
--- 책
 books
   id, country_id, title, cover_url
-  pdf_url_ko, pdf_url_en
-  languages_available[]
-  created_by, scope (global/class), class_id
-  approved                -- 전역 승인 여부
+  pdf_urls
+  pdf_url_ko, pdf_url_en                 # deprecated
+  languages_available
+  created_by, scope, class_id, approved
+
+book_pdf_texts
+  book_id, extraction_type, source_language, source_pdf_url, source_hash
+  status, extracted_text, extracted_text_chars, error_message
 
 book_analyses
-  id, book_id, analysis_type
-  source_language, source_pdf_url, source_hash
-  status, model, prompt_version
-  analysis_json           -- 책 전체 분석 결과
-  extracted_text_chars, error_message
+  book_id, analysis_type, source_language, source_pdf_url, source_hash
+  status, model, prompt_version, analysis_json, extracted_text_chars, error_message
 
--- Hidden Stories 콘텐츠
 hidden_content
-  id, book_id, country_id
-  type (video/pdf/image/link)
-  title, url, order
-  created_by, scope (global/class), class_id
-  approved
+  book_id, country_id, type, title, url, order
+  created_by, scope, class_id, approved
 
--- 학생 활동
+hidden_content_class_overrides
+  hidden_content_id, teacher_id, class_id, hidden
+
 activities
-  id, student_id, book_id, country_id, language
-  emotion, one_line
-  completed_tabs[]        -- ['read', 'hidden', 'character']
-  stamps_earned[]
+  student_id, book_id, country_id, language
+  emotion, one_line, read_question_seed
+  explore_challenges
+  completed_tabs, stamps_earned
 
--- 대화 기록
 chat_logs
-  id, student_id, book_id
-  character_id, character_name
-  chat_type               -- 'character' / 'story_gauge'
-  messages                -- JSON [{role, content, timestamp}]
-  language
-  flagged                 -- 부적절 내용 여부
-  created_at, ended_at
+  student_id, book_id, character_id, character_name
+  chat_type: character | story_gauge | questions
+  messages, language, flagged, ended_at
 
--- 이야기 창작
+question_posts
+  book_id, student_id, teacher_id, class_name
+  chat_log_id, question_type, question_text
+  adopted_answer_id
+
+question_answers
+  post_id, student_id, answer_text
+  moderation_status, moderated_by, moderated_at, moderation_reason
+
+question_moderation_logs
+  target_type, target_id, action, moderator_id, moderator_role, reason
+
 stories
-  id, student_id, book_id, country_id, language
-  current_step            -- 1~7 (현재 진행 단계, 이어하기 용)
-  story_type
-  custom_input            -- 기타 선택 시
-  guide_answers           -- JSON {content, character, world} (Step 1 가이드 답변)
-  student_freewrite       -- TEXT (Step 2 자유 작성 내용)
-  ai_draft                -- JSON [{draft, advice}] (Step 3 초안+조언 배열)
-  final_text[]            -- 학생이 완성한 페이지별 텍스트 (Step 3)
-  uploaded_images[]       -- 학생 업로드 이미지 URL (Step 4)
-  scene_descriptions[]    -- 장면 설명 텍스트 (Step 4)
-  scene_images[]          -- AI 생성 삽화 URL (Step 7 제작 후)
-  character_designs       -- JSON [{name, appearance, personality, imageUrl}] (Step 5, 최대 3명)
-  illustration_style      -- 'colored_pencil'/'watercolor'/'woodblock'/'pastel' (Step 5)
-  cover_design            -- JSON {title, author, image_url 또는 description} (Step 6)
-  cover_image_url         -- 생성된 표지 이미지 URL (Step 7 제작 후)
-  translation_text[]      -- 번역본
-  pdf_url_original
-  pdf_url_translated
-  visibility              -- 'public' / 'secret'
-  production_status       -- 'pending'/'processing'/'completed'/'failed' (Step 6)
-  production_progress     -- 0~100 (제작 진행률)
-  created_at
+  student_id, book_id, country_id, language
+  story_status: draft | completed | archived
+  story_type, custom_input
+  chat_log, all_student_messages
+  current_step
+  guide_answers, student_freewrite        # legacy 호환 필드
+  ai_draft, final_text
+  uploaded_images, scene_descriptions, scene_images
+  character_designs, character_refs
+  illustration_style
+  cover_design, cover_image_url
+  production_status, production_progress
+  production_started_at, production_heartbeat_at, production_error_message
+  translation_text, translated_texts
+  pdf_url_original, pdf_url_translated, translated_pdf_urls
+  visibility: public | secret
+  started_at, completed_at, created_at
 
--- 세계 상식 (제작 대기 화면용)
 country_facts
-  id, country_id
-  fact_text               -- "케냐의 마사이족은 소의 수로 부자인지 판단해요."
-  fact_text_en            -- 영어 버전
-  order
+  country_id, fact_text, fact_text_en, order
 
--- 서재
 library
-  id, story_id, country_id, book_id
+  story_id, country_id, book_id
+  story_title, author_nickname, thumbnail_url
   likes, views
 
--- 서재 좋아요
 story_likes
-  id, story_id, user_id
-  created_at
+  story_id, user_id
 
--- 서재 읽기 진행
 story_read_progress
-  id, story_id, user_id
-  last_page              -- 마지막으로 읽은 페이지 index
-  total_pages_snapshot   -- 읽기 완료 판정 기준 페이지 수
-  completed              -- 마지막 페이지 도달 여부
-  completed_at
-  created_at, updated_at
+  story_id, user_id, last_page, total_pages_snapshot, completed, completed_at
 
--- 서재 댓글
 story_comments
-  id, story_id, user_id
-  content
-  created_at
+  story_id, user_id, content
 
--- 승인 요청
 approval_requests
-  id, requester_id
-  content_type            -- 'book' / 'hidden_content'
-  content_id
-  status                  -- 'pending' / 'approved' / 'rejected'
-  created_at, reviewed_at
+  requester_id, content_type, content_id
+  status, reviewer_id, review_note
+  content_title, content_scope, reviewed_at
+
+campaigns
+  title, description, cover_image_url
+  allowed_content_types, tags, status, deadline
+  max_files_per_submission, max_file_size_mb
+  created_by, class_id, scope
+
+campaign_submissions
+  campaign_id, student_id, content_type, title, description, assets, status
+
+campaign_likes
+  submission_id, user_id
 ```
 
 ---
 
-# 9. API 구조
+## 13. 주요 API
 
-| 용도 | API | 비고 |
-|------|-----|------|
-| 등장인물 스캔 | GPT-5-mini | 책 등록 시 1회 |
-| 질문 만들기 | 없음 (AI 불필요) | 학생이 직접 질문 작성 |
-| 토리 챗봇 대화 | gpt-5-nano | Step 1 매 턴 |
-| 소형모델 검증 | gpt-5-nano | Step 1 → Step 3 전환 시 (5회 대화 후) |
-| 초안 + 조언 동시 생성 | gpt-5-mini | Step 1 → Step 3 전환 시 1회 |
-| 표지/삽화 이미지 생성 | Nanobanana2 | Step 6 제작 시 (표지 1장 + 장면 최대 6장) |
-| 번역 | GPT-5-mini | 완성 후 1회 |
-| 부적절 내용 스크리닝 | 소형 저렴 모델 | 세션 종료 시 |
-
----
-
-# 10. 구축 우선순위
-
-```
-1단계 ── 로그인 + 권한 구조 + Supabase 테이블 세팅
-         교사 가입 → 학생 코드 발급 → 로그인 플로우
-
-2단계 ── Story Read
-         PDF 뷰어 + 언어 선택 + 감정표현 + 도장 1
-
-3단계 ── Hidden Stories
-         카드 피드 + 교사 콘텐츠 관리 + 승인 로직 + 도장 2
-
-4단계 ── 질문 만들기
-         등장인물 스캔 + 인물 선택 + AI 챗봇 + 사이드바 + 도장 3
-
-5단계 ── My Story Step 1 (토리 챗봇)
-         유형 선택 + 토리 대화 + 자동 검증 → AI 초안 직행
-
-6단계 ── My Story Step 3
-         초안+조언 생성 + 좌우 에디터 + 페이지 추가
-
-7단계 ── My Story Step 4~5
-         그림 업로드/장면 설명 + 삽화 스타일 + 표지 디자인
-
-8단계 ── My Story Step 6~7 + 서재
-         제작(이미지 생성) + 대기 화면(세계 상식) + 완성(텍스트 수정) + 서재 등록 + 도장 4 + 여권
-
-9단계 ── 교사 대시보드
-         3단계 드릴다운 + 모니터링 + 갤러리
-
-10단계 ─ UI 다듬기
-          지도, 애니메이션, 호버 인터랙션, 여권 디자인
-```
+| 영역 | API |
+|------|-----|
+| 읽기 완료 | `POST /api/activities/read-complete` |
+| 질문 검증 | `POST /api/story/validate-questions` |
+| World Smart 동기화 | `POST /api/world-smart/sync` |
+| World Smart 게시판 | `GET/POST /api/world-smart`, `/api/world-smart/posts/[postId]/*` |
+| My World 채팅 | `POST /api/story/guide-chat` |
+| My World 검증 | `POST /api/story/validate` |
+| 초안 생성 | `POST /api/story/generate-draft` |
+| 이미지 생성 | `POST /api/story/generate-image` |
+| 그림 업로드 | `POST /api/story/upload-drawing` |
+| 제작 시작/재생성 | `POST /api/story/produce` |
+| 제작 진행 | `GET /api/story/progress` |
+| 번역 | `POST /api/story/translate` |
+| 공유/도장 완료 | `POST /api/story/publish` |
+| 도서관 | `GET/POST /api/library`, `/api/library/read-progress` |
+| 캠페인 | `/api/campaign`, `/api/campaign/[id]`, `/api/campaign/[id]/submissions`, `/api/campaign/upload` |
+| 교사 | `/api/teacher/*` |
+| 관리자 | `/api/admin/*` |
 
 ---
 
-# 11. 도서관 리뉴얼 계획
+## 14. AI 설계
 
-## 11-1. 목표
-- 도서관을 단순 카드 모음이 아니라 `국가 > 원작책 > 학생 작품` 구조의 컬렉션으로 재구성한다
-- 학생 작품이 어떤 나라와 어떤 원작 책에서 출발했는지 한눈에 보이게 만든다
-- 좋아요와 읽기 완료 기반 댓글을 통해 가벼운 사회적 상호작용을 제공한다
+### 도서 원문/분석
 
-## 11-2. 구현 범위
-1. 데이터 조회 구조 개편
-   - `library + stories + books + author` 조인
-   - `country_id`로 1차 그룹핑, `book_id`로 2차 그룹핑
-2. 서가 레이아웃 개편
-   - 국가별 책장 섹션
-   - 원작 책 대표 카드
-   - 학생 작품 카드 그리드
-3. 그림책 뷰어 보강
-   - 원본/번역 토글 유지
-   - 마지막 페이지 도달 시 읽기 완료 기록 저장
-4. 사회적 상호작용 규칙 적용
-   - 좋아요는 로그인 사용자 누구나 가능
-   - 댓글은 `타인 작품`을 `끝까지 읽은 뒤`에만 가능
-5. 후속 다듬기
-   - 국가 스트립 이미지, 책 hover, empty state, 모바일 아코디언 최적화
+- PDF 원문 추출 결과는 `book_pdf_texts`에 저장한다.
+- 구조화 분석 결과는 `book_analyses.analysis_json`에 저장한다.
+- 분석에는 줄거리, 상세 줄거리, 배경, 플롯 구조, 인물, 주요 사건, 주제, 중요 사물, 감정 키워드, 범위 밖 주제가 포함된다.
 
-## 11-3. 구현 순서
-1. PRD 기준으로 `/library` 데이터 모델과 그룹핑 구조를 먼저 변경
-2. 국가 섹션과 원작 책 섹션 컴포넌트를 분리
-3. 학생 작품 카드와 뷰어를 리뉴얼
-4. `story_read_progress` 기반 읽기 완료 판정 추가
-5. 읽기 완료 사용자만 댓글 가능하도록 정책과 UI를 연결
-6. 좋아요/조회수/댓글 영역을 다듬고 모바일 UX를 점검
+### 질문 만들기 검증
 
-## 11-4. 필요 에셋
-- 필수 추가 에셋 없음
-- 기존 `countries.image_url`, `books.cover_url`, `story.scene_images`를 그대로 활용 가능
-- 아이콘은 기본 SVG 또는 아이콘 라이브러리로 충분하다
-- 추후 완성도를 높이기 위해 국가별 장식 일러스트를 추가할 수는 있지만, 1차 구현 필수는 아니다
+- 학생 질문을 카테고리별로 검토한다.
+- 결과는 전체 통과 여부, 카테고리별 통과 여부, 질문별 칭찬/문제/힌트/예시를 포함한다.
+- 통과한 질문만 World Smart로 동기화한다.
+
+### 토리 채팅
+
+- 모델: `gpt-5-mini`.
+- 학생이 1~4회 말하는 동안에는 질문을 금지하고 짧은 반응 중심으로 응답한다.
+- 검증에서 부족한 항목이 잡히면 이후 해당 항목 하나만 묻는다.
+- 학생 이야기를 대신 만들거나 방향을 제안하지 않는다.
+
+### 이야기 재료 검증
+
+- 모델: `gpt-5-nano`.
+- 로컬 휴리스틱으로 인물/사건 신호를 보완한다.
+- 현재 pass 기준은 `character && conflict`다.
+
+### 초안 생성
+
+- 모델: `gpt-5-mini`.
+- PDF 원문, 도서 분석, 학생 채팅을 바탕으로 정확히 5장면 JSON을 생성한다.
+- 각 장면은 `draft`, `advice`를 가진다.
+
+### 이미지 생성
+
+- 기본 모델: `gpt-image-2`.
+- `OPENAI_IMAGE_MODEL`로 교체 가능.
+- 장면 이미지는 학생 장면 설명을 최우선 시각 지시로 사용한다.
+- 캐릭터 레퍼런스, 표지 스타일 레퍼런스, 판형 비율을 이미지 생성에 전달한다.
+- 텍스트/말풍선/로고는 장면 이미지에서 금지한다.
+
+### 번역
+
+- 완성본 편집 단계에서 원문과 다른 언어의 번역본을 생성한다.
+- `translation_text`는 영어 레거시 저장소, `translated_texts`는 다국어 저장소다.
 
 ---
 
-*World Docent PRD / 솔로 개발 / 무료 교육용 / 2026.04*
+## 15. 현재 운영/개발 메모
+
+- `Prd.md`의 기준은 로컬 폴더이며, 원격 배포나 DB 실제 상태보다 현재 소스 구조를 우선한다.
+- `/book/[id]/chat`는 코드에 남아 있지만 현재 4도장/여권 완료 기준에는 넣지 않는다.
+- `StampType`은 `read | hidden | questions | mystory`가 기준이다. 과거 `character` 도장 데이터는 레거시로 간주한다.
+- 이미 적용된 migration은 수정하지 않고 새 번호로만 추가한다.
+- Supabase migration README는 일부 최신 migration을 모두 설명하지 않을 수 있으므로 실제 스키마 판단은 `supabase/migrations`와 `src/types/database.ts`를 함께 본다.
+
+---
+
+*World Stories / World Docent PRD — local code aligned, 2026.04.27*

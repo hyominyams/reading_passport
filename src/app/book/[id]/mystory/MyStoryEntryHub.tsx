@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, BookOpen, CheckCircle2, CirclePlus, Clock, History, RotateCcw } from 'lucide-react';
 import { DETAIL_STEP_META, getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
 import BackToActivity from '@/components/book/BackToActivity';
 import type { Language, ProductionStatus, StoryStatus, StoryType } from '@/types/database';
@@ -40,14 +41,20 @@ const STORY_TYPE_LABELS: Record<StoryType, string> = {
 };
 
 const STEP_SHORT_LABELS: Record<number, string> = {
-  1: '채팅',
-  3: '바꿔쓰기',
+  1: '대화',
+  3: '초안',
   4: '장면',
   5: '주인공',
   6: '표지',
   7: '제작',
   8: '완성',
 };
+
+const STEP_DOT_LABELS = DETAIL_STEP_META.map((item, index) => ({
+  ...item,
+  displayIndex: index + 1,
+  shortLabel: STEP_SHORT_LABELS[item.step] ?? item.label,
+}));
 
 /* ── Helpers ── */
 
@@ -171,203 +178,223 @@ export default function MyStoryEntryHub({
   };
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8">
-
-      {/* ── A. Compact Header ── */}
-      <motion.div {...fadeUp(0)}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center rounded-full border border-border bg-muted-light px-3 py-1 text-xs font-heading font-semibold tracking-[0.15em] text-muted">
-                STEP 4
-              </span>
-              <h1 className="text-xl font-heading font-bold text-foreground sm:text-2xl">
-                My World
-              </h1>
-            </div>
-            <p className="mt-1.5 text-sm text-muted">
-              이야기를 이어서 쓰거나, 새로 시작하거나, 완성본을 확인할 수 있어요.
-            </p>
-          </div>
-          <div className="shrink-0 pt-1">
-            <BackToActivity bookId={bookId} language={language} />
-          </div>
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-7 px-4 py-8">
+      <motion.header {...fadeUp(0)} className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <span className="inline-flex items-center rounded-full border border-border bg-white px-3 py-1 text-xs font-heading font-semibold tracking-[0.15em] text-muted">
+            STEP 4
+          </span>
+          <h1 className="mt-3 text-2xl font-heading font-bold text-foreground sm:text-3xl">
+            My World
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+            책의 작가 도슨트와 이야기하고, 다음 활동을 골라 새 그림책으로 이어가요.
+          </p>
         </div>
-      </motion.div>
+        <div className="shrink-0">
+          <BackToActivity bookId={bookId} language={language} />
+        </div>
+      </motion.header>
 
-      {/* ── B. Draft Hero Card / Empty State ── */}
-      {activeDraft ? (
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
         <motion.article
-          {...fadeUp(0.08)}
-          className="rounded-3xl border border-border bg-white p-6 shadow-sm"
+          {...fadeUp(0.06)}
+          className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-7"
         >
-          <p className="text-xs font-heading font-semibold uppercase tracking-[0.2em] text-muted">
-            현재 진행 중인 이야기
-          </p>
-
-          <h2 className="mt-3 text-xl font-heading font-bold text-foreground sm:text-2xl">
-            {activeDraftTitle}
-          </h2>
-
-          {/* Metadata pills */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-foreground/[0.06] px-3 py-1 text-xs font-medium text-foreground">
-              {activeDraftStepLabel}
+          <div className="flex items-start gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-foreground text-white">
+              <CirclePlus className="h-5 w-5" />
             </span>
-            <span className="inline-flex items-center rounded-full bg-muted-light px-3 py-1 text-xs text-muted">
-              시작일 {activeDraftDate}
-            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-heading font-semibold uppercase tracking-[0.2em] text-muted">
+                새 작업
+              </p>
+              <h2 className="mt-1.5 text-xl font-heading font-bold leading-snug text-foreground">
+                책의 작가 도슨트가 기다리고 있어요
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                작가에게 책 속 장면을 묻고, 추천 활동을 골라 나만의 그림책으로 이어가요.
+              </p>
+            </div>
           </div>
 
-          {/* Step Progress Bar */}
-          <div className="mt-6">
-            <div className="flex items-center gap-1">
-              {DETAIL_STEP_META.map((stepMeta, index) => {
-                const isCompleted = activeDraft.current_step > stepMeta.step;
-                const isCurrent = activeDraft.current_step === stepMeta.step;
-                return (
-                  <Fragment key={stepMeta.step}>
-                    <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                        isCompleted
-                          ? 'bg-foreground text-white'
-                          : isCurrent
-                            ? 'bg-foreground/10 text-foreground ring-2 ring-foreground/30'
-                            : 'bg-muted-light text-muted'
-                      }`}
-                    >
-                      {isCompleted ? (
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        index + 1
-                      )}
-                    </div>
-                    {index < DETAIL_STEP_META.length - 1 && (
-                      <div
-                        className={`h-0.5 flex-1 rounded-full ${
-                          isCompleted ? 'bg-foreground/30' : 'bg-border'
-                        }`}
-                      />
-                    )}
-                  </Fragment>
-                );
-              })}
-            </div>
-
-            {/* Step short labels */}
-            <div className="mt-1.5 flex justify-between">
-              {DETAIL_STEP_META.map((stepMeta) => {
-                const isCurrent = activeDraft.current_step === stepMeta.step;
-                return (
-                  <span
-                    key={stepMeta.step}
-                    className={`w-7 text-center text-[10px] leading-tight ${
-                      isCurrent ? 'font-semibold text-foreground' : 'text-muted'
-                    }`}
-                  >
-                    {STEP_SHORT_LABELS[stepMeta.step] ?? ''}
+          <ol className="mt-6 grid gap-3 sm:grid-cols-3">
+            {[
+              ['그림책 작가', '책을 더 깊게 봐요'],
+              ['활동 선택', '이어갈 방향을 골라요'],
+              ['토리 대화', '새 이야기를 들려줘요'],
+            ].map(([title, description], index) => (
+              <li
+                key={title}
+                className="rounded-xl border border-border bg-muted-light/50 px-4 py-3.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-[11px] font-bold text-foreground">
+                    {index + 1}
                   </span>
-                );
-              })}
-            </div>
-          </div>
+                  <p className="text-sm font-bold text-foreground">{title}</p>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted">{description}</p>
+              </li>
+            ))}
+          </ol>
 
-          {/* CTA */}
           <motion.button
-            type="button"
-            onClick={() => void handleContinue()}
-            disabled={continuing || startingFresh}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            className="mt-6 w-full rounded-xl bg-foreground py-3.5 text-center text-sm font-bold text-white shadow-sm transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-10"
-          >
-            {continuing ? '이동 중...' : getDraftActionLabel(activeDraft)}
-          </motion.button>
-        </motion.article>
-      ) : (
-        <motion.div
-          {...fadeUp(0.08)}
-          className="rounded-3xl border border-dashed border-border bg-white px-6 py-14 text-center"
-        >
-          <div className="text-4xl">✏️</div>
-          <h2 className="mt-4 text-lg font-heading font-bold text-foreground">
-            아직 진행 중인 이야기가 없어요
-          </h2>
-          <p className="mt-2 text-sm text-muted">
-            새 이야기를 시작해서 나만의 그림책을 만들어 보세요.
-          </p>
-          <motion.button
-            type="button"
-            onClick={() => void handleStartFresh()}
-            disabled={startingFresh}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="mt-6 rounded-xl bg-foreground px-8 py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-foreground/90 disabled:opacity-50"
-          >
-            {startingFresh ? '만드는 중...' : '새 이야기 시작하기'}
-          </motion.button>
-        </motion.div>
-      )}
-
-      {/* ── C. Start Fresh (secondary, only when draft exists) ── */}
-      {activeDraft && (
-        <motion.div {...fadeUp(0.16)}>
-          <button
             type="button"
             onClick={() => void handleStartFresh()}
             disabled={startingFresh || continuing}
-            className="flex w-full items-center justify-between rounded-2xl border border-border bg-white px-5 py-4 text-left transition-colors hover:bg-muted-light disabled:cursor-not-allowed disabled:opacity-50"
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-6 py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
+            {startingFresh ? '그림책 작가에게 가는 중...' : '그림책 작가 만나러 가기'}
+            <ArrowRight className="h-4 w-4" />
+          </motion.button>
+
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="mt-4 rounded-xl border border-error/20 bg-error/5 px-4 py-3 text-sm text-error"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.article>
+
+        {activeDraft ? (
+          <motion.article
+            {...fadeUp(0.12)}
+            className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-7"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-heading font-semibold uppercase tracking-[0.2em] text-muted">
+                  진행 중
+                </p>
+                <h2 className="mt-1.5 line-clamp-2 text-xl font-heading font-bold leading-snug text-foreground">
+                  {activeDraftTitle}
+                </h2>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted-light/70 px-3 py-1 text-[11px] font-medium text-muted">
+                <Clock className="h-3.5 w-3.5" />
+                {activeDraftDate}
+              </span>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center rounded-full bg-foreground/[0.06] px-2.5 py-1 text-[11px] font-semibold text-foreground">
+                {activeDraftStepLabel}
+              </span>
+              <span className="inline-flex items-center rounded-full border border-border bg-muted-light/60 px-2.5 py-1 text-[11px] text-muted">
+                저장된 진행본
+              </span>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center gap-1">
+                {STEP_DOT_LABELS.map((stepMeta, index) => {
+                  const isCompleted = activeDraft.current_step > stepMeta.step;
+                  const isCurrent = activeDraft.current_step === stepMeta.step;
+
+                  return (
+                    <Fragment key={stepMeta.step}>
+                      <div
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
+                          isCompleted
+                            ? 'bg-foreground text-white'
+                            : isCurrent
+                              ? 'border border-foreground bg-card text-foreground ring-4 ring-foreground/10'
+                              : 'border border-border bg-muted-light text-muted'
+                        }`}
+                      >
+                        {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : stepMeta.displayIndex}
+                      </div>
+                      {index < STEP_DOT_LABELS.length - 1 && (
+                        <div className={`h-0.5 flex-1 rounded-full ${isCompleted ? 'bg-foreground/35' : 'bg-border'}`} />
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </div>
+              <div className="mt-2.5 flex justify-between">
+                {STEP_DOT_LABELS.map((stepMeta) => {
+                  const isCurrent = activeDraft.current_step === stepMeta.step;
+                  return (
+                    <span
+                      key={stepMeta.step}
+                      className={`w-9 text-center text-[10px] leading-tight ${
+                        isCurrent ? 'font-semibold text-foreground' : 'text-muted'
+                      }`}
+                    >
+                      {stepMeta.shortLabel}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-auto pt-6 flex flex-col gap-2.5 sm:flex-row">
+              <motion.button
+                type="button"
+                onClick={() => void handleContinue()}
+                disabled={continuing || startingFresh}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {continuing ? '이동 중...' : getDraftActionLabel(activeDraft)}
+                <ArrowRight className="h-4 w-4" />
+              </motion.button>
+              <button
+                type="button"
+                onClick={() => void handleStartFresh()}
+                disabled={startingFresh || continuing}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-muted transition-colors hover:border-foreground/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RotateCcw className="h-4 w-4" />
+                처음부터
+              </button>
+            </div>
+          </motion.article>
+        ) : (
+          <motion.article
+            {...fadeUp(0.12)}
+            className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/60 p-6 text-center"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card">
+              <BookOpen className="h-5 w-5 text-muted" />
+            </span>
+            <h2 className="mt-4 text-base font-heading font-bold text-foreground">
+              진행 중인 이야기가 없어요
+            </h2>
+            <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
+              새 이야기를 열면 그림책 작가와 바로 만나요.
+            </p>
+          </motion.article>
+        )}
+      </section>
+
+      {completedStories.length > 0 && (
+        <motion.section {...fadeUp(0.2)} className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-bold text-foreground">처음부터 새로 시작하기</p>
-              <p className="mt-0.5 text-xs text-muted">
-                현재 진행본을 보관하고 새 이야기를 시작합니다.
+              <p className="text-xs font-heading font-semibold uppercase tracking-[0.18em] text-muted">
+                완성본
+              </p>
+              <h2 className="mt-2 text-lg font-heading font-bold text-foreground">
+                이전에 완성한 이야기
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                완성한 이야기는 기록으로 남아 있어요.
               </p>
             </div>
-            <svg
-              className="h-5 w-5 shrink-0 text-muted"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          </button>
-        </motion.div>
-      )}
+            <History className="h-5 w-5 text-muted" />
+          </div>
 
-      {/* ── Error Toast ── */}
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm text-error"
-          >
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── D. Completed Stories Grid ── */}
-      <motion.section {...fadeUp(0.24)}>
-        <div className="mb-4">
-          <p className="text-xs font-heading font-semibold uppercase tracking-[0.2em] text-muted">
-            완성본 이력
-          </p>
-          <h2 className="mt-1 text-lg font-heading font-bold text-foreground">
-            완성한 이야기 다시 열기
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            완성한 작품도 다시 열어서 수정할 수 있어요.
-          </p>
-        </div>
-
-        {completedStories.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {completedStories.map((story, index) => {
               const storyTitle =
@@ -378,41 +405,34 @@ export default function MyStoryEntryHub({
                   key={story.id}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.28 + index * 0.06 }}
-                  whileHover={{ y: -4 }}
-                  className="group rounded-2xl border border-border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                  transition={{ delay: 0.24 + index * 0.05 }}
+                  className="rounded-xl border border-border bg-muted-light/40 p-4"
                 >
-                  <span className="inline-flex rounded-full bg-muted-light px-2.5 py-0.5 text-[11px] font-medium text-muted">
+                  <span className="inline-flex rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-muted">
                     {STORY_TYPE_LABELS[story.story_type]}
                   </span>
-
-                  <h3 className="mt-2.5 text-base font-bold text-foreground line-clamp-2">
+                  <h3 className="mt-3 line-clamp-2 text-base font-bold text-foreground">
                     {storyTitle}
                   </h3>
-
-                  <p className="mt-1.5 text-xs text-muted">
+                  <p className="mt-2 text-xs text-muted">
                     {formatKoreanDate(story.completed_at ?? story.created_at)}
                   </p>
-
                   <button
                     type="button"
                     onClick={() => {
                       router.push(getStepRouteWithLang(bookId, 8, story.id, story.language));
                     }}
-                    className="mt-4 w-full rounded-xl border border-border bg-white py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted-light"
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-white py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted-light"
                   >
                     완성본 보기
+                    <ArrowRight className="h-4 w-4" />
                   </button>
                 </motion.article>
               );
             })}
           </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center">
-            <p className="text-sm text-muted">아직 완성된 이야기가 없습니다.</p>
-          </div>
-        )}
-      </motion.section>
+        </motion.section>
+      )}
     </main>
   );
 }

@@ -382,7 +382,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
   return (
     <>
       <MyStoryStepSidebar currentStep={6} busy={saving} onStepSelect={handleStepSelect} />
-      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto">
+      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
       {/* Header */}
       <div className="text-center mb-8">
         <motion.h1

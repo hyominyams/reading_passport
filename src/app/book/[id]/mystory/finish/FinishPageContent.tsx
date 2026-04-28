@@ -595,7 +595,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   return (
     <>
       <MyStoryStepSidebar currentStep={7} busy={saving || translating} onStepSelect={handleStepSelect} />
-      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
+      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
         {/* Step indicator */}
         <div className="px-4 pt-6 pb-2">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">

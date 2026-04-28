@@ -1,4 +1,5 @@
 import type { CampaignStatus } from '@/types/database';
+import { getEffectiveCampaignStatus } from '@/lib/campaign-deadline';
 
 const statusConfig: Record<CampaignStatus, { label: string; classes: string }> = {
   draft: {
@@ -15,8 +16,14 @@ const statusConfig: Record<CampaignStatus, { label: string; classes: string }> =
   },
 };
 
-export default function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
-  const config = statusConfig[status];
+export default function CampaignStatusBadge({
+  status,
+  deadline = null,
+}: {
+  status: CampaignStatus;
+  deadline?: string | null;
+}) {
+  const config = statusConfig[getEffectiveCampaignStatus({ status, deadline })];
   return (
     <span
       className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.2em] ${config.classes}`}

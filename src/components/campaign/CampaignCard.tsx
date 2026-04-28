@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import type { Campaign } from '@/types/database';
+import { getCampaignDeadlineTime } from '@/lib/campaign-deadline';
 import CampaignStatusBadge from './CampaignStatusBadge';
 
 const ACCENT_COLORS = [
@@ -24,9 +25,10 @@ function getAccent(id: string) {
 
 function formatDeadline(deadline: string | null) {
   if (!deadline) return null;
-  const d = new Date(deadline);
+  const deadlineTime = getCampaignDeadlineTime(deadline);
+  if (deadlineTime === null) return null;
   const now = new Date();
-  const diff = d.getTime() - now.getTime();
+  const diff = deadlineTime - now.getTime();
   if (diff < 0) return '마감됨';
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
   if (days === 0) return '오늘 마감';
@@ -76,7 +78,7 @@ export default function CampaignCard({
 
         <div className="p-5">
           <div className="mb-3 flex items-center gap-2">
-            <CampaignStatusBadge status={campaign.status} />
+            <CampaignStatusBadge status={campaign.status} deadline={campaign.deadline} />
             {deadlineLabel && (
               <span className="text-[11px] font-medium text-slate-400">
                 {deadlineLabel}

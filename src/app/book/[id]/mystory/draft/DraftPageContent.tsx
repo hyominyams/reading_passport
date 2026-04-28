@@ -236,7 +236,7 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
   return (
     <>
       <MyStoryStepSidebar currentStep={3} busy={saving} onStepSelect={handleStepSelect} />
-      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto">
+      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}

@@ -18,13 +18,13 @@ export const STEP_ROUTES: Record<number, string> = {
 export const DETAIL_STEP_SEQUENCE = [1, 3, 4, 5, 6, 7, 8] as const;
 export const DETAIL_STEP_TOTAL = DETAIL_STEP_SEQUENCE.length;
 export const DETAIL_STEP_META: Array<{ step: (typeof DETAIL_STEP_SEQUENCE)[number]; label: string }> = [
-  { step: 1, label: '이야기 채팅' },
-  { step: 3, label: '이야기 바꿔 쓰기' },
-  { step: 4, label: '장면 상상하기' },
-  { step: 5, label: '주인공 설정' },
+  { step: 1, label: '작가와 토리 대화' },
+  { step: 3, label: '초안 다듬기' },
+  { step: 4, label: '장면 만들기' },
+  { step: 5, label: '주인공 디자인' },
   { step: 6, label: '표지 디자인' },
   { step: 7, label: '그림책 제작' },
-  { step: 8, label: '완성하기' },
+  { step: 8, label: '완성본 확인' },
 ];
 
 export function getStepRoute(bookId: string, step: number, storyId: string): string {
@@ -48,7 +48,7 @@ export function getDetailStepIndex(step: number): number {
 }
 
 export function getDetailStepLabel(step: number): string {
-  return DETAIL_STEP_META.find((item) => item.step === step)?.label ?? '이야기 채팅';
+  return DETAIL_STEP_META.find((item) => item.step === step)?.label ?? '작가와 토리 대화';
 }
 
 export function getDetailStepProgressLabel(step: number): string {

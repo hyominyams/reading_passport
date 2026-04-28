@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import {
+  getEffectiveCampaignStatus,
+  isCampaignPastDeadline,
+  normalizeCampaignDeadlineInput,
+} from '@/lib/campaign-deadline';
 import type { Campaign, CampaignContentType, CampaignStatus, ContentScope } from '@/types/database';
 
 // ── Types ──
@@ -193,7 +198,7 @@ export default function TeacherCampaignManager() {
           description: formDescription.trim(),
           allowed_content_types: formTypes,
           tags: formTags.split(',').map((t) => t.trim()).filter(Boolean).slice(0, 5),
-          deadline: formDeadline || null,
+          deadline: normalizeCampaignDeadlineInput(formDeadline),
           max_files_per_submission: formMaxFiles,
           max_file_size_mb: formMaxSize,
           scope: formScope,
@@ -381,7 +386,8 @@ export default function TeacherCampaignManager() {
   // ── DETAIL VIEW ──
 
   if (view === 'detail' && selectedCampaign) {
-    const isExpired = selectedCampaign.deadline && new Date(selectedCampaign.deadline) < new Date();
+    const effectiveStatus = getEffectiveCampaignStatus(selectedCampaign);
+    const isExpired = isCampaignPastDeadline(selectedCampaign.deadline);
 
     return (
       <div className="space-y-6">
@@ -399,8 +405,8 @@ export default function TeacherCampaignManager() {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-bold text-foreground">{selectedCampaign.title}</h3>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[selectedCampaign.status]}`}>
-                  {STATUS_LABEL[selectedCampaign.status]}
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[effectiveStatus]}`}>
+                  {STATUS_LABEL[effectiveStatus]}
                 </span>
               </div>
               <p className="mt-2 text-sm text-muted">{selectedCampaign.description}</p>
@@ -534,20 +540,23 @@ export default function TeacherCampaignManager() {
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
-            {campaigns.map((campaign) => (
-              <article
-                key={campaign.id}
-                onClick={() => openDetail(campaign.id)}
-                className="cursor-pointer rounded-2xl border border-border p-5 transition-colors hover:bg-muted-light/50"
-              >
+            {campaigns.map((campaign) => {
+              const effectiveStatus = getEffectiveCampaignStatus(campaign);
+
+              return (
+                <article
+                  key={campaign.id}
+                  onClick={() => openDetail(campaign.id)}
+                  className="cursor-pointer rounded-2xl border border-border p-5 transition-colors hover:bg-muted-light/50"
+                >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h4 className="truncate text-sm font-semibold text-foreground">
                         {campaign.title}
                       </h4>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[campaign.status]}`}>
-                        {STATUS_LABEL[campaign.status]}
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[effectiveStatus]}`}>
+                        {STATUS_LABEL[effectiveStatus]}
                       </span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs text-muted">
@@ -577,8 +586,9 @@ export default function TeacherCampaignManager() {
                     ))}
                   </div>
                 )}
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

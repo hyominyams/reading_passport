@@ -48,6 +48,14 @@
    - 책 PDF 원문 추출 결과를 `book_pdf_texts` 테이블에 분리 저장합니다.
    - 원문 추출 상태/오류를 교사 및 관리자 대시보드에서 확인할 수 있게 합니다.
 
+14. `031_hidden_content_class_overrides.sql`
+   - 교사가 관리자/전체 공개 Hidden Stories 자료를 학급별로 숨길 수 있는 override 테이블을 추가합니다.
+   - 학생 Step 2 탐색에서는 선택 학급에서 숨김 처리된 자료가 제외됩니다.
+
+15. `032_docent_meeting_story_fields.sql`
+   - Step 4의 `작가와의 만남` 대화, 추천 활동 3개, 학생이 선택한 활동을 `stories`에 분리 저장합니다.
+   - 기존 토리 채팅 로그와 섞이지 않도록 `docent_chat_log`, `docent_recommendations`, `selected_activity`를 추가합니다.
+
 ## 원격 DB 상태 점검
 
 - 애플리케이션 레벨 점검은 `npx tsx scripts/check-books.ts` 또는 `npx tsx scripts/check-db-health.ts`로 확인합니다.

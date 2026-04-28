@@ -5,6 +5,7 @@ import {
   FileImage,
   FileText,
   Link2,
+  MoveRight,
   PlayCircle,
   Upload,
 } from 'lucide-react';
@@ -66,8 +67,11 @@ export default function HiddenContentManager() {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | ContentType>('all');
+  const [bookFilter, setBookFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<HiddenContentRow | null>(null);
+  const [movingItem, setMovingItem] = useState<HiddenContentRow | null>(null);
+  const [moveTargetBookId, setMoveTargetBookId] = useState('');
   const [form, setForm] = useState<HiddenContentFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -113,6 +117,9 @@ export default function HiddenContentManager() {
       if (typeFilter !== 'all' && item.type !== typeFilter) {
         return false;
       }
+      if (bookFilter !== 'all' && item.book_id !== bookFilter) {
+        return false;
+      }
 
       if (!normalizedQuery) {
         return true;
@@ -131,7 +138,7 @@ export default function HiddenContentManager() {
 
       return haystack.includes(normalizedQuery);
     });
-  }, [content, query, typeFilter]);
+  }, [bookFilter, content, query, typeFilter]);
 
   const counts = useMemo(() => ({
     total: content.length,
@@ -248,6 +255,35 @@ export default function HiddenContentManager() {
     }
   };
 
+  const handleMove = async () => {
+    if (!movingItem || !moveTargetBookId) {
+      setError('이동할 도서를 선택해주세요');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/hidden-content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: movingItem.id,
+          targetBookId: moveTargetBookId,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '자료 이동에 실패했습니다');
+      }
+
+      setMovingItem(null);
+      setMoveTargetBookId('');
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -306,6 +342,18 @@ export default function HiddenContentManager() {
               placeholder="제목, 책, 국가 검색"
               className="min-w-[220px] rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-200"
             />
+            <select
+              value={bookFilter}
+              onChange={(event) => setBookFilter(event.target.value)}
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-200"
+            >
+              <option value="all">모든 도서</option>
+              {books.map((book) => (
+                <option key={book.id} value={book.id}>
+                  {book.title}
+                </option>
+              ))}
+            </select>
             <select
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value as 'all' | ContentType)}
@@ -384,6 +432,17 @@ export default function HiddenContentManager() {
                         className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
                         수정
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMovingItem(item);
+                          setMoveTargetBookId(books.find((book) => book.id !== item.book_id)?.id ?? '');
+                        }}
+                        className="inline-flex items-center gap-1 rounded-2xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <MoveRight className="h-3.5 w-3.5" />
+                        옮기기
                       </button>
                       <button
                         type="button"
@@ -564,6 +623,68 @@ export default function HiddenContentManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {movingItem ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+          <div className="w-full max-w-lg rounded-[32px] border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-lg font-heading font-semibold text-slate-950">
+                  다른 책으로 자료 옮기기
+                </h4>
+                <p className="mt-1 text-sm text-slate-500">{movingItem.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMovingItem(null);
+                  setMoveTargetBookId('');
+                }}
+                className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              >
+                ×
+              </button>
+            </div>
+
+            <label className="mb-2 block text-sm font-medium text-slate-900">이동할 도서</label>
+            <select
+              value={moveTargetBookId}
+              onChange={(event) => setMoveTargetBookId(event.target.value)}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-200"
+            >
+              <option value="">도서를 선택하세요</option>
+              {books
+                .filter((book) => book.id !== movingItem.book_id)
+                .map((book) => (
+                  <option key={book.id} value={book.id}>
+                    {book.title}
+                  </option>
+                ))}
+            </select>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMovingItem(null);
+                  setMoveTargetBookId('');
+                }}
+                className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleMove()}
+                disabled={!moveTargetBookId}
+                className="flex-1 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+              >
+                옮기기
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

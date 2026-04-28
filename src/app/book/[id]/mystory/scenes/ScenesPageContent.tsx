@@ -286,7 +286,7 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
   return (
     <>
       <MyStoryStepSidebar currentStep={4} busy={saving} onStepSelect={handleStepSelect} />
-      <div className="flex-1 flex justify-center">
+      <div className="flex-1 flex justify-center lg:mr-[22rem] xl:mr-[25rem]">
       <main className="flex-1 px-4 py-8 max-w-3xl">
         {/* Header */}
         <div className="mb-8">

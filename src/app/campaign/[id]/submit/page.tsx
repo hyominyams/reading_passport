@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import SubmissionForm from '@/components/campaign/SubmissionForm';
+import { isCampaignParticipationOpen } from '@/lib/campaign-deadline';
 import type { Campaign } from '@/types/database';
 
 export default function CampaignSubmitPage() {
@@ -21,7 +22,7 @@ export default function CampaignSubmitPage() {
           return;
         }
         const data = await res.json();
-        if (data.campaign.status !== 'active') {
+        if (!isCampaignParticipationOpen(data.campaign)) {
           router.replace(`/campaign/${params.id}`);
           return;
         }

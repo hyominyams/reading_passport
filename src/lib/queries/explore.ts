@@ -1,6 +1,29 @@
 import { createClient } from '@/lib/supabase/server';
 import type { HiddenContent } from '@/types/database';
 
+type QueryError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
+
+function isMissingOverridesTable(error: QueryError) {
+  return (
+    error.code === 'PGRST205'
+    && error.message?.includes('hidden_content_class_overrides')
+  );
+}
+
+function normalizeQueryError(error: QueryError) {
+  return {
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+  };
+}
+
 export async function getHiddenContent(
   bookId: string,
   classId?: string
@@ -32,7 +55,28 @@ export async function getHiddenContent(
     return [];
   }
 
-  return (data ?? []) as HiddenContent[];
+  const contents = (data ?? []) as HiddenContent[];
+
+  if (!classId || contents.length === 0) {
+    return contents;
+  }
+
+  const { data: overrides, error: overrideError } = await supabase
+    .from('hidden_content_class_overrides')
+    .select('hidden_content_id')
+    .eq('class_id', classId)
+    .eq('hidden', true)
+    .in('hidden_content_id', contents.map((item) => item.id));
+
+  if (overrideError) {
+    if (!isMissingOverridesTable(overrideError)) {
+      console.error('Error fetching hidden content overrides:', normalizeQueryError(overrideError));
+    }
+    return contents;
+  }
+
+  const hiddenIds = new Set((overrides ?? []).map((item) => item.hidden_content_id as string));
+  return contents.filter((item) => !hiddenIds.has(item.id));
 }
 
 export async function markExplorationComplete(

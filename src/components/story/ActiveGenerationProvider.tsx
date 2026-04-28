@@ -54,6 +54,7 @@ export default function ActiveGenerationProvider({ children }: { children: React
   const pathname = usePathname();
   const [toast, setToast] = useState<ToastState | null>(null);
   const lastObservedStatusRef = useRef<Map<string, ActiveProduction['status']>>(new Map());
+  const isReviewPage = pathname.includes('/mystory/finish');
 
   const checkActiveProduction = useCallback(async () => {
     if (loading || !isStudent) {
@@ -132,7 +133,7 @@ export default function ActiveGenerationProvider({ children }: { children: React
       {children}
 
       <AnimatePresence>
-        {toast && (
+        {toast && !isReviewPage && (
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

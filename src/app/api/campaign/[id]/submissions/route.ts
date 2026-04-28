@@ -7,6 +7,7 @@ import {
   getSubmissionLikeCounts,
   getUserLikedSubmissions,
 } from '@/lib/queries/campaign';
+import { isCampaignParticipationOpen } from '@/lib/campaign-deadline';
 
 export async function GET(
   _request: NextRequest,
@@ -50,12 +51,15 @@ export async function POST(
   }
 
   const campaign = await getCampaign(id);
-  if (!campaign || campaign.status !== 'active') {
-    return NextResponse.json({ error: 'Campaign not found or not active' }, { status: 404 });
+  if (!campaign) {
+    return NextResponse.json({ error: '캠페인을 찾을 수 없습니다.' }, { status: 404 });
   }
 
-  if (campaign.deadline && new Date(campaign.deadline) < new Date()) {
-    return NextResponse.json({ error: 'Campaign deadline has passed' }, { status: 400 });
+  if (!isCampaignParticipationOpen(campaign)) {
+    return NextResponse.json(
+      { error: '이 캠페인은 참여할 수 없습니다.' },
+      { status: 400 }
+    );
   }
 
   const body = await request.json();
