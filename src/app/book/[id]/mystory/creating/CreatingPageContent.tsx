@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -5,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import StoryPurposeCoach from '@/components/story/StoryPurposeCoach';
+import type { LibraryStoryItem } from '@/components/story/LibraryGrid';
 import { createClient } from '@/lib/supabase/client';
 import { getDetailStepProgressLabel } from '@/lib/mystory-steps';
 import type { Story, CountryFact } from '@/types/database';
@@ -66,6 +68,31 @@ function splitFactIntoLines(text: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+function getLibraryPreviewCover(item: LibraryStoryItem) {
+  return (
+    item.thumbnail_url?.trim()
+    || item.story.cover_image_url?.trim()
+    || item.story.cover_design?.image_url?.trim()
+    || item.story.uploaded_images?.find((url) => typeof url === 'string' && url.trim().length > 0)
+    || item.story.scene_images?.find((url) => typeof url === 'string' && url.trim().length > 0)
+    || item.book?.cover_url?.trim()
+    || null
+  );
+}
+
+function getLibraryPreviewTitle(item: LibraryStoryItem) {
+  return (
+    item.story_title?.trim()
+    || item.story.cover_design?.title?.trim()
+    || item.story.final_text?.find((page) => page.trim().length > 0)?.slice(0, 24)
+    || '이야기'
+  );
+}
+
+function getLibraryPreviewAuthor(item: LibraryStoryItem) {
+  return item.author_nickname?.trim() || item.story.author?.nickname?.trim() || '작성자';
+}
+
 export default function CreatingPageContent({
   storyId,
   lang,
@@ -84,6 +111,8 @@ export default function CreatingPageContent({
   const [facts, setFacts] = useState<CountryFact[]>([]);
   const [factIndex, setFactIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [libraryPreviewItems, setLibraryPreviewItems] = useState<LibraryStoryItem[]>([]);
+  const [libraryPreviewLoading, setLibraryPreviewLoading] = useState(false);
 
   const produceCalledRef = useRef(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -157,6 +186,51 @@ export default function CreatingPageContent({
     };
     fetchFacts();
   }, [story?.country_id]);
+
+  useEffect(() => {
+    if (loading || !story) return;
+
+    let active = true;
+
+    const fetchLibraryPreview = async () => {
+      setLibraryPreviewLoading(true);
+
+      try {
+        const res = await fetch('/api/library', { cache: 'no-store' });
+
+        if (!active) return;
+
+        if (!res.ok) {
+          setLibraryPreviewItems([]);
+          return;
+        }
+
+        const payload = (await res.json()) as { items?: LibraryStoryItem[] };
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        const previewItems = items
+          .filter((item) => item.story_id !== storyId)
+          .filter((item) => item.story.student_id !== story.student_id)
+          .slice(0, 6);
+
+        setLibraryPreviewItems(previewItems);
+      } catch (previewError) {
+        console.error('Failed to load library preview:', previewError);
+        if (active) {
+          setLibraryPreviewItems([]);
+        }
+      } finally {
+        if (active) {
+          setLibraryPreviewLoading(false);
+        }
+      }
+    };
+
+    void fetchLibraryPreview();
+
+    return () => {
+      active = false;
+    };
+  }, [loading, story, storyId]);
 
   // Auto-rotate carousel
   useEffect(() => {
@@ -340,7 +414,7 @@ export default function CreatingPageContent({
   return (
     <>
       <StoryPurposeCoach storyId={storyId} />
-      <main className="flex-1 px-4 py-8 max-w-lg mx-auto flex flex-col items-center lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
+      <main className="flex-1 px-4 py-8 max-w-lg mx-auto flex flex-col items-center xl:ml-auto xl:mr-[22rem] 2xl:mr-[25rem]">
       {/* Animated book icon */}
       <motion.div
         animate={{ rotate: [0, -5, 5, -5, 0] }}
@@ -372,15 +446,6 @@ export default function CreatingPageContent({
           : 'AI가 그림책을 그리고 있어요. 잠시만 기다려 주세요!'}
       </p>
 
-      <a
-        href="/library"
-        target="_blank"
-        rel="noreferrer"
-        className="mb-8 inline-flex h-11 items-center rounded-full border border-border bg-white px-5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted-light"
-      >
-        {lang === 'en' ? 'Visit library' : '서재 보러가기'}
-      </a>
-
       {/* Progress bar */}
       <div className="w-full mb-3">
         <div className="h-4 bg-muted-light rounded-full overflow-hidden">
@@ -402,6 +467,75 @@ export default function CreatingPageContent({
             : '준비 중...'}
       </p>
       <p className="text-xs text-muted mb-8">{progress}%</p>
+
+      <section className="w-full mb-8 rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-bold text-foreground">
+            {lang === 'en' ? "Friends' stories" : '친구들의 이야기'}
+          </h2>
+          <button
+            type="button"
+            onClick={() => router.push('/library')}
+            className="inline-flex min-h-11 items-center rounded-full border border-border bg-white px-4 text-xs font-semibold text-foreground transition-colors hover:bg-muted-light"
+          >
+            {lang === 'en' ? 'Visit library' : '서재 보러가기'}
+          </button>
+        </div>
+
+        {libraryPreviewLoading ? (
+          <div className="mt-4 flex gap-3 overflow-hidden">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="w-24 shrink-0 animate-pulse sm:w-28">
+                <div className="aspect-[3/4] rounded-xl bg-muted-light" />
+                <div className="mt-2 h-3 rounded bg-muted-light" />
+                <div className="mt-1 h-2 w-2/3 rounded bg-muted-light" />
+              </div>
+            ))}
+          </div>
+        ) : libraryPreviewItems.length > 0 ? (
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+            {libraryPreviewItems.map((item) => {
+              const cover = getLibraryPreviewCover(item);
+              const title = getLibraryPreviewTitle(item);
+              const author = getLibraryPreviewAuthor(item);
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => router.push('/library')}
+                  className="w-24 shrink-0 text-left sm:w-28"
+                  aria-label={`${title} 서재에서 보기`}
+                >
+                  <div className="aspect-[3/4] overflow-hidden rounded-xl bg-muted-light">
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt={title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-3xl opacity-40">
+                        📖
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs font-semibold leading-snug text-foreground">
+                    {title}
+                  </p>
+                  <p className="mt-0.5 line-clamp-1 text-[11px] text-muted">
+                    {author}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl bg-muted-light px-4 py-5 text-center text-sm text-muted">
+            {lang === 'en' ? 'No shared stories yet.' : '아직 친구들의 이야기가 없어요.'}
+          </p>
+        )}
+      </section>
 
       {/* Error state */}
       {error && (

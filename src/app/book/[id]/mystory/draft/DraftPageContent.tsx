@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import MyStoryActionDock from '@/components/story/MyStoryActionDock';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
 import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
@@ -236,7 +237,7 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
   return (
     <>
       <MyStoryStepSidebar currentStep={3} busy={saving} onStepSelect={handleStepSelect} />
-      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
+      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto xl:ml-auto xl:mr-[22rem] 2xl:mr-[25rem]">
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -271,7 +272,7 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
               {index >= 5 && pages.length > 5 && (
                 <button
                   onClick={() => removePage(index)}
-                  className="text-red-400 hover:text-red-600 text-sm"
+	                  className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-red-400 hover:text-red-600"
                 >
                   삭제
                 </button>
@@ -303,7 +304,7 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
                   value={page.studentText}
                   onChange={(e) => updatePageText(index, e.target.value)}
                   placeholder="여기에 이야기를 써보세요..."
-                  className="w-full min-h-[120px] p-3 border border-gray-200 rounded-lg text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+	                  className="min-h-[140px] w-full resize-y rounded-lg border border-gray-200 p-4 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
                 />
 
                 {/* Advice */}
@@ -325,26 +326,29 @@ export default function DraftPageContent({ storyId }: { storyId: string | null }
       {pages.length < 6 && (
         <button
           onClick={addPage}
-          className="w-full mt-4 py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors text-sm"
+	          className="mt-4 min-h-11 w-full rounded-xl border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
         >
           + 페이지 추가 ({pages.length}/6)
         </button>
       )}
 
-      {/* Footer actions */}
-      <div className="mt-8 flex items-center justify-between">
-        <p className="text-sm text-gray-400">
-          {filledCount}/{pages.length} 페이지 작성 완료
-          {filledCount < 5 && ' (최소 5페이지 필요)'}
-        </p>
+      {/* Footer actions — sticky dock on mobile, inline on md+ */}
+      <MyStoryActionDock
+        info={
+          <>
+            {filledCount}/{pages.length} 페이지 작성 완료
+            {filledCount < 5 && ' (최소 5페이지 필요)'}
+          </>
+        }
+      >
         <button
           onClick={handleNext}
           disabled={!canProceed}
-          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+          className="min-h-11 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
         >
           장면 상상하러 가기
         </button>
-      </div>
+      </MyStoryActionDock>
       </main>
     </>
   );

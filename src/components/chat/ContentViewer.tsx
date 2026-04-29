@@ -54,7 +54,7 @@ export default function ContentViewer({
               </h2>
               <button
                 onClick={onClose}
-                className="flex-shrink-0 w-8 h-8 rounded-full bg-muted-light hover:bg-border flex items-center justify-center text-muted hover:text-foreground transition-colors text-lg"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-muted-light text-lg text-muted transition-colors hover:bg-border hover:text-foreground"
                 aria-label="닫기"
               >
                 &times;
@@ -105,7 +105,7 @@ export default function ContentViewer({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={onOpenExternal}
-                    className="px-6 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
                   >
                     링크 열기 &rarr;
                   </a>

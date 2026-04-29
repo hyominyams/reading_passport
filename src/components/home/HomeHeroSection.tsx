@@ -52,6 +52,14 @@ export default function HomeHeroSection() {
   }, [hasStarted]);
 
   useEffect(() => {
+    const autoStartId = window.setTimeout(() => {
+      startHeroVideo();
+    }, 0);
+
+    return () => window.clearTimeout(autoStartId);
+  }, [startHeroVideo]);
+
+  useEffect(() => {
     const { body, documentElement } = document;
     const previousBodyOverflow = body.style.overflow;
     const previousHtmlOverflow = documentElement.style.overflow;
@@ -142,7 +150,7 @@ export default function HomeHeroSection() {
       <video
         ref={videoRef}
         muted
-        preload="auto"
+        preload="metadata"
         playsInline
         onEnded={handleVideoEnded}
         onTimeUpdate={handleVideoTimeUpdate}

@@ -62,7 +62,7 @@ export default function ExplorationProgress({
             animate={{ opacity: 1, y: 0 }}
             onClick={onComplete}
             disabled={isCompleting}
-            className="w-full py-2.5 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark disabled:opacity-50 transition-colors"
+            className="min-h-11 w-full rounded-xl bg-secondary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-secondary-dark disabled:opacity-50"
           >
             {isCompleting ? '처리 중...' : '🔍 탐험 스탬프 받기'}
           </motion.button>

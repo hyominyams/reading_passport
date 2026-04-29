@@ -1,20 +1,46 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import type { User, Activity, Book, ChatLog } from '@/types/database';
 
 import StudentTable from '@/components/teacher/StudentTable';
-import StudentDetail from '@/components/teacher/StudentDetail';
-import ChatHistoryView from '@/components/teacher/ChatHistoryView';
-import ContentManager from '@/components/teacher/ContentManager';
-import StudentCreator from '@/components/teacher/StudentCreator';
-import TeacherLibraryManager from '@/components/teacher/TeacherLibraryManager';
-import ClassSettingsPanel from '@/components/teacher/ClassSettingsPanel';
-import TeacherCampaignManager from '@/components/teacher/TeacherCampaignManager';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import WorldSmartManagementPanel from '@/components/world-smart/WorldSmartManagementPanel';
+
+function PanelLoading() {
+  return (
+    <div className="flex justify-center py-12">
+      <LoadingSpinner message="불러오는 중..." />
+    </div>
+  );
+}
+
+const StudentDetail = dynamic(() => import('@/components/teacher/StudentDetail'), {
+  loading: PanelLoading,
+});
+const ChatHistoryView = dynamic(() => import('@/components/teacher/ChatHistoryView'), {
+  loading: PanelLoading,
+});
+const ContentManager = dynamic(() => import('@/components/teacher/ContentManager'), {
+  loading: PanelLoading,
+});
+const StudentCreator = dynamic(() => import('@/components/teacher/StudentCreator'), {
+  loading: PanelLoading,
+});
+const TeacherLibraryManager = dynamic(() => import('@/components/teacher/TeacherLibraryManager'), {
+  loading: PanelLoading,
+});
+const ClassSettingsPanel = dynamic(() => import('@/components/teacher/ClassSettingsPanel'), {
+  loading: PanelLoading,
+});
+const TeacherCampaignManager = dynamic(() => import('@/components/teacher/TeacherCampaignManager'), {
+  loading: PanelLoading,
+});
+const WorldSmartManagementPanel = dynamic(() => import('@/components/world-smart/WorldSmartManagementPanel'), {
+  loading: PanelLoading,
+});
 
 type Tab = 'overview' | 'worldSmart' | 'resources' | 'students' | 'library' | 'campaign' | 'settings';
 

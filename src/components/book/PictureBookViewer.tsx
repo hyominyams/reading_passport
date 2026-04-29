@@ -77,6 +77,7 @@ function PageCanvas({
 
   useEffect(() => {
     let cancelled = false;
+    let renderTask: { promise: Promise<void>; cancel?: () => void } | null = null;
 
     async function renderPage() {
       setLoaded(false);
@@ -89,7 +90,7 @@ function PageCanvas({
         const container = containerRef.current;
         if (!canvas || !container) return;
 
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const containerW = container.clientWidth;
         const containerH = container.clientHeight;
 
@@ -108,16 +109,20 @@ function PageCanvas({
         const ctx = canvas.getContext('2d');
         if (!ctx || cancelled) return;
 
-        await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+        renderTask = page.render({ canvas, canvasContext: ctx, viewport });
+        await renderTask.promise;
         if (!cancelled) setLoaded(true);
       } catch (e) {
-        console.error(`Failed to render page ${pageNum}:`, e);
+        if (!cancelled) {
+          console.error(`Failed to render page ${pageNum}:`, e);
+        }
       }
     }
 
     renderPage();
     return () => {
       cancelled = true;
+      renderTask?.cancel?.();
     };
   }, [doc, pageNum]);
 
@@ -164,6 +169,7 @@ export default function PictureBookViewer({
   onMaxPageChange,
 }: PictureBookViewerProps) {
   const isMobile = useMediaQuery('(max-width: 639px)');
+  const isShortLandscape = useMediaQuery('(max-height: 700px) and (orientation: landscape)');
 
   const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
@@ -216,6 +222,8 @@ export default function PictureBookViewer({
   /* ── Load PDF document (with cache + range requests) ── */
   useEffect(() => {
     let cancelled = false;
+    let loadingTask: ReturnType<Awaited<ReturnType<typeof getPdfJs>>['getDocument']> | null = null;
+    let documentLoaded = false;
 
     async function load() {
       try {
@@ -233,8 +241,9 @@ export default function PictureBookViewer({
         }
 
         const pdfjsLib = await getPdfJs();
-        const loadingTask = pdfjsLib.getDocument(createLoadParams(pdfUrl));
+        loadingTask = pdfjsLib.getDocument(createLoadParams(pdfUrl));
         const doc = await loadingTask.promise;
+        documentLoaded = true;
         if (cancelled) {
           await doc.destroy();
           return;
@@ -258,6 +267,9 @@ export default function PictureBookViewer({
     load();
     return () => {
       cancelled = true;
+      if (!documentLoaded) {
+        void loadingTask?.destroy?.();
+      }
     };
   }, [pdfUrl]);
 
@@ -382,11 +394,17 @@ export default function PictureBookViewer({
   // Desktop: two pages side-by-side → aspect = singlePageAspect * 2
   // Mobile: single page → aspect = singlePageAspect
   const spreadAspect = isMobile ? pageAspect : pageAspect * 2;
+  const compactReaderMaxWidth = isShortLandscape
+    ? `min(100%, calc((100dvh - 17rem) * ${spreadAspect}))`
+    : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
       {/* ── Book body ── */}
-      <div className="overflow-hidden rounded-[28px] border border-[#d9c7ae] bg-[radial-gradient(circle_at_top,#fffaf1_0%,#f4e6d1_42%,#e2c7a6_100%)] p-2.5 shadow-[0_34px_90px_rgba(94,63,34,0.2)] sm:rounded-[32px] sm:p-5">
+      <div
+        className="mx-auto w-full overflow-hidden rounded-[28px] border border-[#d9c7ae] bg-[radial-gradient(circle_at_top,#fffaf1_0%,#f4e6d1_42%,#e2c7a6_100%)] p-2.5 shadow-[0_34px_90px_rgba(94,63,34,0.2)] sm:rounded-[32px] sm:p-5"
+        style={{ maxWidth: compactReaderMaxWidth }}
+      >
         <div
           className="relative overflow-hidden rounded-[20px] border border-[#ddc7a8] bg-[#5d3b22] shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_20px_60px_rgba(50,28,10,0.28)] sm:rounded-[24px]"
           style={{ perspective: 1800, aspectRatio: `${spreadAspect}` }}
@@ -465,10 +483,10 @@ export default function PictureBookViewer({
             aria-label="이전 페이지"
             onClick={goPrev}
             disabled={!canGoPrev}
-            className="absolute inset-y-0 left-0 z-30 w-1/4 cursor-w-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0 sm:w-[15%]"
+            className="coarse-pointer-visible absolute inset-y-0 left-0 z-30 w-1/4 cursor-w-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0 sm:w-[15%]"
           >
             <div className="flex h-full items-center justify-start pl-3">
-              <div className="rounded-full bg-black/20 p-2 backdrop-blur-sm">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
                 <ChevronLeft />
               </div>
             </div>
@@ -478,10 +496,10 @@ export default function PictureBookViewer({
             aria-label="다음 페이지"
             onClick={goNext}
             disabled={!canGoNext}
-            className="absolute inset-y-0 right-0 z-30 w-1/4 cursor-e-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0 sm:w-[15%]"
+            className="coarse-pointer-visible absolute inset-y-0 right-0 z-30 w-1/4 cursor-e-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0 sm:w-[15%]"
           >
             <div className="flex h-full items-center justify-end pr-3">
-              <div className="rounded-full bg-black/20 p-2 backdrop-blur-sm">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
                 <ChevronRight />
               </div>
             </div>
@@ -496,7 +514,7 @@ export default function PictureBookViewer({
             type="button"
             onClick={goPrev}
             disabled={!canGoPrev}
-            className="flex items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-3 py-1.5 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0 sm:px-4 sm:py-2"
+            className="flex min-h-11 items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-4 py-2 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0"
           >
             <ChevronLeft />
             <span className="hidden sm:inline">이전</span>
@@ -514,12 +532,16 @@ export default function PictureBookViewer({
                   key={i}
                   aria-label={`${i === 0 ? '표지' : `${i * 2}-${i * 2 + 1}쪽`}`}
                   onClick={() => goToSpread(i)}
-                  className={`h-2 shrink-0 rounded-full transition-all ${
-                    i === currentSpread
-                      ? 'w-6 bg-[#8c5d35]'
-                      : 'w-2 bg-[#d9c7ae] hover:bg-[#c4ae92]'
-                  }`}
-                />
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#f7ead7]"
+                >
+                  <span
+                    className={`block h-2 rounded-full transition-all ${
+                      i === currentSpread
+                        ? 'w-6 bg-[#8c5d35]'
+                        : 'w-2 bg-[#d9c7ae]'
+                    }`}
+                  />
+                </button>
               ))}
             </div>
           )}
@@ -528,7 +550,7 @@ export default function PictureBookViewer({
             type="button"
             onClick={goNext}
             disabled={!canGoNext}
-            className="flex items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-3 py-1.5 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0 sm:px-4 sm:py-2"
+            className="flex min-h-11 items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-4 py-2 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0"
           >
             <span className="hidden sm:inline">다음</span>
             <ChevronRight />
@@ -555,7 +577,7 @@ export default function PictureBookViewer({
             whileTap={{ scale: 0.98 }}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center justify-center self-center rounded-full bg-[#8c5d35] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#7b512d]"
+            className="inline-flex min-h-11 items-center justify-center self-center rounded-full bg-[#8c5d35] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#7b512d]"
           >
             읽기 완료
           </motion.button>

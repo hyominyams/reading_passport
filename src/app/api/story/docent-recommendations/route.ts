@@ -34,85 +34,85 @@ const ACTIVITY_CANDIDATES: ActivityCandidate[] = [
   {
     id: 'continue_story',
     title: '다음 이야기 만들기',
-    description: '책이 끝난 뒤 인물에게 생긴 일을 새 그림책으로 만들어요.',
-    starter: '책이 끝난 다음 날, ___에게 이런 일이 생겼어요.',
+    description: '책이 끝난 뒤 인물에게는 어떤 일이 펼쳐졌을까요?',
+    starter: '책이 끝난 다음 날, ___에게 이런 일이 생겼을 거예요.',
     fitFor: '결말 뒤의 변화, 후속 사건, 인물의 성장에 관심을 보인 학생',
   },
   {
     id: 'change_ending',
     title: '다른 결말 만들기',
-    description: '같은 이야기에서 마지막 장면만 다르게 바꿔 새 그림책을 만들어요.',
-    starter: '만약 마지막에 ___이 달라졌다면, 이야기는 이렇게 끝났어요.',
+    description: '이야기의 마지막이 다르게 흘러갔다면 어떻게 됐을까요?',
+    starter: '만약 마지막에 ___이 달라졌다면, 이야기는 이렇게 끝났을 거예요.',
     fitFor: '결말, 후회, 더 나은 해결 방법, 다른 마무리에 관심을 보인 학생',
   },
   {
     id: 'change_main_character',
     title: '다른 주인공으로 만들기',
-    description: '원래 주인공이 아닌 다른 인물을 주인공으로 새 그림책을 만들어요.',
-    starter: '이번에는 ___이 주인공이에요. 그 인물은 ___을 겪게 돼요.',
+    description: '다른 인물이 주인공이었다면 이야기가 어떻게 흘러갔을까요?',
+    starter: '이번엔 ___이 주인공이라면, 그 인물은 ___을 겪었을 거예요.',
     fitFor: '특정 인물의 마음, 이유, 행동을 많이 물어본 학생',
   },
   {
     id: 'side_character_story',
     title: '잠깐 나온 인물 이야기 만들기',
-    description: '책에 잠깐 나온 인물이 겪은 일을 새 그림책으로 만들어요.',
-    starter: '책에 잠깐 나온 ___은 사실 이런 하루를 보내고 있었어요.',
+    description: '책에 잠깐 나온 그 인물은 어떤 하루를 보내고 있었을까요?',
+    starter: '책에 잠깐 나온 ___은 사실 이런 하루를 보내고 있었을 거예요.',
     fitFor: '주변 인물, 엑스트라 인물, 책에 덜 나온 인물의 사정을 궁금해한 학생',
   },
   {
     id: 'change_choice',
     title: '다른 선택 이야기 만들기',
-    description: '인물이 중요한 순간에 다른 선택을 했다면 어떻게 됐을지 만들어요.',
-    starter: '그때 ___이 원래와 다른 선택을 했다면, 이런 일이 벌어졌어요.',
+    description: '인물이 그 순간에 다른 선택을 했다면 어떤 일이 벌어졌을까요?',
+    starter: '그때 ___이 원래와 다른 선택을 했다면, 이런 일이 벌어졌을 거예요.',
     fitFor: '인물이 왜 그렇게 행동했는지, 다른 행동을 할 수 있었는지 질문한 학생',
   },
   {
     id: 'before_story',
     title: '처음 전 이야기 만들기',
-    description: '책이 시작되기 전에 있었던 일을 상상해 새 그림책으로 만들어요.',
-    starter: '이 이야기가 시작되기 전, ___에게는 이런 일이 있었어요.',
+    description: '책이 시작되기 전에는 어떤 일이 있었을까요?',
+    starter: '이 이야기가 시작되기 전, ___에게는 이런 일이 있었을 거예요.',
     fitFor: '인물의 과거, 성격이 생긴 이유, 사건의 원인을 궁금해한 학생',
   },
   {
     id: 'hidden_scene_story',
     title: '숨은 장면 이야기 만들기',
-    description: '책에는 나오지 않았지만 있었을 것 같은 장면을 새 그림책으로 만들어요.',
-    starter: '책에는 나오지 않았지만, 그 사이에 ___ 장면이 있었어요.',
+    description: '책 사이사이에는 어떤 숨은 장면이 있었을까요?',
+    starter: '책에는 나오지 않았지만, 그 사이에 ___ 장면이 있었을 거예요.',
     fitFor: '장면 사이의 빈틈, 감정이 바뀌는 순간, 안 보이는 사건을 상상한 학생',
   },
   {
     id: 'same_message_new_story',
     title: '같은 마음을 담은 새 이야기 만들기',
-    description: '책이 전한 마음은 살리고, 인물과 사건은 새롭게 만들어요.',
-    starter: '이 책에서 느낀 ___이라는 마음을 담아, 새로운 인물 ___의 이야기를 만들어요.',
+    description: '이 책의 마음을 새 인물과 사건으로 다시 풀어보면 어떨까요?',
+    starter: '이 책에서 느낀 ___이라는 마음을, 새로운 인물 ___의 이야기로 풀어볼 수 있을 거예요.',
     fitFor: '책의 메시지, 교훈, 현실에서 할 수 있는 행동을 자기 이야기로 옮기려는 학생',
   },
   {
     id: 'change_setting',
     title: '다른 장소에서 다시 만들기',
-    description: '같은 사건이 다른 장소에서 일어난다면 어떨지 새 그림책으로 만들어요.',
-    starter: '같은 일이 ___에서 벌어진다면, 이야기는 이렇게 시작돼요.',
+    description: '같은 일이 다른 장소에서 벌어졌다면 어떻게 보였을까요?',
+    starter: '같은 일이 ___에서 벌어진다면, 이야기는 이렇게 시작됐을 거예요.',
     fitFor: '장소, 나라, 시대, 날씨, 분위기를 바꿔 상상한 학생',
   },
   {
     id: 'opposite_perspective',
     title: '다른 인물 눈으로 다시 보기',
-    description: '같은 일을 다른 인물의 마음으로 다시 만든 그림책을 써요.',
-    starter: '이번에는 ___의 눈으로 같은 장면을 바라보면, 이런 마음이 보여요.',
+    description: '같은 일이 다른 인물의 눈에는 어떻게 비쳤을까요?',
+    starter: '이번엔 ___의 눈으로 같은 장면을 바라보면, 이런 마음이 보였을 거예요.',
     fitFor: '서로 다른 인물의 마음, 오해, 입장 차이에 관심을 보인 학생',
   },
   {
     id: 'new_problem_story',
     title: '또 다른 어려움 만나기',
-    description: '책 속 인물이 새로운 어려움을 만났을 때의 이야기를 만들어요.',
-    starter: '그 일이 지나간 뒤, ___은 또 다른 어려움 ___을 만나게 돼요.',
+    description: '책이 끝난 뒤 인물에게는 또 어떤 어려움이 찾아왔을까요?',
+    starter: '그 일이 지나간 뒤, ___은 또 다른 어려움 ___을 만나게 됐을 거예요.',
     fitFor: '원래 인물이 다시 성장하거나 새 문제를 해결하는 이야기를 만들고 싶은 학생',
   },
   {
     id: 'new_helper_story',
     title: '새 친구가 도와주는 이야기 만들기',
-    description: '책 속 문제를 도와줄 새 친구를 넣어 이야기를 만들어요.',
-    starter: '어려움에 빠진 ___ 앞에 새 친구 ___이 나타났어요.',
+    description: '어려움에 빠진 인물 곁에 어떤 친구가 나타났을까요?',
+    starter: '어려움에 빠진 ___ 앞에 새 친구 ___이 나타났을 거예요.',
     fitFor: '도움, 협력, 새로운 인물, 함께 해결하는 이야기에 관심을 보인 학생',
   },
 ];
@@ -177,14 +177,6 @@ function extractJsonObject(text: string): string | null {
   return null;
 }
 
-function fallbackRecommendations(): DocentActivityRecommendation[] {
-  return ACTIVITY_CANDIDATES
-    .filter((candidate) =>
-      ['change_choice', 'opposite_perspective', 'continue_story'].includes(candidate.id),
-    )
-    .map(({ title, description, starter }) => ({ title, description, starter }));
-}
-
 function activityCandidateListForPrompt(): string {
   return ACTIVITY_CANDIDATES
     .map((candidate, index) => (
@@ -224,6 +216,7 @@ function normalizeCandidateRecommendations(payload: unknown): DocentActivityReco
 
     const starter = cleanText(raw.starter) || candidate.starter;
     normalized.push({
+      id: candidate.id,
       title: candidate.title,
       description: candidate.description,
       starter,
@@ -233,13 +226,7 @@ function normalizeCandidateRecommendations(payload: unknown): DocentActivityReco
     if (normalized.length >= 3) break;
   }
 
-  if (normalized.length >= 3) return normalized;
-
-  const fallbacks = fallbackRecommendations().filter(
-    (fallback) => !normalized.some((item) => item.title === fallback.title),
-  );
-
-  return [...normalized, ...fallbacks].slice(0, 3);
+  return normalized.slice(0, 3);
 }
 
 function applyStudentNamePreference(
@@ -258,6 +245,7 @@ function applyStudentNamePreference(
     replacements.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
 
   return recommendations.map((item) => ({
+    id: item.id,
     title: fix(item.title),
     description: fix(item.description),
     starter: fix(item.starter),
@@ -387,7 +375,7 @@ function formatPriorStudentContext(context: PriorStudentContext): string {
   }
 
   if (context.readQuestionSeed) {
-    lines.push(`[Step 1 읽고 떠올린 질문 씨앗]\n${context.readQuestionSeed}`);
+    lines.push(`[Step 1 읽고 떠올린 질문]\n${context.readQuestionSeed}`);
   }
 
   if (context.exploreChallenges.length > 0) {
@@ -415,7 +403,7 @@ function formatPriorStudentContext(context: PriorStudentContext): string {
 
   return lines.length > 0
     ? lines.join('\n\n')
-    : '이전 단계에서 저장된 한 줄 감상, 질문 씨앗, 질문 게시글이 아직 없습니다.';
+    : '이전 단계에서 저장된 한 줄 감상, 읽고 떠올린 질문, 질문 게시글이 아직 없습니다.';
 }
 
 export async function POST(request: NextRequest) {
@@ -465,10 +453,14 @@ export async function POST(request: NextRequest) {
 - 추천 활동은 모두 "읽은 그림책을 바탕으로 다시 새 그림책을 만드는 활동"이어야 한다.
 - 독후감, 발표, 조사, 토론, 만들기만 하는 활동은 추천하지 않는다.
 - 활동명과 설명은 후보의 문구를 그대로 사용한다.
-- starter만 학생 대화와 책 내용에 맞게 한 문장으로 구체화한다.
+- starter는 후보의 "기본 시작 문장"을 토대로, 빈 칸(___) 자리에만 학생 대화와 책 내용에 맞는 표현을 채운다. 빈 칸 이외의 글자는 한 글자도 추가·삭제·변형하지 않는다.
+- 빈 칸에는 짧은 명사구만 넣는다. 사람 이름, 호칭(아저씨/아주머니/할머니 등), 한두 단어로 된 장소·감정·짧은 사건만 허용한다.
+- 빈 칸에 절이나 긴 설명("멈춰 서서 ~를 도와주기로 했다면", "~에게 ~을 신겨 주려 가는 길에" 같은 표현)을 넣지 않는다.
+- starter는 초등학생이 읽을 첫 줄이다. 한국어 대명사 "그/그녀/그들"은 사용 금지. 인물은 이름이나 호칭으로 다시 쓴다.
+- starter는 한 문장이고, 카드에서 잘리지 않도록 60자를 넘기지 않는다.
 - 학생이 대화에서 보인 관심사, 질문, 감정, 막힌 지점을 반영한다.
 - 인물 이름은 학생 발화에 나온 표기를 우선 사용한다. 학생이 "타다오"라고 썼다면 "타다호"로 바꾸지 않는다.
-- starter에는 학생이 직접 말한 인물, 장면, 질문, 이야기 씨앗을 우선 사용한다.
+- starter에는 학생이 직접 말한 인물, 장면, 질문, 새 그림책 아이디어를 우선 사용한다.
 - 학생이 직접 말하지 않은 새 인물이나 곁가지 인물을 starter의 중심으로 세우지 않는다.
 - 정확히 3개만 추천한다.
 - 각 추천은 UI 카드에 들어갈 만큼 짧고 선명해야 한다.
@@ -492,12 +484,27 @@ ${transcript}
 [활동 후보]
 ${activityCandidateListForPrompt()}
 
+[starter 어조 — 반드시 지킨다]
+- starter는 학생이 답을 정해서 쓰는 게 아니라, 같이 상상해보자는 톤이어야 한다.
+- 기본 시작 문장의 어미("~었을 거예요", "~었을까요?")는 그대로 유지한다. 단정형(~었어요/생겼어요/벌어졌어요/시작돼요)으로 바꾸지 않는다.
+
+[starter 작성 예시]
+좋은 예 (빈 칸만 짧게 채우고 어미 포함 나머지 문구는 그대로):
+- 기본: "그때 ___이 원래와 다른 선택을 했다면, 이런 일이 벌어졌을 거예요." → "그때 카카마 아저씨가 원래와 다른 선택을 했다면, 이런 일이 벌어졌을 거예요."
+- 기본: "이번엔 ___의 눈으로 같은 장면을 바라보면, 이런 마음이 보였을 거예요." → "이번엔 사라마 아주머니의 눈으로 같은 장면을 바라보면, 이런 마음이 보였을 거예요."
+- 기본: "책이 끝난 다음 날, ___에게 이런 일이 생겼을 거예요." → "책이 끝난 다음 날, 카카마 아저씨에게 이런 일이 생겼을 거예요."
+
+피해야 할 예 (자주 나오는 실수):
+- "그때 카카마 아저씨가 원래와 다른 선택을 했다면, 이런 일이 벌어졌어요." — 어미를 단정형("벌어졌어요")으로 바꿔 상상하는 톤이 사라졌다. "벌어졌을 거예요"로 유지해야 한다.
+- "그때 타다오와 파케오가 멈춰 서서 카카마 아저씨를 도와주기로 했다면, 이런 일이 벌어졌을 거예요." — 빈 칸 자리에 긴 절을 넣어 문장이 무거워졌고, "원래와 다른 선택을 했다면"이라는 핵심 표현이 사라졌다.
+- "이번엔 사라마 아주머니의 눈으로 같은 장면을 바라보면, 그녀가 아저씨를 도우러 가는 동안 어떤 생각과 고민이 보였는지 이렇게 시작될 거예요." — 대명사 "그녀"를 썼고, 기본 시작 문장의 뒷부분("이런 마음이 보였을 거예요")을 다른 문구로 바꿨다.
+
 [추천 기준]
 1. 작가 도슨트 대화에서 학생이 가장 자주 물은 인물, 장면, 선택, 결말, 마음을 우선한다.
-2. Step 1 한 줄 감상과 질문 씨앗이 있으면 학생이 처음 붙잡은 감정과 궁금증으로 보고 강하게 반영한다.
+2. Step 1 한 줄 감상과 읽고 떠올린 질문이 있으면 학생이 처음 붙잡은 감정과 궁금증으로 보고 강하게 반영한다.
 3. Step 3 학생 질문이 있으면 반복되는 질문 유형을 보고 후보를 고른다. 인물 질문은 다른 주인공/다른 인물 눈, 선택 질문은 다른 선택, 결말 질문은 다른 결말/다음 이야기와 잘 맞는다.
 4. Step 2 자료 탐색 메모가 있으면 장소, 문화, 배경 단서를 보조로 반영한다.
-5. 학생이 직접 말한 해석이나 만들고 싶은 이야기 씨앗을 우선한다.
+5. 학생이 직접 말한 해석이나 만들고 싶은 새 그림책 아이디어를 우선한다.
 6. 책의 핵심 사건과 메시지에서 너무 멀어지지 않는 후보를 고른다.
 7. 학생이 막히거나 질문을 어려워했다면 시작하기 쉬운 후보를 고른다.
 
@@ -522,7 +529,7 @@ ${activityCandidateListForPrompt()}
       {
         model: 'gpt-5-mini',
         maxTokens: 1800,
-        reasoningEffort: 'minimal',
+        reasoningEffort: 'low',
         jsonMode: true,
         timeoutMs: 60_000,
       },
@@ -534,6 +541,13 @@ ${activityCandidateListForPrompt()}
       normalizeCandidateRecommendations(parsed),
       studentTranscript,
     );
+
+    if (recommendations.length !== 3) {
+      return Response.json(
+        { error: '활동 추천 응답이 3개로 생성되지 않았습니다.' },
+        { status: 502 },
+      );
+    }
 
     if (story_id) {
       const { error: updateError } = await supabase
@@ -551,16 +565,13 @@ ${activityCandidateListForPrompt()}
     }
 
     return Response.json({
-      farewell: '이제 헤어질 시간이야. 오늘 네가 나눈 이야기를 보니, 다음에는 이런 활동이 잘 어울리겠어.',
+      farewell: '자, 그럼 이만 가볼게. 오늘 네가 나눈 이야기를 보니, 다음에는 이런 활동이 잘 어울리겠어.',
       recommendations,
     });
   } catch (error) {
     console.error('Docent recommendation error:', error);
     return Response.json(
-      {
-        farewell: '이제 헤어질 시간이야. 오늘 이야기를 바탕으로 바로 시작하기 좋은 활동을 골라봤어.',
-        recommendations: fallbackRecommendations(),
-      },
+      { error: '활동 추천을 만들지 못했습니다.' },
       { status: 500 },
     );
   }

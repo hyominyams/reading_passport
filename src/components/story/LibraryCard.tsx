@@ -70,11 +70,13 @@ export default function LibraryCard({
       {/* Like + Views row */}
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onLike(item.story_id);
           }}
-          className={`flex items-center gap-1 text-xs transition-colors ${
+          aria-label={`${title} 좋아요`}
+          className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-xs transition-colors ${
             isLiked ? 'text-error' : 'text-muted hover:text-error'
           }`}
         >

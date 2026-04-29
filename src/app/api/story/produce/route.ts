@@ -10,9 +10,11 @@ import { applyProductionWatchdog } from '@/lib/story-production-watchdog';
 import type { Story, CharacterRef, IllustrationStyle } from '@/types/database';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minutes for long-running image generation
+export const maxDuration = 900; // 15 minutes for long-running image generation
 
-const PRODUCTION_IMAGE_CONCURRENCY = 5;
+const PRODUCTION_IMAGE_TIMEOUT_MS = 10 * 60 * 1000;
+const PRODUCTION_PROMPT_TIMEOUT_MS = 90 * 1000;
+const PRODUCTION_HEARTBEAT_INTERVAL_MS = 60 * 1000;
 
 type SupabaseServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -88,6 +90,7 @@ Output ONLY the English image prompt, nothing else.`,
     {
       model: 'gpt-5-nano',
       maxTokens: 300,
+      timeoutMs: PRODUCTION_PROMPT_TIMEOUT_MS,
     }
   );
 
@@ -128,6 +131,79 @@ function buildReferenceImages(story: Story, coverImageUrl: string | null) {
   }
 
   return referenceImages;
+}
+
+function normalizePromptLine(value: string | null | undefined) {
+  return value?.replace(/\s+/g, ' ').trim() ?? '';
+}
+
+function getCharacterGenderLabel(gender: string | null | undefined) {
+  switch (gender) {
+    case 'female':
+      return 'female';
+    case 'male':
+      return 'male';
+    default:
+      return 'unspecified gender';
+  }
+}
+
+function buildCharacterContinuityContext(story: Story) {
+  const characterLines = (story.character_designs ?? [])
+    .map((character) => {
+      const details = [
+        `name: ${normalizePromptLine(character.name)}`,
+        `gender: ${getCharacterGenderLabel(character.gender)}`,
+        normalizePromptLine(character.appearance)
+          ? `appearance: ${normalizePromptLine(character.appearance)}`
+          : null,
+        normalizePromptLine(character.personality)
+          ? `personality: ${normalizePromptLine(character.personality)}`
+          : null,
+        character.imageUrl
+          ? 'a character reference image is attached for this character'
+          : null,
+      ].filter(Boolean);
+
+      return details.length > 0 ? `- ${details.join('; ')}` : null;
+    })
+    .filter(Boolean);
+
+  const namedCharacterDesigns = new Set(
+    (story.character_designs ?? [])
+      .map((character) => normalizePromptLine(character.name).toLowerCase())
+      .filter(Boolean)
+  );
+
+  const legacyReferenceLines = (story.character_refs ?? [])
+    .filter((ref) => !namedCharacterDesigns.has(normalizePromptLine(ref.name).toLowerCase()))
+    .map((ref) => `- name: ${normalizePromptLine(ref.name)}; a character reference image is attached for this character`)
+    .filter(Boolean);
+
+  const allLines = [...characterLines, ...legacyReferenceLines];
+
+  if (allLines.length === 0) {
+    return '';
+  }
+
+  return ` Story-wide character continuity sheet for this independently generated page: ${allLines.join(' ')} Use these references to keep recurring characters visually consistent across every page. Include only the characters needed for the current page.`;
+}
+
+function buildCoverContinuityContext(story: Story, coverImageUrl: string | null) {
+  const coverDesign = story.cover_design;
+  const coverDetails = [
+    normalizePromptLine(coverDesign?.title) ? `title: ${normalizePromptLine(coverDesign?.title)}` : null,
+    normalizePromptLine(coverDesign?.description)
+      ? `visual direction: ${normalizePromptLine(coverDesign?.description)}`
+      : null,
+    coverImageUrl ? 'a cover design image is attached as the style and color reference' : null,
+  ].filter(Boolean);
+
+  if (coverDetails.length === 0) {
+    return '';
+  }
+
+  return ` Story-wide cover design continuity: ${coverDetails.join('; ')}. Keep the scene aligned with the cover's artistic direction, palette, and picture-book identity without copying the cover composition.`;
 }
 
 function ensureSceneImagesLength(sceneImages: Array<string | null>, pageCount: number) {
@@ -183,6 +259,8 @@ async function generateSceneImageForPage({
   const pictureBookShape = normalizePictureBookShape(story.cover_design?.picture_book_shape);
   const pictureBookShapeOption = getPictureBookShapeOption(pictureBookShape);
   const referenceImages = buildReferenceImages(story, coverImageUrl);
+  const characterContinuityContext = buildCharacterContinuityContext(story);
+  const coverContinuityContext = buildCoverContinuityContext(story, coverImageUrl);
   const characterReferenceImages = referenceImages.filter(
     (ref) => ref.name !== 'cover design style reference'
   );
@@ -208,12 +286,13 @@ async function generateSceneImageForPage({
     : '';
 
   const fullPrompt =
-    `Children's book illustration.${studentSceneInstruction}${pageContextInstruction} Final English visual prompt: ${imagePrompt}. Picture book format: ${pictureBookShapeOption.label}. Match a ${pictureBookShapeOption.aspectRatio} composition and keep the layout natural for a ${pictureBookShapeOption.promptLabel}. Selected style: ${styleOption.label}. Style keywords: ${styleOption.promptLabel}.${coverImageUrl ? ' Use the attached cover design image ONLY as a reference for the overall artistic style and color palette. Do not copy its composition, characters, scene, objects, or layout.' : ''}${matchedNames.length > 0 ? ` The named characters in this scene are ${matchedNames.join(', ')}. Use the attached character reference images for those same names to keep them visually consistent.` : ''} Style: warm, friendly, appropriate for elementary school students. Do not include any written text, letters, words, captions, speech bubbles, signs, logos, or typography in the image.`;
+    `Children's book illustration.${coverContinuityContext}${characterContinuityContext}${studentSceneInstruction}${pageContextInstruction} Final English visual prompt: ${imagePrompt}. Picture book format: ${pictureBookShapeOption.label}. Match a ${pictureBookShapeOption.aspectRatio} composition and keep the layout natural for a ${pictureBookShapeOption.promptLabel}. Selected style: ${styleOption.label}. Style keywords: ${styleOption.promptLabel}.${coverImageUrl ? ' Use the attached cover design image ONLY as a reference for the overall artistic style and color palette. Do not copy its composition, characters, scene, objects, or layout.' : ''}${matchedNames.length > 0 ? ` The named characters in this scene are ${matchedNames.join(', ')}. Use the attached character reference images for those same names to keep them visually consistent.` : ''} Style: warm, friendly, appropriate for elementary school students. Do not include any written text, letters, words, captions, speech bubbles, signs, logos, or typography in the image.`;
 
   const generatedImage = await generateOpenAIImage({
     prompt: fullPrompt,
     referenceImages,
     aspectRatio: pictureBookShapeOption.aspectRatio,
+    timeoutMs: PRODUCTION_IMAGE_TIMEOUT_MS,
   });
 
   return storeGeneratedImage({
@@ -247,12 +326,28 @@ async function runProductionJob({
   pageIndex: number | null;
 }) {
   const totalImages = imageTasks.length;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+  const stopProductionHeartbeat = () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  };
 
   try {
-    let nextTaskIndex = 0;
-    let generationError: unknown = null;
     let progressPersistError: unknown = null;
     let progressPersistChain = Promise.resolve();
+
+    heartbeatTimer = setInterval(() => {
+      void supabase
+        .from('stories')
+        .update({
+          production_heartbeat_at: new Date().toISOString(),
+        })
+        .eq('id', storyId)
+        .eq('production_status', 'processing');
+    }, PRODUCTION_HEARTBEAT_INTERVAL_MS);
 
     const queueProgressPersist = () => {
       const sceneImagesSnapshot = [...sceneImages];
@@ -285,38 +380,24 @@ async function runProductionJob({
         });
     };
 
-    const workerCount = Math.min(PRODUCTION_IMAGE_CONCURRENCY, totalImages);
-    const workers = Array.from({ length: workerCount }, async () => {
-      while (!generationError) {
-        const task = imageTasks[nextTaskIndex];
-        nextTaskIndex += 1;
+    const generationResults = await Promise.allSettled(
+      imageTasks.map(async (task) => {
+        const imageUrl = await generateSceneImageForPage({
+          story,
+          studentText: task.studentText,
+          sceneDescription: task.sceneDescription,
+          coverImageUrl,
+        });
 
-        if (!task) {
-          return;
-        }
-
-        try {
-          const imageUrl = await generateSceneImageForPage({
-            story,
-            studentText: task.studentText,
-            sceneDescription: task.sceneDescription,
-            coverImageUrl,
-          });
-
-          sceneImages[task.index] = imageUrl;
-          queueProgressPersist();
-        } catch (error) {
-          generationError ??= error;
-          return;
-        }
-      }
-    });
-
-    await Promise.all(workers);
+        sceneImages[task.index] = imageUrl;
+        queueProgressPersist();
+      })
+    );
     await progressPersistChain;
 
-    if (generationError) {
-      throw generationError;
+    const failedGeneration = generationResults.find((result) => result.status === 'rejected');
+    if (failedGeneration?.status === 'rejected') {
+      throw failedGeneration.reason;
     }
 
     if (progressPersistError) {
@@ -341,6 +422,8 @@ async function runProductionJob({
       throw finalUpdateError;
     }
 
+    stopProductionHeartbeat();
+
     return {
       message: isSinglePageRegeneration
         ? 'Page image regenerated'
@@ -348,12 +431,13 @@ async function runProductionJob({
       total: progressInfo.total,
       completed: progressInfo.completed,
       progress: progressInfo.progress,
-      concurrency: workerCount,
+      concurrency: totalImages,
       page_index: pageIndex,
       image_url: isSinglePageRegeneration && pageIndex !== null ? sceneImages[pageIndex] : null,
       scene_images: sceneImages,
     };
   } catch (genError) {
+    stopProductionHeartbeat();
     console.error('Image generation error during production:', genError);
     const progressInfo = calculateProductionProgress(finalText, uploadedImages, sceneImages);
 

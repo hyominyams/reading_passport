@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { retryingFetch } from './fetch';
 
 // Persist client across HMR to avoid navigator.locks deadlock.
 // Supabase auth acquires a navigator lock; if the client is destroyed
@@ -17,6 +18,9 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: {
+        fetch: retryingFetch,
+      },
       auth: {
         flowType: 'pkce',
         // Bypass navigator.locks to prevent deadlock on HMR / Fast Refresh

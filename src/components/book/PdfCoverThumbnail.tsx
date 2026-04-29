@@ -15,18 +15,54 @@ export default function PdfCoverThumbnail({
   title,
   className = '',
 }: PdfCoverThumbnailProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [shouldRender, setShouldRender] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    const root = rootRef.current;
+
+    if (!root) {
+      return;
+    }
+
+    if (typeof IntersectionObserver === 'undefined') {
+      const fallbackTimer = window.setTimeout(() => setShouldRender(true), 0);
+      return () => window.clearTimeout(fallbackTimer);
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '240px' }
+    );
+
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldRender) {
+      return;
+    }
+
     let cancelled = false;
+    let loadingTask: ReturnType<Awaited<ReturnType<typeof getPdfJs>>['getDocument']> | null = null;
+    let renderTask: { promise: Promise<void>; cancel?: () => void } | null = null;
+    let documentLoaded = false;
 
     async function render() {
       try {
         const pdfjsLib = await getPdfJs();
-        const loadingTask = pdfjsLib.getDocument(createLoadParams(pdfUrl));
+        loadingTask = pdfjsLib.getDocument(createLoadParams(pdfUrl));
         const doc = await loadingTask.promise;
+        documentLoaded = true;
         if (cancelled) {
           await doc.destroy();
           return;
@@ -40,7 +76,7 @@ export default function PdfCoverThumbnail({
         }
 
         const containerWidth = canvas.parentElement?.clientWidth || 280;
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const baseViewport = page.getViewport({ scale: 1 });
         const scale = (containerWidth * dpr) / baseViewport.width;
         const viewport = page.getViewport({ scale });
@@ -56,7 +92,8 @@ export default function PdfCoverThumbnail({
           return;
         }
 
-        await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+        renderTask = page.render({ canvas, canvasContext: ctx, viewport });
+        await renderTask.promise;
         await doc.destroy();
 
         if (!cancelled) setLoaded(true);
@@ -68,8 +105,12 @@ export default function PdfCoverThumbnail({
     render();
     return () => {
       cancelled = true;
+      renderTask?.cancel?.();
+      if (!documentLoaded) {
+        void loadingTask?.destroy?.();
+      }
     };
-  }, [pdfUrl]);
+  }, [pdfUrl, shouldRender]);
 
   /* Fallback: show styled placeholder on error */
   if (error) {
@@ -93,6 +134,7 @@ export default function PdfCoverThumbnail({
 
   return (
     <div
+      ref={rootRef}
       className={`relative flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit] bg-[#faf6ef] ${className}`}
     >
       {!loaded && (

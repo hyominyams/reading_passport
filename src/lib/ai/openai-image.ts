@@ -2,7 +2,7 @@ import { toFile, type Uploadable } from 'openai';
 import openai from '@/lib/ai/openai';
 
 const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2';
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 
 export interface OpenAIReferenceImage {
   imageUrl: string;
@@ -73,6 +73,16 @@ function extensionForMimeType(mimeType: string) {
   }
 }
 
+function filenameSafeReferenceName(name: string | undefined, fallback: string) {
+  const safeName = name
+    ?.normalize('NFKD')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+
+  return safeName || fallback;
+}
+
 function mimeTypeForOutputFormat(outputFormat: OpenAIOutputFormat) {
   switch (outputFormat) {
     case 'jpeg':
@@ -111,7 +121,7 @@ async function loadReferenceImage(
 
     return toFile(
       dataUrl.data,
-      `reference-${index}.${extensionForMimeType(dataUrl.mimeType)}`,
+      `${filenameSafeReferenceName(referenceImage.name, `reference-${index}`)}.${extensionForMimeType(dataUrl.mimeType)}`,
       { type: dataUrl.mimeType }
     );
   }
@@ -136,34 +146,32 @@ async function loadReferenceImage(
 
   return toFile(
     buffer,
-    `reference-${index}.${extensionForMimeType(mimeType)}`,
+    `${filenameSafeReferenceName(referenceImage.name, `reference-${index}`)}.${extensionForMimeType(mimeType)}`,
     { type: mimeType }
   );
 }
 
 async function buildReferenceFiles(referenceImages: OpenAIReferenceImage[]) {
-  const files: Uploadable[] = [];
-
-  for (const [index, referenceImage] of referenceImages.entries()) {
-    if (files.length >= 16) {
-      console.warn('Skipping extra reference images; OpenAI image edits support up to 16 inputs.');
-      break;
-    }
-
-    try {
-      const file = await loadReferenceImage(referenceImage, index);
-      if (file) {
-        files.push(file);
-      }
-    } catch (error) {
-      console.warn(
-        `Skipping reference image for "${referenceImage.name ?? 'unknown'}"`,
-        error
-      );
-    }
+  const limitedReferenceImages = referenceImages.slice(0, 16);
+  if (referenceImages.length > limitedReferenceImages.length) {
+    console.warn('Skipping extra reference images; OpenAI image edits support up to 16 inputs.');
   }
 
-  return files;
+  const files = await Promise.all(
+    limitedReferenceImages.map(async (referenceImage, index) => {
+      try {
+        return loadReferenceImage(referenceImage, index);
+      } catch (error) {
+        console.warn(
+          `Skipping reference image for "${referenceImage.name ?? 'unknown'}"`,
+          error
+        );
+        return null;
+      }
+    })
+  );
+
+  return files.filter((file): file is Uploadable => Boolean(file));
 }
 
 function extractImageBase64(response: { data?: Array<{ b64_json?: string }> }) {

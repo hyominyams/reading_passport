@@ -1,14 +1,41 @@
 'use client';
 
 import { useState } from 'react';
-import AdminOverview from '@/components/admin/AdminOverview';
-import TeacherList from '@/components/admin/TeacherList';
-import ApprovalQueue from '@/components/admin/ApprovalQueue';
-import BookManager from '@/components/admin/BookManager';
-import HiddenContentManager from '@/components/admin/HiddenContentManager';
-import LibraryAdmin from '@/components/admin/LibraryAdmin';
-import FactsManager from '@/components/admin/FactsManager';
-import WorldSmartManagementPanel from '@/components/world-smart/WorldSmartManagementPanel';
+import dynamic from 'next/dynamic';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+
+function PanelLoading() {
+  return (
+    <div className="flex justify-center py-12">
+      <LoadingSpinner message="불러오는 중..." />
+    </div>
+  );
+}
+
+const AdminOverview = dynamic(() => import('@/components/admin/AdminOverview'), {
+  loading: PanelLoading,
+});
+const TeacherList = dynamic(() => import('@/components/admin/TeacherList'), {
+  loading: PanelLoading,
+});
+const ApprovalQueue = dynamic(() => import('@/components/admin/ApprovalQueue'), {
+  loading: PanelLoading,
+});
+const BookManager = dynamic(() => import('@/components/admin/BookManager'), {
+  loading: PanelLoading,
+});
+const HiddenContentManager = dynamic(() => import('@/components/admin/HiddenContentManager'), {
+  loading: PanelLoading,
+});
+const LibraryAdmin = dynamic(() => import('@/components/admin/LibraryAdmin'), {
+  loading: PanelLoading,
+});
+const FactsManager = dynamic(() => import('@/components/admin/FactsManager'), {
+  loading: PanelLoading,
+});
+const WorldSmartManagementPanel = dynamic(() => import('@/components/world-smart/WorldSmartManagementPanel'), {
+  loading: PanelLoading,
+});
 
 type Tab = 'overview' | 'teachers' | 'approvals' | 'books' | 'worldSmart' | 'hidden' | 'library' | 'facts';
 

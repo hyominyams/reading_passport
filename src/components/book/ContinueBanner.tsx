@@ -81,7 +81,7 @@ export default function ContinueBanner({
   };
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+    <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 sm:bottom-6">
       <AnimatePresence mode="wait">
         {collapsed ? (
           /* ── Collapsed: small pill button ── */
@@ -92,7 +92,7 @@ export default function ContinueBanner({
             exit={{ scale: 0.8, opacity: 0 }}
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             onClick={() => setCollapsed(false)}
-            className="flex items-center gap-2 bg-white border border-border shadow-lg rounded-full px-4 py-2.5 cursor-pointer hover:shadow-xl active:scale-95 transition-all"
+	            className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-white px-4 py-2.5 shadow-lg transition-all hover:shadow-xl active:scale-95"
           >
             <span className="text-base">{country?.flag}</span>
             <span className="text-xs font-medium text-foreground whitespace-nowrap">
@@ -158,7 +158,7 @@ export default function ContinueBanner({
                 {/* CTA button */}
                 <button
                   onClick={handleContinue}
-                  className="shrink-0 bg-primary hover:bg-primary-dark active:scale-95 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                  className="min-h-11 shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-dark active:scale-95 whitespace-nowrap"
                 >
                   이어하기 &rarr;
                 </button>
@@ -171,7 +171,7 @@ export default function ContinueBanner({
                 </p>
                 <button
                   onClick={() => setCollapsed(true)}
-                  className="flex items-center gap-1 text-[11px] text-muted hover:text-foreground cursor-pointer transition-colors"
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-[11px] text-muted transition-colors hover:text-foreground"
                 >
                   숨기기
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

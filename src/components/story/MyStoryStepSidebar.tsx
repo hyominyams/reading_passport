@@ -35,15 +35,15 @@ export default function MyStoryStepSidebar({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-border bg-white/95 px-4 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur"
+        className="fixed top-[7.75rem] right-3 z-40 inline-flex min-h-11 max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full border border-border bg-white/95 px-4 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur lg:top-auto lg:right-4 lg:bottom-4 xl:right-6 xl:bottom-6"
       >
         <span>{open ? '✕' : '☰'}</span>
         <span>{getDetailStepProgressLabel(currentStep)}</span>
       </button>
 
       <aside
-        className={`fixed bottom-20 right-6 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-3xl border border-border bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 ${
-          open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-6 opacity-0'
+        className={`fixed top-[10.75rem] left-3 right-3 z-40 max-h-[calc(100vh-13rem)] overflow-y-auto rounded-3xl border border-border bg-white/95 p-4 shadow-2xl backdrop-blur transition-all duration-200 lg:top-auto lg:bottom-20 lg:left-auto lg:right-4 lg:w-72 lg:max-w-[calc(100vw-2rem)] lg:max-h-[calc(100vh-6rem)] xl:right-6 ${
+          open ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         }`}
       >
         <div className="mb-3">
@@ -67,7 +67,7 @@ export default function MyStoryStepSidebar({
                   void onStepSelect(item.step);
                 }}
                 disabled={!canOpen || isCurrent}
-                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
+                className={`flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
                   isCurrent
                     ? 'bg-foreground text-white'
                     : canOpen

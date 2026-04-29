@@ -56,6 +56,12 @@
    - Step 4의 `작가와의 만남` 대화, 추천 활동 3개, 학생이 선택한 활동을 `stories`에 분리 저장합니다.
    - 기존 토리 채팅 로그와 섞이지 않도록 `docent_chat_log`, `docent_recommendations`, `selected_activity`를 추가합니다.
 
+16. `033_story_purpose_answers.sql`
+   - Step 4 창작 목적 질문의 답변을 `stories.purpose_answers`에 저장합니다.
+
+17. `034_story_tori_answers.sql`
+   - 구조화된 토리 질문 카드 답변을 `stories.tori_answers`에 저장합니다.
+
 ## 원격 DB 상태 점검
 
 - 애플리케이션 레벨 점검은 `npx tsx scripts/check-books.ts` 또는 `npx tsx scripts/check-db-health.ts`로 확인합니다.

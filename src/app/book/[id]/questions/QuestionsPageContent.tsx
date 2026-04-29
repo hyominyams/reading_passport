@@ -1013,15 +1013,15 @@ export default function QuestionsPageContent({
                     </span>
                     <div className="flex-1">
                       <div className="flex items-start gap-2">
-                        <input
-                          type="text"
+                        <textarea
+                          rows={2}
                           value={question}
                           onChange={(e) => handleQuestionChange(category.key, questionIndex, e.target.value)}
                           readOnly={isReadOnly}
                           placeholder={questionIndex === 0
                             ? EXAMPLE_PLACEHOLDERS[category.key]
                             : `${category.title}에 대한 질문을 입력하세요...`}
-                          className={`flex-1 px-3 py-2 border rounded-lg text-sm text-foreground placeholder:text-muted/60 focus:outline-none transition-all ${
+                          className={`min-h-11 flex-1 resize-y rounded-lg border px-4 py-3 text-sm leading-6 text-foreground placeholder:text-muted/60 focus:outline-none transition-all ${
                             isReadOnly
                               ? 'bg-gray-50 border-border cursor-default'
                               : isInvalid
@@ -1031,8 +1031,10 @@ export default function QuestionsPageContent({
                         />
                         {!isReadOnly && (questions[category.key] ?? []).length > requiredByCategory[category.key] && (
                           <button
+                            type="button"
                             onClick={() => handleRemoveQuestion(category.key, questionIndex)}
-                            className="mt-1.5 p-1 text-muted hover:text-red-500 transition-colors"
+                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-red-50 hover:text-red-500"
+                            aria-label={`${category.title} ${questionIndex + 1}번 질문 삭제`}
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1059,8 +1061,9 @@ export default function QuestionsPageContent({
 
             {!isReadOnly && (questions[category.key] ?? []).length < category.max && (
               <button
+                type="button"
                 onClick={() => handleAddQuestion(category.key)}
-                className="mt-3 text-sm text-primary font-medium hover:text-primary/80 transition-colors flex items-center gap-1"
+                className="mt-3 inline-flex min-h-11 items-center gap-1 rounded-xl border border-primary/20 px-4 py-2 text-sm font-medium text-primary transition-colors hover:border-primary/40 hover:text-primary/80"
               >
                 <span>+</span><span>질문 추가</span>
               </button>

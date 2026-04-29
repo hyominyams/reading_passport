@@ -7,6 +7,7 @@ import { signOutAction } from '@/app/login/actions';
 import type { User as SupabaseUser, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import type { User, UserRole } from '@/types/database';
 import { buildAutoNickname, hasNickname } from '@/lib/profile';
+import { logClientError } from '@/lib/network-error';
 
 interface AuthContextType {
   user: SupabaseUser | null;
@@ -64,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (error) {
-      console.error('Failed to persist auto nickname:', error);
+      logClientError('Failed to persist auto nickname:', error);
       return { ...loadedProfile, nickname: fallbackNickname } as User;
     }
 

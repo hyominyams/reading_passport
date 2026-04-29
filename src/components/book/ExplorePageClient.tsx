@@ -505,7 +505,7 @@ export default function ExplorePageClient({
                         event.stopPropagation();
                         handleOpenChallenge(content);
                       }}
-                      className={`absolute left-2 top-2 rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.16em] transition-colors ${
+                      className={`absolute left-2 top-2 inline-flex min-h-11 items-center justify-center rounded-full border px-4 py-2 text-xs font-black tracking-[0.12em] transition-colors ${
                         challengeDone
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                           : 'border-[#d0b189] bg-[#fbf2e1] text-[#8a5d2f]'
@@ -548,7 +548,7 @@ export default function ExplorePageClient({
           />
 
           {viewerOpen && !activeIsComplete && (
-            <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-full bg-white/95 px-5 py-3 shadow-lg backdrop-blur">
+            <div className="fixed bottom-4 left-1/2 z-[60] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-white/95 px-5 py-3 shadow-lg backdrop-blur">
               <div className="h-2 w-32 overflow-hidden rounded-full bg-gray-200">
                 <motion.div
                   className="h-full rounded-full bg-indigo-500"
@@ -566,7 +566,7 @@ export default function ExplorePageClient({
           )}
 
           {viewerOpen && activeIsComplete && (
-            <div className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-3xl border border-[#dcc8ad] bg-[#fffaf1] px-4 py-3 shadow-lg">
+            <div className="fixed bottom-4 left-1/2 z-[60] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-3xl border border-[#dcc8ad] bg-[#fffaf1] px-4 py-3 shadow-lg">
               <div>
                 <p className="text-xs font-semibold tracking-[0.16em] text-[#8a5d2f]">CHALLENGE</p>
                 <p className="mt-1 text-xs text-[#6d573d]">
@@ -576,7 +576,7 @@ export default function ExplorePageClient({
               <button
                 type="button"
                 onClick={() => handleOpenChallenge(activeContent)}
-                className="rounded-full bg-[#8a5d2f] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#734a22]"
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#8a5d2f] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#734a22]"
               >
                 {challengeNoteMap.has(activeContent.id) ? '다시 기록하기' : '기록 열기'}
               </button>
@@ -599,7 +599,7 @@ export default function ExplorePageClient({
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 16, opacity: 0, scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-              className="w-full max-w-xl rounded-[28px] border border-[#dcc8ad] bg-[#fffaf1] p-6 shadow-[0_30px_90px_rgba(67,43,17,0.22)]"
+              className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-[28px] border border-[#dcc8ad] bg-[#fffaf1] p-5 shadow-[0_30px_90px_rgba(67,43,17,0.22)] sm:p-6"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4">
@@ -615,7 +615,7 @@ export default function ExplorePageClient({
                 <button
                   type="button"
                   onClick={handleCloseChallenge}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#dfcfb7] bg-white text-lg text-[#7a6247] transition-colors hover:text-foreground"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dfcfb7] bg-white text-lg text-[#7a6247] transition-colors hover:text-foreground"
                   aria-label="닫기"
                 >
                   &times;
@@ -667,7 +667,7 @@ export default function ExplorePageClient({
                   <button
                     type="button"
                     onClick={handleCloseChallenge}
-                    className="rounded-full border border-[#d8c6ac] bg-white px-4 py-2 text-sm font-medium text-[#6d573d] transition-colors hover:border-[#b78559] hover:text-foreground"
+                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#d8c6ac] bg-white px-4 py-2 text-sm font-medium text-[#6d573d] transition-colors hover:border-[#b78559] hover:text-foreground"
                   >
                     닫기
                   </button>
@@ -675,7 +675,7 @@ export default function ExplorePageClient({
                     type="button"
                     onClick={() => void handleSaveChallenge()}
                     disabled={savingChallenge}
-                    className="rounded-full bg-[#8a5d2f] px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-[#734a22] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#8a5d2f] px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-[#734a22] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {savingChallenge ? '저장 중...' : '기록 저장'}
                   </button>

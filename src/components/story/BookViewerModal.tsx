@@ -128,6 +128,8 @@ export default function BookViewerModal({
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   const isMobile = useMediaQuery('(max-width: 639px)');
+  const isShortLandscapeTablet = useMediaQuery('(max-width: 1199px) and (max-height: 700px) and (orientation: landscape)');
+  const useBottomCommentsPanel = isMobile || isShortLandscapeTablet;
 
   const isLastPage = currentPage === pages.length - 1;
   const normalizedTranslatedPagesByLanguage =
@@ -252,7 +254,7 @@ export default function BookViewerModal({
                   <select
                     value={selectedLanguage}
                     onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="rounded-full bg-black/35 backdrop-blur-sm px-3 py-1 text-xs font-medium text-white/90 border-none outline-none appearance-none cursor-pointer"
+                    className="min-h-11 rounded-full bg-black/35 backdrop-blur-sm px-3 py-1 text-xs font-medium text-white/90 border-none outline-none appearance-none cursor-pointer"
                   >
                     <option value="original">원문</option>
                     {availableLanguages.map((lc) => (
@@ -264,7 +266,7 @@ export default function BookViewerModal({
                 )}
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 rounded-full bg-black/35 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-white hover:bg-black/50 transition-colors"
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -341,10 +343,10 @@ export default function BookViewerModal({
                 aria-label="이전 페이지"
                 onClick={goPrev}
                 disabled={currentPage === 0}
-                className="absolute inset-y-0 left-0 z-30 w-[12%] cursor-w-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0"
+                className="coarse-pointer-visible absolute inset-y-0 left-0 z-30 w-[12%] cursor-w-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0"
               >
                 <div className="flex h-full items-center justify-start pl-3">
-                  <div className="rounded-full bg-black/25 p-2 backdrop-blur-sm">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
                     <ChevronLeft />
                   </div>
                 </div>
@@ -354,10 +356,10 @@ export default function BookViewerModal({
                 aria-label="다음 페이지"
                 onClick={goNext}
                 disabled={currentPage === pages.length - 1}
-                className="absolute inset-y-0 right-0 z-30 w-[12%] cursor-e-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0"
+                className="coarse-pointer-visible absolute inset-y-0 right-0 z-30 w-[12%] cursor-e-resize opacity-0 transition hover:opacity-100 disabled:cursor-default disabled:opacity-0"
               >
                 <div className="flex h-full items-center justify-end pr-3">
-                  <div className="rounded-full bg-black/25 p-2 backdrop-blur-sm">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
                     <ChevronRight />
                   </div>
                 </div>
@@ -369,7 +371,7 @@ export default function BookViewerModal({
                   <motion.button
                     onClick={(e) => { e.stopPropagation(); onLike(); }}
                     whileTap={{ scale: 1.3 }}
-                    className={`flex items-center gap-1.5 rounded-full backdrop-blur-sm px-3 py-1.5 shadow-md text-sm font-medium transition-colors ${
+	                    className={`flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium shadow-md backdrop-blur-sm transition-colors ${
                       isLiked
                         ? 'bg-red-500/90 text-white'
                         : 'bg-white/85 text-gray-700 hover:bg-white'
@@ -394,7 +396,7 @@ export default function BookViewerModal({
                 <motion.button
                   onClick={(e) => { e.stopPropagation(); setCommentsPanelOpen((v) => !v); }}
                   whileTap={{ scale: 1.1 }}
-                  className={`flex items-center gap-1.5 rounded-full backdrop-blur-sm px-3 py-1.5 shadow-md text-sm font-medium transition-colors ${
+	                  className={`flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium shadow-md backdrop-blur-sm transition-colors ${
                     commentsPanelOpen
                       ? 'bg-[#8c5d35] text-white'
                       : 'bg-white/85 text-gray-700 hover:bg-white'
@@ -414,7 +416,7 @@ export default function BookViewerModal({
                 type="button"
                 onClick={goPrev}
                 disabled={currentPage === 0}
-                className="flex items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-3 py-1.5 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0"
+                className="flex min-h-11 items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-4 py-2 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -431,12 +433,16 @@ export default function BookViewerModal({
                       key={idx}
                       aria-label={`${idx + 1}쪽`}
                       onClick={() => goToPage(idx)}
-                      className={`shrink-0 rounded-full transition-all ${
-                        idx === currentPage
-                          ? 'h-2 w-6 bg-[#8c5d35]'
-                          : 'h-2 w-2 bg-[#d9c7ae] hover:bg-[#c4ae92]'
-                      }`}
-                    />
+	                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#f7ead7]"
+	                    >
+	                      <span
+	                        className={`block h-2 rounded-full transition-all ${
+	                          idx === currentPage
+	                            ? 'w-6 bg-[#8c5d35]'
+	                            : 'w-2 bg-[#d9c7ae]'
+	                        }`}
+	                      />
+	                    </button>
                   ))
                 ) : (
                   <>
@@ -445,10 +451,14 @@ export default function BookViewerModal({
                         type="button"
                         key={idx}
                         onClick={() => goToPage(idx)}
-                        className={`shrink-0 rounded-full transition-all ${
-                          idx === currentPage ? 'h-2 w-6 bg-[#8c5d35]' : 'h-2 w-2 bg-[#d9c7ae] hover:bg-[#c4ae92]'
-                        }`}
-                      />
+	                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#f7ead7]"
+	                      >
+	                        <span
+	                          className={`block h-2 rounded-full transition-all ${
+	                            idx === currentPage ? 'w-6 bg-[#8c5d35]' : 'w-2 bg-[#d9c7ae]'
+	                          }`}
+	                        />
+	                      </button>
                     ))}
                     <span className="text-[10px] text-[#b8a48c] px-0.5">···</span>
                     {Array.from({ length: Math.min(3, pages.length) }, (_, i) => pages.length - 3 + i)
@@ -458,10 +468,14 @@ export default function BookViewerModal({
                           type="button"
                           key={idx}
                           onClick={() => goToPage(idx)}
-                          className={`shrink-0 rounded-full transition-all ${
-                            idx === currentPage ? 'h-2 w-6 bg-[#8c5d35]' : 'h-2 w-2 bg-[#d9c7ae] hover:bg-[#c4ae92]'
-                          }`}
-                        />
+	                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#f7ead7]"
+	                        >
+	                          <span
+	                            className={`block h-2 rounded-full transition-all ${
+	                              idx === currentPage ? 'w-6 bg-[#8c5d35]' : 'w-2 bg-[#d9c7ae]'
+	                            }`}
+	                          />
+	                        </button>
                       ))}
                   </>
                 )}
@@ -471,7 +485,7 @@ export default function BookViewerModal({
                 type="button"
                 onClick={goNext}
                 disabled={currentPage === pages.length - 1}
-                className="flex items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-3 py-1.5 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0"
+                className="flex min-h-11 items-center gap-1 rounded-full border border-[#d8c5a8] bg-[#fffaf1] px-4 py-2 text-sm font-semibold text-[#7d6243] transition hover:-translate-y-0.5 hover:bg-white disabled:opacity-30 disabled:hover:translate-y-0"
               >
                 <span className="hidden sm:inline">다음</span>
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -485,13 +499,13 @@ export default function BookViewerModal({
           <AnimatePresence>
             {commentsPanelOpen && (
               <motion.div
-                initial={isMobile ? { y: '100%' } : { x: '100%', opacity: 0 }}
-                animate={isMobile ? { y: 0 } : { x: 0, opacity: 1 }}
-                exit={isMobile ? { y: '100%' } : { x: '100%', opacity: 0 }}
+                initial={useBottomCommentsPanel ? { y: '100%' } : { x: '100%', opacity: 0 }}
+                animate={useBottomCommentsPanel ? { y: 0 } : { x: 0, opacity: 1 }}
+                exit={useBottomCommentsPanel ? { y: '100%' } : { x: '100%', opacity: 0 }}
                 transition={{ type: 'spring', damping: 28, stiffness: 260 }}
                 onClick={(e) => e.stopPropagation()}
                 className={
-                  isMobile
+                  useBottomCommentsPanel
                     ? 'fixed inset-x-0 bottom-0 z-[60] max-h-[70vh] rounded-t-2xl bg-[#fffaf1] border-t border-[#d9c7ae] shadow-[0_-10px_40px_rgba(94,63,34,0.2)] flex flex-col'
                     : 'fixed top-1/2 -translate-y-1/2 right-4 z-[60] w-[340px] max-h-[80vh] rounded-2xl bg-[#fffaf1] border border-[#d9c7ae] shadow-[0_20px_60px_rgba(94,63,34,0.25)] flex flex-col'
                 }
@@ -506,7 +520,7 @@ export default function BookViewerModal({
                   </h3>
                   <button
                     onClick={() => setCommentsPanelOpen(false)}
-                    className="w-7 h-7 rounded-full bg-[#e2d5c2] flex items-center justify-center text-[#7d6243] hover:bg-[#d9c7ae] transition-colors"
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e2d5c2] text-[#7d6243] transition-colors hover:bg-[#d9c7ae]"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -558,7 +572,7 @@ export default function BookViewerModal({
                         value={commentText}
                         onChange={(e) => onCommentChange?.(e.target.value)}
                         placeholder="감상을 남겨보세요..."
-                        className="flex-1 px-3 py-2 rounded-xl border border-[#d9c7ae] bg-white text-sm text-[#5d3b22] placeholder-[#c4ae92] focus:outline-none focus:ring-2 focus:ring-[#8c5d35]/30 focus:border-[#8c5d35]"
+                        className="min-h-11 flex-1 rounded-xl border border-[#d9c7ae] bg-white px-3 py-2 text-sm text-[#5d3b22] placeholder-[#c4ae92] focus:outline-none focus:ring-2 focus:ring-[#8c5d35]/30 focus:border-[#8c5d35]"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -569,7 +583,7 @@ export default function BookViewerModal({
                       <button
                         onClick={onSubmitComment}
                         disabled={!commentText?.trim() || submittingComment}
-                        className="px-4 py-2 bg-[#8c5d35] text-white rounded-xl text-sm font-semibold hover:bg-[#7a5130] transition-colors disabled:opacity-40"
+                        className="min-h-11 rounded-xl bg-[#8c5d35] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#7a5130] disabled:opacity-40"
                       >
                         {submittingComment ? '...' : '등록'}
                       </button>

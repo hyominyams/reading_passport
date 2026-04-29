@@ -35,6 +35,11 @@ export interface PurposeAnswers {
   reason: string;
 }
 
+export interface ToriAnswersRecord {
+  activity_id: string;
+  answers: Record<string, string>;
+}
+
 export interface AiDraftPage {
   draft: string;
   advice: string;
@@ -276,6 +281,12 @@ export interface ChatMessage {
 }
 
 export interface DocentActivityRecommendation {
+  /**
+   * Stable activity id (matches ACTIVITY_CANDIDATES in docent-recommendations).
+   * Optional for backwards compatibility with stories saved before the id
+   * was preserved through the normalizer.
+   */
+  id?: string;
   title: string;
   description: string;
   starter: string;
@@ -321,6 +332,7 @@ export interface Story {
   current_step: number;
   guide_answers: GuideAnswers | null;
   purpose_answers: PurposeAnswers | null;
+  tori_answers: ToriAnswersRecord | null;
   student_freewrite: string | null;
   ai_draft: AiDraftPage[] | null;
   final_text: string[] | null;

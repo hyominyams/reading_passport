@@ -110,7 +110,7 @@ function LibraryCountrySection({
               <button
                 key={opt.key}
                 onClick={() => setSortMode(opt.key)}
-                className={`text-[11px] sm:text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+	                className={`inline-flex min-h-10 items-center justify-center rounded-full px-3 py-1 text-[11px] font-medium transition-colors sm:min-h-11 sm:text-xs ${
                   sortMode === opt.key
                     ? 'bg-secondary text-white'
                     : 'bg-border/30 text-muted hover:bg-border/50'
@@ -128,10 +128,10 @@ function LibraryCountrySection({
           {canScrollLeft && (
             <button
               onClick={() => scroll('left')}
-              className="absolute left-0 top-0 bottom-4 z-10 w-10 flex items-center justify-center bg-gradient-to-r from-white/90 via-white/60 to-transparent opacity-0 group-hover/scroll:opacity-100 transition-opacity"
+	              className="coarse-pointer-visible absolute bottom-4 left-0 top-0 z-10 flex w-11 items-center justify-center bg-gradient-to-r from-white/90 via-white/60 to-transparent opacity-0 transition-opacity group-hover/scroll:opacity-100"
               aria-label="이전으로 스크롤"
             >
-              <span className="w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-foreground">
+	              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-foreground shadow-md">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
@@ -143,10 +143,10 @@ function LibraryCountrySection({
           {canScrollRight && (
             <button
               onClick={() => scroll('right')}
-              className="absolute right-0 top-0 bottom-4 z-10 w-10 flex items-center justify-center bg-gradient-to-l from-white/90 via-white/60 to-transparent opacity-0 group-hover/scroll:opacity-100 transition-opacity"
+	              className="coarse-pointer-visible absolute bottom-4 right-0 top-0 z-10 flex w-11 items-center justify-center bg-gradient-to-l from-white/90 via-white/60 to-transparent opacity-0 transition-opacity group-hover/scroll:opacity-100"
               aria-label="다음으로 스크롤"
             >
-              <span className="w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-foreground">
+	              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-foreground shadow-md">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>

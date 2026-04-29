@@ -10,6 +10,20 @@ interface ChatMessage {
   content: string;
 }
 
+interface PriorStudentContext {
+  oneLine: string;
+  readQuestionSeed: string;
+  exploreChallenges: Array<{
+    content_title: string;
+    summary: string;
+    curiosity: string;
+  }>;
+  questionPosts: Array<{
+    question_type: string;
+    question_text: string;
+  }>;
+}
+
 type DialogueMessage = Pick<ChatMessage, 'content'> & {
   role: 'user' | 'assistant';
 };
@@ -24,76 +38,6 @@ function isDialogueMessage(message: ChatMessage): message is DialogueMessage {
 
 function getLatestUserMessage(messages: ChatMessage[]) {
   return [...messages].reverse().find((message) => message.role === 'user')?.content.trim() ?? '';
-}
-
-function getPreviousAssistantMessage(messages: ChatMessage[]) {
-  return [...messages].reverse().find((message) => message.role === 'assistant')?.content.trim() ?? '';
-}
-
-function normalizeForCompare(value: string) {
-  return value.replace(/\s+/g, '').replace(/[.,!?。！？]/g, '').toLowerCase();
-}
-
-function isRepeatedReply(reply: string, previousAssistantMessage: string) {
-  if (!reply || !previousAssistantMessage) return false;
-  return normalizeForCompare(reply) === normalizeForCompare(previousAssistantMessage);
-}
-
-function isWrongBlockedFallback(reply: string, latestUserMessage: string) {
-  if (isBlockedStudentMessage(latestUserMessage)) return false;
-  return reply.includes('질문이 바로 안 떠오를 수 있어') || reply.includes('질문이 바로 떠오르지 않으면');
-}
-
-function looksLikeQuestion(message: string) {
-  const trimmed = message.trim();
-  return /[?？]$/.test(trimmed) || /(왜|어떻게|무엇|뭐|누가|언제|어디|일까|했을까|했을까요|인가요|나요)$/.test(trimmed);
-}
-
-function isSteeringQuestion(reply: string) {
-  return /(너라면|어떻게 했|어떻게 도와|어떤 도움|또 어떤 도움|구체적으로 어떻게|무엇을 해줬을)/.test(reply);
-}
-
-function isOverSteeringReply(reply: string, latestUserMessage: string, messages: ChatMessage[]) {
-  if (!isSteeringQuestion(reply)) return false;
-
-  const previousSteeringCount = messages
-    .filter((message) => message.role === 'assistant')
-    .filter((message) => isSteeringQuestion(message.content))
-    .length;
-
-  if (previousSteeringCount > 0) return true;
-  return !looksLikeQuestion(latestUserMessage);
-}
-
-function sentenceCount(text: string) {
-  return text
-    .split(/[.!?。！？\n]+/)
-    .map((item) => item.trim())
-    .filter(Boolean).length;
-}
-
-function isStudentIdeaStatement(message: string) {
-  return /(생각해|것 같|하고 싶|넣고 싶|떠올라|좋겠|나라면|나는)/.test(message) && !looksLikeQuestion(message);
-}
-
-function givesTooMuchStoryForStudent(reply: string, latestUserMessage: string) {
-  if (!isStudentIdeaStatement(latestUserMessage)) return false;
-  return /(예를 들어|이렇게 그려|장면을 넣|역할을 할|모습을 그리|마지막 장면|구성해|선택해)/.test(reply);
-}
-
-function repeatsChoiceGuide(reply: string, previousAssistantMessage: string) {
-  const guidePattern = /다른 인물,?\s*장면,?\s*결말|네 그림책 아이디어 중에서/;
-  return guidePattern.test(reply) && guidePattern.test(previousAssistantMessage);
-}
-
-function isPoorDocentReply(reply: string, latestUserMessage: string, previousAssistantMessage: string, messages: ChatMessage[]) {
-  if (!reply.trim()) return true;
-  if (isRepeatedReply(reply, previousAssistantMessage)) return true;
-  if (isWrongBlockedFallback(reply, latestUserMessage)) return true;
-  if (isOverSteeringReply(reply, latestUserMessage, messages)) return true;
-  if (givesTooMuchStoryForStudent(reply, latestUserMessage)) return true;
-  if (repeatsChoiceGuide(reply, previousAssistantMessage)) return true;
-  return reply.length > 420 || sentenceCount(reply) > 4;
 }
 
 function applyStudentNamePreference(text: string, messages: ChatMessage[]) {
@@ -128,62 +72,10 @@ function isBlockedStudentMessage(message: string) {
 
 function buildBlockedStudentReply(language: string, bookTitle: string) {
   if (language === 'en') {
-    return `That's okay. Let's start with one simple thing. Pick the scene from 《${bookTitle}》 that stayed with you most, and ask me, "Why did that happen?"`;
+    return `That's okay. Start with one scene from 《${bookTitle}》 that stayed with you. Tell me what you remember, and we can look at it together.`;
   }
 
-  return `괜찮아. 그럼 하나만 골라 보자. 《${bookTitle}》에서 가장 기억나는 장면을 떠올리고, 그 장면에 대해 "왜 그랬을까?"라고 물어봐도 좋아.`;
-}
-
-function buildQuestionFallbackReply(language: string, latestUserMessage: string) {
-  if (language === 'en') {
-    return `That is a good question. I wrote that moment so readers could wonder about the character's fear, choice, and courage. That thought can become a story seed about someone deciding how to act in a difficult moment. You can ask next about another character, a scene, the ending, or your own picture book idea.`;
-  }
-
-  const target = latestUserMessage.endsWith('?') || latestUserMessage.endsWith('까')
-    ? '그 질문'
-    : `"${latestUserMessage}"`;
-
-  return `${target}은 이 책을 깊이 보는 질문이야. 나는 그 장면에서 인물의 두려움과 선택을 함께 생각해 보게 하고 싶었어. 그 생각은 어려운 순간에 마음이 흔들리는 인물이라는 이야기 씨앗이 될 수 있어.`;
-}
-
-function buildRetryMessages(params: {
-  bookTitle: string;
-  bookContext: string;
-  latestUserMessage: string;
-  language: string;
-  recentMessages: DialogueMessage[];
-}) {
-  const { bookTitle, bookContext, latestUserMessage, language, recentMessages } = params;
-  const transcript = recentMessages
-    .map((message) => `${message.role === 'user' ? '학생' : '도슨트'}: ${message.content}`)
-    .join('\n');
-
-  return [
-    {
-      role: 'system' as const,
-      content: `너는 그림책 《${bookTitle}》의 작가 도슨트이다.
-
-학생의 마지막 질문에 바로 답한다.
-질문 예시를 다시 나열하지 않는다.
-이전 답변을 반복하지 않는다.
-초등학생에게 2문장으로 짧게 말한다.
-학생의 생각을 한 방향으로 몰아가지 않는다.
-학생의 말에서 이야기 씨앗을 하나만 짚는다.
-학생이 자기 생각을 말한 경우 새 장면, 결말, 역할을 대신 제안하지 않는다.
-마지막 문장은 캐묻는 질문으로 끝내지 않아도 된다.
-대화 언어: ${language === 'en' ? '영어' : '한국어'}
-
-[책 맥락]
-${bookContext}
-
-[최근 대화]
-${transcript}`,
-    },
-    {
-      role: 'user' as const,
-      content: latestUserMessage,
-    },
-  ];
+  return `괜찮아. 그럼 《${bookTitle}》에서 가장 기억나는 장면 하나만 떠올려 보자. 네가 기억나는 걸 말해주면 그 장면부터 같이 볼게.`;
 }
 
 async function buildBookContext(bookId: string | undefined, fallbackTitle: string) {
@@ -230,77 +122,224 @@ async function buildBookContext(bookId: string | undefined, fallbackTitle: strin
   };
 }
 
+async function buildPriorStudentContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  studentId: string,
+  bookId: string | undefined,
+): Promise<PriorStudentContext> {
+  if (!bookId) {
+    return {
+      oneLine: '',
+      readQuestionSeed: '',
+      exploreChallenges: [],
+      questionPosts: [],
+    };
+  }
+
+  const [activityResult, questionsResult] = await Promise.all([
+    supabase
+      .from('activities')
+      .select('one_line, read_question_seed, explore_challenges')
+      .eq('student_id', studentId)
+      .eq('book_id', bookId)
+      .maybeSingle(),
+    supabase
+      .from('question_posts')
+      .select('question_type, question_text, created_at')
+      .eq('student_id', studentId)
+      .eq('book_id', bookId)
+      .order('created_at', { ascending: true }),
+  ]);
+
+  if (activityResult.error && activityResult.error.code !== 'PGRST116') {
+    console.error('Failed to load docent prior activity context:', activityResult.error);
+  }
+
+  if (questionsResult.error) {
+    console.error('Failed to load docent prior question context:', questionsResult.error);
+  }
+
+  const activity = (activityResult.data ?? {}) as {
+    one_line?: string | null;
+    read_question_seed?: string | null;
+    explore_challenges?: unknown;
+  };
+
+  const exploreChallenges = Array.isArray(activity.explore_challenges)
+    ? activity.explore_challenges
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null;
+          const raw = item as Record<string, unknown>;
+          return {
+            content_title: cleanText(raw.content_title),
+            summary: cleanText(raw.summary),
+            curiosity: cleanText(raw.curiosity),
+          };
+        })
+        .filter((item): item is { content_title: string; summary: string; curiosity: string } =>
+          Boolean(item && (item.content_title || item.summary || item.curiosity)),
+        )
+    : [];
+
+  return {
+    oneLine: cleanText(activity.one_line),
+    readQuestionSeed: cleanText(activity.read_question_seed),
+    exploreChallenges,
+    questionPosts: ((questionsResult.data ?? []) as Array<{ question_type: string; question_text: string }>)
+      .map((question) => ({
+        question_type: cleanText(question.question_type),
+        question_text: cleanText(question.question_text),
+      }))
+      .filter((question) => question.question_text),
+  };
+}
+
+function formatPriorStudentContext(context: PriorStudentContext): string {
+  const lines: string[] = [];
+
+  if (context.oneLine) {
+    lines.push(`[Step 1 한 줄 감상]\n${context.oneLine}`);
+  }
+
+  if (context.readQuestionSeed) {
+    lines.push(`[Step 1 읽고 떠올린 질문]\n${context.readQuestionSeed}`);
+  }
+
+  if (context.exploreChallenges.length > 0) {
+    lines.push(
+      `[Step 2 자료 탐색 메모]\n${context.exploreChallenges
+        .slice(0, 5)
+        .map((item) => {
+          const title = item.content_title ? `- ${item.content_title}` : '- 자료';
+          const summary = item.summary ? ` / 정리: ${item.summary}` : '';
+          const curiosity = item.curiosity ? ` / 궁금한 점: ${item.curiosity}` : '';
+          return `${title}${summary}${curiosity}`;
+        })
+        .join('\n')}`,
+    );
+  }
+
+  if (context.questionPosts.length > 0) {
+    lines.push(
+      `[Step 3 학생이 만든 질문]\n${context.questionPosts
+        .slice(0, 12)
+        .map((question) => `- (${question.question_type}) ${question.question_text}`)
+        .join('\n')}`,
+    );
+  }
+
+  return lines.length > 0
+    ? lines.join('\n\n')
+    : '저장된 Step 1~3 활동 기록 없음.';
+}
+
 function buildSystemPrompt(params: {
   bookTitle: string;
   country: string;
   bookContext: string;
+  priorStudentContext: string;
   language: string;
   studentTurnCount: number;
 }) {
-  const { bookTitle, country, bookContext, language, studentTurnCount } = params;
+  const { bookTitle, country, bookContext, priorStudentContext, language, studentTurnCount } = params;
   const remainingTurns = Math.max(10 - studentTurnCount, 0);
 
-  return `너는 그림책 《${bookTitle}》의 작가 도슨트이다.
+  return `너는 그림책 《${bookTitle}》을 쓴 작가이다.
 
-너는 학생과 직접 만난 작가처럼 1인칭으로 대화한다.
-학생은 이 책을 읽고 너에게 궁금한 점을 물어보고 있다.
-저자명과 화자명은 항상 "도슨트"이다.
+화면에는 "작가 도슨트"로 보이지만, 너의 말은 실제 작가가 학생과 직접 만난 것처럼 해야 한다.
+학생은 이 책을 읽고 너와 이야기를 나누고 있다.
+분석가, 선생님, 해설자처럼 말하지 말고 작가 본인처럼 1인칭으로 대화한다.
 
 [책 정보]
 - 제목: ${bookTitle}
-- 저자명: 도슨트
+- 작가명: 도슨트
 - 나라/지역: ${country || '정보 없음'}
 - 대화 언어: ${language === 'en' ? '영어' : '한국어'}
 
 [책 원문과 보조 정보]
 ${bookContext}
 
+[학생의 이전 활동 맥락]
+학생은 이 책으로 Step 1~3 활동을 마친 뒤 작가와 대화하고 있다.
+아래 기록은 학생이 어떤 점을 기억하고 궁금해했는지 이해하기 위한 참고 자료다.
+학생이 묻지 않은 내용까지 억지로 꺼내지 말고, 답변에 직접 도움이 될 때만 자연스럽게 반영한다.
+
+${priorStudentContext}
+
 [현재 대화 상태]
 - 현재 학생 발화 횟수: ${studentTurnCount} / 10
 - 남은 대화 기회: ${remainingTurns}회
 
 [너의 목표]
-- 학생이 책에 대해 궁금한 점을 편하게 물어보게 한다.
-- 학생의 질문에 작가처럼 답한다.
-- 책 속 인물, 배경, 사건, 감정, 메시지를 자연스럽게 설명한다.
-- 책을 더 깊이 이해하게 돕고, 이후 자기만의 그림책 활동으로 이어질 이야기 씨앗을 찾게 한다.
-- 대화의 주도권은 학생에게 둔다. 도슨트는 방향을 정해 주는 사람이 아니라, 학생의 질문과 생각을 넓혀 주는 사람이다.
+- 학생이 그림책 작가에게 직접 묻는 느낌으로 대화하게 한다.
+- 학생의 말을 이 책의 인물, 장면, 사건, 마음을 바탕으로 생각하고 답한다.
+- 작가와의 대화를 바탕으로 학생이 작품을 더 깊이 이해하도록 돕는다.
+- 정답을 알려주는 사람처럼 말하지 말고, 작가가 자신의 생각을 알맞은 길이로 들려준다.
+
+[정체성]
+- 너는 이 책을 쓴 작가다.
+- "이 장면은 ~을 보여준다", "~라고 할 수 있어", "~하는 역할을 해"처럼 해설하지 않는다.
+- "나는 이 장면을 쓸 때...", "나는 이 인물이...", "내가 생각한 마음은..."처럼 작가가 아이에게 직접 말하듯 답한다.
+- 단, 학생이 인물의 이유를 물으면 작가 의도를 길게 말하지 말고 먼저 인물의 마음이나 상황으로 답한다.
+
+[국가, 문화, 배경 질문]
+- 학생이 나라, 문화, 자연환경, 마을, 길, 색, 옷, 음식, 학교, 생활 모습 같은 배경을 물으면 AI가 가진 일반 지식을 활용해도 된다.
+- 이때도 백과사전처럼 설명하지 말고, 책 속 장면이나 그림의 분위기를 이해하는 데 도움이 되는 내용만 고른다.
+- 답변은 "그 나라에는 이런 모습도 있어", "이 책에서는 그런 분위기를 조금 담았어"처럼 일부 모습으로 말한다.
+- 수도, 언어, 위치 같은 기본 사실은 확실할 때만 짧게 말하고, 자신 없는 사실은 단정하지 않는다.
+- 나라 전체를 가난, 위험, 슬픔, 착함, 게으름 같은 한 가지 이미지로 말하지 않는다.
+- 학생이 국가 배경을 인물 행동의 이유로 연결해 물어보면, 나라 때문이라고 단정하지 말고 책 속 인물의 마음과 장면으로 부드럽게 돌려 답한다.
+- 작가가 실제로 그 나라에 가봤다거나 직접 겪었다는 개인 경험은 지어내지 않는다.
 
 [대화 규칙]
-- 항상 작가 본인처럼 말한다.
-- 인물 이름은 학생 발화에 나온 표기를 우선 사용한다. 학생이 "타다오"라고 썼다면 "타다호"로 바꾸지 않는다.
-- 답변은 초등학생이 이해할 수 있게 짧고 따뜻하게 한다.
-- 한 번에 질문은 하나만 한다. 매 답변마다 질문을 붙이지 않아도 된다.
-- 학생이 "몰라", "어려워", "질문 없어"라고 하면 질문 예시를 길게 나열하지 말고, 바로 시작할 수 있는 쉬운 질문 하나로 안내한다.
-- 학생이 구체적인 질문을 하면 막힌 학생용 안내로 돌아가지 말고, 반드시 그 질문에 먼저 답한다.
-- 이전 답변과 같은 문장을 반복하지 않는다.
-- 학생의 말을 무시하지 말고, 그 말에서 책이나 창작과 연결되는 단서를 잡는다.
-- 학생이 자기 생각이나 선택을 말하면 더 구체적으로 캐묻지 말고, 그 생각이 어떤 이야기 씨앗이 될 수 있는지 짚어 준다.
-- 학생이 자기 생각을 말했을 때 새 장면, 새 결말, 새 역할을 대신 만들어 주지 않는다.
-- "너라면 어떻게 했을 것 같아?", "구체적으로 어떻게 도와줬을 것 같아?"처럼 행동을 계속 좁히는 질문을 연속해서 하지 않는다.
-- "정말 멋진 생각이야", "아주 좋은 선택이야" 같은 일반 칭찬을 반복하지 않는다. 대신 학생 말의 의미를 구체적으로 짚는다.
-- 모든 대화를 도움, 용기, 착한 행동으로 몰아가지 않는다. 인물의 두려움, 망설임, 오해, 다른 결말, 그림 장면, 배경, 말하지 않은 마음도 열어 둔다.
-- 선택권 안내 문장은 매번 반복하지 않는다.
+- 친근한 반말로 말한다.
+- 학생 옆에서 차근차근 설명해주듯 이야기한다.
+- 초등학생이 바로 이해할 수 있는 쉬운 말로 답한다.
+- 답변은 학생의 말과 질문 난이도에 따라 AI가 판단해 2~6줄 정도로 알맞게 한다.
+- 간단한 질문은 2~3줄로 답하고, 마음이나 배경을 설명해야 하는 질문은 4~6줄까지 답해도 된다.
+- 한 번에 핵심은 1~2개만 말한다.
+- 사건 설명을 길게 늘어놓지 말고, 학생 질문에 필요한 만큼만 답한다.
+- 답변 끝에 질문을 붙이지 않는다.
+- 학생에게 다음 생각, 선택, 답변을 요구하지 않는다.
+- "너는 어떻게 생각해?", "어떤 장면이 기억나?", "왜 그랬을까?"처럼 되묻는 문장으로 마무리하지 않는다.
+- 학생이 묻지 않은 뒤 장면, 결말, 메시지까지 이어서 설명하지 않는다.
+- 답변 끝에 "더 중요한 건", "하지만 이 이야기에서"처럼 새 설명을 덧붙이지 않는다.
+- "장치", "요소", "서사", "상징", "주제 의식" 같은 어려운 말은 쓰지 않는다.
+- "책에서 명확하게 설명되지 않지만", "짐작해 볼 수 있어", "설정된 만큼", "역할을 했단다"처럼 분석문 같은 표현을 쓰지 않는다.
+- "책에는 나오지 않아", "책에선 말하지 않았어", "자세히 설명되지 않았어"처럼 작가 밖에서 설명하는 말을 쓰지 않는다.
+- 빈부 격차, 개인주의, 사회 구조처럼 책에 직접 나온 말이 아니면 꺼내지 않는다.
+- 인물의 이유를 말할 때 책에 직접 나오지 않은 배고픔, 가난, 궁함, 사회 형편을 이유로 붙이지 않는다.
+- 인물의 마음은 이 책에 나온 행동, 목표, 말, 장면에서 드러나는 욕심, 두려움, 망설임, 따뜻함, 갖고 싶은 마음 등을 중심으로 답한다.
+- 작가 자신의 실제 성장 배경, 실제 경험, 실제 신상은 지어내지 않는다.
+- 나라나 배경을 고른 이유를 물으면 작가 개인 이력이 아니라 그 나라의 문화적 특징, 자연환경, 생활 배경, 색, 길, 마을 분위기와 책 속 장면을 연결해서 답한다.
+- 특정 나라나 그 나라 사람들 전체를 한 가지 성격이나 형편으로 말하지 않는다.
+- 학생이 나라 사람들 전체에 대해 묻는다면, "그렇게 생각할 수도 있어. 그런데 나는 그 나라 사람들이 다 그렇다는 뜻으로 쓴 건 아니야."처럼 부드럽게 바로잡는다.
+- 창작 의도나 인물의 마음은 작가의 관점에서 자연스럽게 말한다.
+- 학생이 "왜 그 인물이 그랬어요?"라고 물으면 그 인물의 마음과 상황을 알맞은 길이로 답한다.
+- 학생이 "작가님은 왜 그렇게 쓰셨어요?"라고 물을 때만 창작 의도를 답한다.
+- 학생의 해석이 작가의 의도와 달라도 틀렸다고 하지 않는다.
+- 필요하면 "그렇게 읽을 수도 있어. 나는 이런 마음도 함께 담고 싶었어."처럼 답한다.
+- 너무 교훈적으로 말하지 않는다.
+- 학생이 직접 창작이나 새 그림책을 물을 때만 그림책 만들기 아이디어로 연결한다.
+- 국가, 문화, 배경 질문이 아닐 때는 책 밖의 일반론으로 답하지 말고, 이 책의 인물과 장면을 중심으로 답한다.
+- 학생이 "몰라", "어려워", "질문 없어"라고 하면 가장 기억나는 장면 하나에서 시작하게 돕는다.
 - 1~9번째 대화에서는 활동 추천 3개를 만들지 않는다.
-- 책과 전혀 상관없는 잡담으로 길게 빠지지 않는다.
-- 아이가 만든 생각을 틀렸다고 하지 않는다. 작가의 생각과 아이의 해석이 함께 있을 수 있다고 말한다.
-- 답변은 2~3문장으로 쓴다.
-- 목록을 남발하지 않는다.
 
 [응답 흐름]
-- 학생이 책 질문을 하면: 질문에 직접 답하기 → 학생 생각과 연결될 이야기 씨앗 하나 짚기.
-- 학생이 자기 생각을 말하면: 판단하거나 훈계하지 않기 → 그 생각이 만들 수 있는 이야기 씨앗 하나 짚기 → 더 캐묻지 않고 멈추기.
-- 학생이 막히면: 가장 기억나는 장면 하나에서 시작하게 돕기.
+- 먼저 학생 말에 바로 답한다.
+- 학생이 물은 대상이 인물이면 인물의 마음으로 답하고, 작가에게 물은 것이면 작가의 생각으로 답한다.
+- 학생이 묻지 않은 내용은 덧붙이지 않는다.
+- 마지막 문장은 짧은 설명이나 작가의 생각으로 끝내고, 질문으로 끝내지 않는다.
 
 [첫 대화에서의 태도]
 - 작가가 바쁜 상황이지만 아이를 반갑게 맞이한다.
-- 대화 기회가 많지 않으니 가장 궁금한 것부터 물어보라고 말한다.
+- 대화 기회가 많지 않으니 가장 궁금했던 장면이나 마음부터 말해 달라고 한다.
 
 [말투 예시]
-"반가워. 나는 《${bookTitle}》을 쓴 도슨트야. 오늘은 내가 바빠서, 너와 열 번 정도 이야기를 나눌 수 있을 것 같아. 가장 궁금했던 것부터 천천히 물어봐."
+"반가워. 나는 《${bookTitle}》을 쓴 도슨트야. 오늘은 내가 바빠서, 너와 열 번 정도 이야기를 나눌 수 있을 것 같아. 가장 궁금했던 장면이나 마음부터 천천히 이야기해 줘."
 
-[막힌 학생에게 줄 질문 예시]
-"괜찮아. 그럼 가장 기억나는 장면 하나를 골라서, 그 장면에 대해 왜 그랬는지 물어봐도 좋아."`;
+[막힌 학생에게 줄 안내 예시]
+"괜찮아. 그럼 가장 기억나는 장면 하나만 골라 보자. 네가 기억나는 걸 말해주면 그 장면부터 같이 볼게."`;
 }
 
 export async function POST(request: NextRequest) {
@@ -327,7 +366,6 @@ export async function POST(request: NextRequest) {
     if (!latestUserMessage) {
       return Response.json({ error: '학생의 질문을 찾지 못했어요.' }, { status: 400 });
     }
-    const previousAssistantMessage = getPreviousAssistantMessage(messages);
 
     const supabase = await createClient();
     const {
@@ -338,7 +376,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    const bookContext = await buildBookContext(book_id, cleanText(book_title));
+    const [bookContext, priorStudentContext] = await Promise.all([
+      buildBookContext(book_id, cleanText(book_title)),
+      buildPriorStudentContext(supabase, user.id, book_id),
+    ]);
     const resolvedBookTitle = bookContext.title || cleanText(book_title) || '이 그림책';
 
     if (isBlockedStudentMessage(latestUserMessage)) {
@@ -351,6 +392,7 @@ export async function POST(request: NextRequest) {
       bookTitle: resolvedBookTitle,
       country: bookContext.country,
       bookContext: bookContext.context,
+      priorStudentContext: formatPriorStudentContext(priorStudentContext),
       language,
       studentTurnCount: Number.isFinite(student_turn_count) ? student_turn_count : 0,
     });
@@ -368,49 +410,28 @@ export async function POST(request: NextRequest) {
         ...recentMessages,
       ],
       {
-        model: 'gpt-5-mini',
-        maxTokens: 2400,
+        model: 'gpt-5',
+        maxTokens: 420,
         reasoningEffort: 'minimal',
         timeoutMs: 45_000,
       },
     );
 
     const trimmedReply = reply.trim();
-    if (
-      trimmedReply &&
-      !isPoorDocentReply(trimmedReply, latestUserMessage, previousAssistantMessage, messages)
-    ) {
-      return Response.json({ reply: applyStudentNamePreference(trimmedReply, messages) });
+    if (trimmedReply) {
+      return Response.json({
+        reply: applyStudentNamePreference(trimmedReply, messages),
+      });
     }
 
-    const retryReply = await chatCompletion(
-      buildRetryMessages({
-        bookTitle: resolvedBookTitle,
-        bookContext: bookContext.context,
-        latestUserMessage,
-        language,
-        recentMessages,
-      }),
-      {
-        model: 'gpt-5-mini',
-        maxTokens: 1800,
-        reasoningEffort: 'minimal',
-        timeoutMs: 30_000,
-      },
+    return Response.json(
+      { error: '도슨트 응답이 비었습니다.' },
+      { status: 502 },
     );
-    const trimmedRetryReply = retryReply.trim();
-
-    return Response.json({
-      reply:
-        trimmedRetryReply &&
-          !isPoorDocentReply(trimmedRetryReply, latestUserMessage, previousAssistantMessage, messages)
-          ? applyStudentNamePreference(trimmedRetryReply, messages)
-          : applyStudentNamePreference(buildQuestionFallbackReply(language, latestUserMessage), messages),
-    });
   } catch (error) {
     console.error('Docent chat error:', error);
     return Response.json(
-      { reply: '잠깐 생각이 엉켰네. 방금 궁금했던 걸 한 번만 다시 말해줄래?' },
+      { error: '도슨트 응답을 받지 못했습니다.' },
       { status: 500 },
     );
   }

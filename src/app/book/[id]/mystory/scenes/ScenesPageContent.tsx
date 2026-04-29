@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import MyStoryActionDock from '@/components/story/MyStoryActionDock';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
 import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
@@ -286,7 +287,7 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
   return (
     <>
       <MyStoryStepSidebar currentStep={4} busy={saving} onStepSelect={handleStepSelect} />
-      <div className="flex-1 flex justify-center lg:mr-[22rem] xl:mr-[25rem]">
+      <div className="flex-1 flex justify-center xl:mr-[22rem] 2xl:mr-[25rem]">
       <main className="flex-1 px-4 py-8 max-w-3xl">
         {/* Header */}
         <div className="mb-8">
@@ -354,22 +355,21 @@ export default function ScenesPageContent({ storyId }: { storyId: string | null 
           ))}
         </div>
 
-        {/* Bottom button */}
-        <div className="mt-10 flex justify-end">
+        {/* Bottom action — sticky dock on mobile, inline on md+ */}
+        <MyStoryActionDock>
           <button
             type="button"
             onClick={() => void handleFinish()}
             disabled={saving}
-            className="px-6 py-3 rounded-xl bg-foreground text-white font-medium text-sm
-              hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-xl bg-foreground px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? '저장 중...' : '주인공 설정하러 가기'}
           </button>
-        </div>
+        </MyStoryActionDock>
       </main>
 
       {/* Right-side CTA — desktop only */}
-      <aside className="hidden lg:block w-52 shrink-0 pt-32 pr-4">
+      <aside className="hidden xl:block w-52 shrink-0 pt-32 pr-4">
         <div className="sticky top-28">
           <div className="flex flex-col items-center text-center">
             {/* Artist character */}
@@ -485,7 +485,7 @@ function PageCard({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-2 text-xs text-muted hover:text-foreground transition-colors"
+	                className="mt-2 inline-flex min-h-10 items-center rounded-lg px-3 text-xs text-muted transition-colors hover:text-foreground"
               >
                 다른 그림으로 변경
               </button>
@@ -523,7 +523,7 @@ function PageCard({
           onChange={(e) => onDescriptionChange(e.target.value)}
           placeholder="이 페이지의 장면을 자유롭게 설명해 주세요..."
           rows={3}
-          className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200
+	          className="mt-2 min-h-11 w-full rounded-xl border border-gray-200 px-4 py-3
             bg-gray-50 text-sm text-foreground placeholder:text-gray-400
             focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30
             resize-none"
@@ -550,7 +550,7 @@ function RadioOption({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-colors ${
+	      className={`flex min-h-11 items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
         selected
           ? 'border-foreground/40 bg-foreground/[0.04]'
           : 'border-gray-200 bg-white hover:bg-gray-50'

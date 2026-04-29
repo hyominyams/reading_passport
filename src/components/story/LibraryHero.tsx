@@ -65,7 +65,7 @@ function LibraryHero({ item, onItemClick }: LibraryHeroProps) {
           )}
 
           <div className="flex items-center gap-4">
-            <button className="px-6 py-2.5 bg-white text-foreground rounded-full text-sm font-bold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+            <button className="min-h-11 rounded-full bg-white px-6 py-2.5 text-sm font-bold text-foreground shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl">
               읽어보기
             </button>
             <div className="flex items-center gap-3 text-white/60 text-sm">

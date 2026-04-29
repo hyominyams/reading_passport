@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 import { chatCompletion } from '@/lib/ai/openai';
 import { buildBookAnalysisPromptContext } from '@/lib/book-analysis';
+import { countries } from '@/lib/data/countries';
 import { getLatestCompletedBookAnalysis } from '@/lib/queries/book-analyses';
 import { getLatestCompletedBookPdfText } from '@/lib/queries/book-pdf-texts';
 import { createClient } from '@/lib/supabase/server';
-import type { DocentActivityRecommendation } from '@/types/database';
+import { getToriCardSet, normalizeToriAnswers } from '@/lib/tori-questions';
+import type { DocentActivityRecommendation, ToriAnswersRecord } from '@/types/database';
 
 type DraftPage = {
   draft: string;
@@ -16,35 +18,141 @@ type DocentChatMessage = {
   content: string;
 };
 
-function buildStudentInput(params: {
-  guide_answers?: {
-    content?: string;
-    character?: string;
-    world?: string;
-  } | null;
-  student_freewrite?: string | null;
-  all_student_messages?: string | null;
-}) {
-  const { guide_answers, student_freewrite, all_student_messages } = params;
-  const parts: string[] = [];
+/**
+ * Per-activity guidance the LLM uses to map Tori answers onto the 5-scene
+ * picture-book structure. The keys here match the `key` field of each card
+ * in `src/lib/tori-questions.ts`. The prompt also tells the model to fall
+ * back to inference when an answer is vague.
+ */
+const ACTIVITY_SCENE_MAPPINGS: Record<string, string> = {
+  continue_story: `
+1. 발단: "start_event" 답을 그대로 사용해 책이 끝난 다음 날의 풍경과 주인공을 보여준다.
+2. 전개: 일상 속에서 "new_event"가 시작되는 장면.
+3. 위기: "new_event"의 여파로 주인공이 흔들리는 순간.
+4. 절정: "helper" 답을 등장시켜 전환점을 만든다.
+5. 결말: "ending" 답을 학생 어조 그대로 이룬다.`,
+  before_story: `
+1. 발단: "timeframe"과 "past_state" 답을 토대로 책 이전의 주인공을 소개한다.
+2. 전개: "origin_event"의 첫 신호가 일상에 등장한다.
+3. 위기: "origin_event"가 본격적으로 주인공을 흔든다.
+4. 절정: 주인공이 그 사건을 마주하는 결정적 장면.
+5. 결말: "ending" 답대로 마무리하되, 책의 시작 장면과 자연스럽게 이어지도록 한다.`,
+  new_problem_story: `
+1. 발단: 책의 결말 직후 풍경에서 시작. 주인공이 평온해 보이는 순간.
+2. 전개: "new_problem" 답을 그대로 발생 장면으로 만든다.
+3. 위기: "why_hard"의 이유가 드러나며 주인공이 흔들린다.
+4. 절정: "helper" 답을 등장시켜 전환점을 만든다.
+5. 결말: "ending" 답대로 마무리한다.`,
+  hidden_scene_story: `
+1. 발단: "between_what"이 가리키는 두 장면 중 앞 장면의 끝에서 시작한다.
+2. 전개: "what_happened"의 첫 부분을 보여준다.
+3. 위기: "what_happened"가 깊어지는 순간 + "inner_feeling"의 흔들림.
+4. 절정: 그 마음이 정점에 도달하는 장면.
+5. 결말: "between_what"이 가리키는 뒷 장면으로 자연스럽게 이어지는 마무리.`,
+  new_helper_story: `
+1. 발단: 책의 어려움이 아직 남아 있는 풍경에서 시작.
+2. 전개: "meeting_moment"에 따라 "new_friend"가 등장.
+3. 위기: 함께 풀어가려 했지만 더 큰 문제가 드러나는 순간.
+4. 절정: "how_help"가 일어나는 결정적 장면.
+5. 결말: "ending" 답대로 마무리한다.`,
+  change_main_character: `
+1. 발단: "new_protagonist"를 소개하고 "daily_life" 답으로 그의 세계를 보여준다.
+2. 전개: 그 인물의 일상에서 "conflict"가 시작된다.
+3. 위기: "conflict"가 커지고 인물이 흔들린다.
+4. 절정: 인물이 "conflict"를 마주하는 결정적 장면.
+5. 결말: "ending" 답대로 마무리한다.`,
+  side_character_story: `
+1. 발단: "which_character"의 평범한 하루를 "daily_life" 답으로 보여준다.
+2. 전개: "hidden_feeling"의 단서가 드러나는 작은 사건.
+3. 위기: 그 인물이 숨긴 마음과 마주하는 순간.
+4. 절정: "hidden_feeling"이 행동으로 표현되는 장면.
+5. 결말: "ending" 답대로 마무리한다.`,
+  opposite_perspective: `
+1. 발단: "whose_eyes"의 시점에서 책의 첫 만남 장면을 다시 그린다.
+2. 전개: "what_seen" 답에 따라 같은 사건이 그 인물 눈에 어떻게 보였는지 보여준다.
+3. 위기: 그 인물이 처음에 알아채지 못한 진실 또는 갈등이 드러난다.
+4. 절정: "feeling_change"가 일어나는 결정적 장면.
+5. 결말: 그 인물의 시점으로 책의 결말을 다시 본다.`,
+  change_ending: `
+1. 발단: 원작과 동일하게 시작하되 시각적 디테일은 학생 답을 참고한다.
+2. 전개: 원작의 흐름이 이어지다가 "branching_point"가 가까워진다.
+3. 위기: "branching_point"에서 "different_choice"가 일어난다.
+4. 절정: "different_choice"의 결과가 정점에 도달한다.
+5. 결말: "new_ending" 답을 학생 어조 그대로 이룬다.`,
+  change_choice: `
+1. 발단: 원작과 동일한 시작.
+2. 전개: "choice_moment"가 가까워지는 흐름.
+3. 위기: "choice_moment"에서 "different_choice"가 일어나며 흐름이 갈라진다.
+4. 절정: 그 다른 선택이 만든 결정적 장면.
+5. 결말: "result" 답대로 마무리한다.`,
+  same_message_new_story: `
+1. 발단: "country_scene" 답을 풍경으로 깔고 "new_protagonist"를 소개한다.
+2. 전개: 그 인물의 일상에서 "conflict"가 시작된다.
+3. 위기: "conflict"가 깊어지는 순간.
+4. 절정: "inherited_feeling"이 행동으로 표현되는 결정적 장면.
+5. 결말: "ending" 답대로 마무리하되, "inherited_feeling"이 살아있게 한다.`,
+  change_setting: `
+1. 발단: "new_setting" 답으로 새 장소와 주인공을 보여준다.
+2. 전개: 책의 사건이 그 장소에서 새롭게 시작된다.
+3. 위기: "setting_difference" 답이 드러나는 순간 — 장소 때문에 보이는 새로운 어려움.
+4. 절정: 주인공이 그 장소만의 어려움을 마주하는 장면.
+5. 결말: "ending" 답대로 마무리한다.`,
+  _custom: `
+1-4. 학생의 "plan" 답을 5장면 중 1~4번에 걸쳐 발단·전개·위기·절정으로 풀어낸다.
+5. 결말: "ending" 답을 학생 어조 그대로 이룬다.`,
+};
 
-  if (guide_answers?.content) parts.push(`내용: ${guide_answers.content}`);
-  if (guide_answers?.character) parts.push(`인물: ${guide_answers.character}`);
-  if (guide_answers?.world) parts.push(`세계: ${guide_answers.world}`);
-  if (student_freewrite) parts.push(`자유 작성:\n${student_freewrite}`);
+function formatToriAnswers(
+  answers: ToriAnswersRecord | null,
+): { hasContent: boolean; text: string; activityId: string } {
+  if (!answers) return { hasContent: false, text: '(없음)', activityId: '_custom' };
 
-  const combined = parts.join('\n').trim();
-  if (combined) {
-    return {
-      sourceLabel: '학생이 직접 정리한 이야기 재료',
-      text: combined,
-    };
+  const cardSet = getToriCardSet(answers.activity_id);
+  const lines: string[] = [];
+
+  for (const card of cardSet.cards) {
+    const value = answers.answers[card.key]?.trim();
+    if (!value) continue;
+    // Strip the variable templates from the title for the prompt — the
+    // student already saw the rendered title; we just want the question
+    // intent for the LLM.
+    const plainTitle = card.title.replace(/\$\{country\}/g, '국가').replace(/\$\{protagonist\}/g, '주인공');
+    lines.push(`- [${card.key}] ${plainTitle}\n  ↳ ${value}`);
   }
 
   return {
-    sourceLabel: '학생 채팅에서 나온 이야기 재료',
-    text: typeof all_student_messages === 'string' ? all_student_messages.trim() : '',
+    hasContent: lines.length > 0,
+    text: lines.length > 0 ? lines.join('\n') : '(없음)',
+    activityId: answers.activity_id,
   };
+}
+
+function getActivitySceneMapping(activityId: string): string {
+  return ACTIVITY_SCENE_MAPPINGS[activityId] ?? ACTIVITY_SCENE_MAPPINGS._custom;
+}
+
+function getCountryDisplayName(countryId: string | null | undefined): string {
+  if (!countryId) return '';
+  const country = countries.find((item) => item.id === countryId);
+  return country?.name ?? countryId;
+}
+
+function buildExploreChallengesText(rows: unknown): string {
+  if (!Array.isArray(rows)) return '';
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null;
+      const item = row as Record<string, unknown>;
+      const title = typeof item.content_title === 'string' ? item.content_title.trim() : '';
+      const summary = typeof item.summary === 'string' ? item.summary.trim() : '';
+      const curiosity = typeof item.curiosity === 'string' ? item.curiosity.trim() : '';
+      if (!title && !summary && !curiosity) return null;
+      const parts = [title ? `자료: ${title}` : '', summary ? `정리: ${summary}` : '', curiosity ? `궁금한 점: ${curiosity}` : ''].filter(Boolean);
+      return `- ${parts.join(' / ')}`;
+    })
+    .filter(Boolean)
+    .slice(0, 5)
+    .join('\n');
 }
 
 function formatSelectedActivity(activity: DocentActivityRecommendation | null | undefined, customInput: string | null | undefined) {
@@ -214,7 +322,6 @@ export async function POST(request: NextRequest) {
   try {
     const {
       bookId,
-      story_type,
       custom_input,
       book_title,
       country,
@@ -222,34 +329,20 @@ export async function POST(request: NextRequest) {
       characters,
       selected_activity,
       docent_messages,
-      // New 7-step fields
-      guide_answers,
-      student_freewrite,
-      all_student_messages,
+      tori_answers,
       book_full_text,
       language = 'ko',
     } = await request.json();
 
-    const storyTypeLabel: Record<string, string> = {
-      continue: '이야기 이어쓰기',
-      new_protagonist: '주인공으로 새 이야기 써보기',
-      extra_backstory: '엑스트라 주인공의 뒷이야기 쓰기',
-      change_ending: '결말 바꾸기',
-      custom: `기타: ${custom_input}`,
-    };
-
-    const studentSource = buildStudentInput({
-      guide_answers,
-      student_freewrite,
-      all_student_messages,
-    });
     const selectedActivityText = formatSelectedActivity(selected_activity, custom_input);
     const docentConversationText = formatDocentConversation(docent_messages);
+    const toriAnswersInfo = formatToriAnswers(normalizeToriAnswers(tori_answers));
+    const sceneMapping = getActivitySceneMapping(toriAnswersInfo.activityId);
 
-    if (!studentSource.text) {
+    if (!toriAnswersInfo.hasContent) {
       return Response.json(
-        { error: '학생 이야기 재료가 비어 있습니다.' },
-        { status: 400 }
+        { error: '토리 답변이 비어 있어 초안을 만들 수 없어요.' },
+        { status: 400 },
       );
     }
 
@@ -268,6 +361,7 @@ export async function POST(request: NextRequest) {
     let resolvedCharacters = characters ?? '';
     let resolvedAnalysisContext = '';
     let resolvedPdfText = '';
+    let resolvedExploreText = '';
     const resolvedBookText =
       typeof book_full_text === 'string' ? book_full_text.trim() : '';
 
@@ -282,10 +376,19 @@ export async function POST(request: NextRequest) {
         resolvedBookTitle = resolvedBookTitle || book.title;
         resolvedCountry = resolvedCountry || book.country_id;
 
-        const pdfTextRecord = await getLatestCompletedBookPdfText(supabase, bookId);
+        const [pdfTextRecord, analysisRecord, activityRecord] = await Promise.all([
+          getLatestCompletedBookPdfText(supabase, bookId),
+          getLatestCompletedBookAnalysis(supabase, bookId),
+          supabase
+            .from('activities')
+            .select('explore_challenges')
+            .eq('student_id', user.id)
+            .eq('book_id', bookId)
+            .maybeSingle(),
+        ]);
+
         resolvedPdfText = pdfTextRecord?.extracted_text?.trim() ?? '';
 
-        const analysisRecord = await getLatestCompletedBookAnalysis(supabase, bookId);
         const analysis = analysisRecord?.analysis_json;
         resolvedAnalysisContext = analysis ? buildBookAnalysisPromptContext(analysis) : '';
 
@@ -304,6 +407,8 @@ export async function POST(request: NextRequest) {
             .filter(Boolean)
             .join('\n');
         }
+
+        resolvedExploreText = buildExploreChallengesText(activityRecord.data?.explore_challenges);
       }
     }
 
@@ -324,47 +429,69 @@ export async function POST(request: NextRequest) {
     if (!resolvedBookText && !resolvedPdfText && !resolvedAnalysisContext) {
       return Response.json(
         { error: '도서 원문 또는 분석 데이터가 아직 준비되지 않았습니다.' },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
-    const systemPrompt = `당신은 초등학생의 그림책 창작을 돕는 아동 창작 교육 도우미입니다.
+    const countryDisplay = getCountryDisplayName(resolvedCountry) || resolvedCountry || '이 나라';
 
-[도서 맥락]
+    const systemPrompt = `당신은 초등학생의 그림책 창작을 돕는 아동 창작 교육 도우미입니다.
+학생은 ${countryDisplay}의 그림책 《${resolvedBookTitle}》을 읽고, 작가 도슨트와 대화하고,
+활동을 골랐고, 자기 이야기 방향을 토리 질문 답변으로 정리했습니다.
+당신은 그 모든 재료로 정확히 5장면 그림책 초안과 페이지별 조언을 씁니다.
+
+[신호 우선순위 — 충돌하면 위쪽을 따른다]
+1. 학생의 토리 답변 (절대 우선)
+2. 학생이 선택한 활동
+3. 도슨트와 학생의 대화
+4. Hidden Stories에서 학생이 본 자료
+5. 책 원문/분석
+
+[책 정보]
+- 제목: ${resolvedBookTitle}
+- 국가: ${countryDisplay}
+- 줄거리: ${resolvedStorySummary || '(요약 없음)'}
+- 등장인물: ${resolvedCharacters || '(분석 없음)'}
+
+[도서 원문 또는 분석 요약]
 ${finalBookContextSection}
 
-[이야기 유형] ${storyTypeLabel[story_type] || story_type}
-${selectedActivityText ? `\n[도슨트와의 만남에서 선택한 활동]\n${selectedActivityText}` : ''}
-${docentConversationText ? `\n[도슨트와 학생의 대화 요약 재료]\n${docentConversationText}` : ''}
+[Hidden Stories - 학생이 본 자료]
+${resolvedExploreText || '(없음)'}
 
-[책 배경 정보]
-제목: ${resolvedBookTitle} / 국가: ${resolvedCountry}
-줄거리: ${resolvedStorySummary}
-등장인물: ${resolvedCharacters}
+[도슨트와 학생의 대화]
+${docentConversationText || '(없음)'}
 
-[${studentSource.sourceLabel}]
-${studentSource.text}
+[학생이 선택한 활동]
+${selectedActivityText || '(없음)'}
 
-위 내용을 바탕으로 이야기 초안과 페이지별 조언을 함께 작성하세요.
+[학생이 토리 질문에 답한 내용 ★최우선]
+${toriAnswersInfo.text}
+
+[활동별 5장면 매핑 - 반드시 따른다]
+${sceneMapping}
 
 [초안 작성 규칙]
-1. 학생이 직접 말한 재료를 최우선으로 사용하세요.
-2. 도슨트와의 만남에서 선택한 활동이 있으면 그 활동 방향을 초안의 중심 조건으로 반영하세요.
-3. PDF 원문 텍스트가 있으면 원작의 사건 순서, 등장인물 관계, 핵심 선택을 정확히 참고하세요.
-4. 책의 배경과 분위기는 참고하되, 학생이 말하지 않은 핵심 사건을 멋대로 새로 만들지 마세요.
-5. 초안은 비어 있으면 안 됩니다. 각 장면마다 실제 문장으로 초안을 써 주세요.
-6. 일부 감정 묘사나 연결 문장은 일부러 덜 채워 학생이 다시 쓸 여백을 남기세요.
-7. 초등학생이 읽고 이해할 수 있는 문체로 쓰세요.
-8. 정확히 5개 장면으로 나누세요: 발단(이야기의 시작, 배경과 인물 소개), 전개(사건이 펼쳐지며 이야기가 진행), 위기(갈등이나 어려움 등장), 절정(가장 긴장감 넘치는 순간), 결말(문제 해결과 마무리).
-9. 각 장면의 draft는 2~4문장으로 쓰세요.
+1. 위 토리 답변에 직접 적힌 인물·사건·결말을 그대로 골격으로 사용한다.
+2. 학생이 말하지 않은 핵심 사건을 멋대로 새로 만들지 않는다.
+3. 학생 답변이 모호하거나 책의 특정 장면을 가리키면 (예: "마지막 장면", "친구를 만난 순간"), 위 책 원문/분석에서 가장 가까운 장면을 추론해 적용한다.
+4. 주인공의 이름·성격은 5장면 전체에서 일관되게 유지한다.
+5. 각 draft는 2~4문장. 일부 감정 묘사와 연결 문장은 일부러 덜 채워 학생이 오른쪽 칸에 다시 쓸 여백을 남긴다.
+6. 초등학생이 한 번 읽고 이해할 수 있는 쉬운 말로 쓴다.
+7. 정확히 5개 장면(발단·전개·위기·절정·결말)으로 나눈다.
 
-[조언 작성 규칙]
-1. 각 장면마다 학생이 이미 말한 내용 중 살릴 만한 요소를 하나씩 짚어 주세요.
-2. 조언은 학생이 오른쪽 칸에 다시 써 볼 수 있게 구체적이어야 합니다.
-3. 각 advice는 1~2문장, 반말, 친근한 톤으로 쓰세요.
-4. advice가 너무 일반적이면 안 됩니다. 가능하면 학생이 말한 인물, 행동, 감정, 배경을 직접 언급하세요.
+[국가·문화 표현 가드 - 반드시 지킨다]
+1. ${countryDisplay}을 "가난한 나라", "불쌍한 곳", "어두운 곳", "위험한 곳" 같은 단일 이미지로 그리지 않는다.
+2. ${countryDisplay} 사람들 전체를 한 가지 성격(착함, 게으름, 슬픔 등)으로 단정하지 않는다.
+3. 어려움을 다루더라도 인물의 존엄·일상의 따뜻함·작은 기쁨을 함께 보여준다.
+4. 학생이 적은 어려움을 그 나라의 본질이라고 일반화하지 않는다.
 
-출력 형식 (반드시 JSON으로만 출력, 다른 텍스트 금지):
+[조언(advice) 작성 규칙]
+1. 각 advice는 그 장면에서 학생이 직접 적은 단어·인물·감정 중 하나를 골라 짚고, 그걸 어떻게 더 풀어낼 수 있는지 한 가지만 제안한다.
+2. "더 자세히 써봐", "감정을 넣어봐" 같은 일반론은 금지.
+3. 1~2문장, 반말, 친근한 톤.
+
+출력 형식 (JSON만, 다른 텍스트 금지):
 {"pages":[{"draft":"발단 초안","advice":"발단 조언"},{"draft":"전개 초안","advice":"전개 조언"},{"draft":"위기 초안","advice":"위기 조언"},{"draft":"절정 초안","advice":"절정 조언"},{"draft":"결말 초안","advice":"결말 조언"}]}
 
 응답 언어: ${language === 'ko' ? '한국어' : 'English'}`;
@@ -390,21 +517,28 @@ ${studentSource.text}
 
 [책 정보]
 제목: ${resolvedBookTitle}
-국가: ${resolvedCountry}
-줄거리: ${resolvedStorySummary}
-등장인물: ${resolvedCharacters}
+국가: ${countryDisplay}
+줄거리: ${resolvedStorySummary || '(없음)'}
+등장인물: ${resolvedCharacters || '(없음)'}
 
-${selectedActivityText ? `[학생이 선택한 활동]\n${selectedActivityText}\n\n` : ''}[학생이 말한 이야기 재료]
-${studentSource.text}
+[학생이 선택한 활동]
+${selectedActivityText || '(없음)'}
+
+[학생이 토리 질문에 답한 내용 ★최우선]
+${toriAnswersInfo.text}
+
+[활동별 5장면 매핑]
+${sceneMapping}
 
 [규칙]
-1. 학생이 말한 재료를 최우선으로 사용한다.
-2. 선택한 활동이 있으면 그 방향을 반드시 반영한다.
-3. 정확히 5개 장면을 만든다: 발단, 전개, 위기, 절정, 결말.
-4. 각 draft는 2~4문장, 각 advice는 1~2문장으로 쓴다.
-5. 초등학생이 이해할 수 있는 문장으로 쓴다.
+1. 토리 답변을 최우선으로 사용한다. 답변에 없는 핵심 사건을 만들지 않는다.
+2. 위 5장면 매핑을 반드시 따른다.
+3. 정확히 5개 장면(발단·전개·위기·절정·결말)을 만든다.
+4. 각 draft는 2~4문장, 각 advice는 1~2문장.
+5. ${countryDisplay}을 단일 이미지나 부정적 고정관념으로 그리지 않는다.
+6. 초등학생이 이해할 수 있는 쉬운 말로 쓴다.
 
-출력은 JSON 객체만 허용한다.
+출력은 JSON만 허용한다.
 {"pages":[{"draft":"발단 초안","advice":"발단 조언"},{"draft":"전개 초안","advice":"전개 조언"},{"draft":"위기 초안","advice":"위기 조언"},{"draft":"절정 초안","advice":"절정 조언"},{"draft":"결말 초안","advice":"결말 조언"}]}
 
 응답 언어: ${language === 'ko' ? '한국어' : 'English'}`;
@@ -424,7 +558,7 @@ ${studentSource.text}
       });
       return Response.json(
         { error: '초안 생성 결과를 해석하지 못했습니다.' },
-        { status: 502 }
+        { status: 502 },
       );
     }
 
@@ -433,7 +567,7 @@ ${studentSource.text}
     console.error('Draft generation error:', error);
     return Response.json(
       { error: 'Failed to generate draft' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

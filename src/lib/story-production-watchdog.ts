@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ProductionStatus } from '@/types/database';
 
-export const PRODUCTION_WATCHDOG_TIMEOUT_MS = 10 * 60 * 1000;
+export const PRODUCTION_WATCHDOG_TIMEOUT_MS = 30 * 60 * 1000;
 export const PRODUCTION_WATCHDOG_MESSAGE = '제작 시간이 오래 걸려 다시 시도가 필요해요.';
 
 export type ProductionWatchdogStory = {

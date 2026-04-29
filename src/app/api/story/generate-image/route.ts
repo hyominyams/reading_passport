@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { CharacterRef, IllustrationStyle } from '@/types/database';
 
 export const runtime = 'nodejs';
+export const maxDuration = 900; // 15 minutes for long-running image generation
 
 export async function POST(request: NextRequest) {
   try {

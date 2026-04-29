@@ -50,12 +50,12 @@ export default function ChatInput({
         placeholder={placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none rounded-xl border border-border bg-muted-light px-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 transition-colors"
+        className="min-h-11 flex-1 resize-none rounded-xl border border-border bg-muted-light px-4 py-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 transition-colors"
       />
       <button
         onClick={handleSend}
         disabled={disabled || !text.trim()}
-        className="flex-shrink-0 h-10 px-5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="h-11 flex-shrink-0 rounded-xl bg-primary px-5 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
       >
         전송
       </button>

@@ -595,7 +595,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
   return (
     <>
       <MyStoryStepSidebar currentStep={7} busy={saving || translating} onStepSelect={handleStepSelect} />
-      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
+      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full xl:ml-auto xl:mr-[22rem] 2xl:mr-[25rem]">
         {/* Step indicator */}
         <div className="px-4 pt-6 pb-2">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
@@ -609,13 +609,13 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
 
         {/* ── Sticky toolbar ── */}
         <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-gray-200 px-4 py-2">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {/* Left: edit / preview toggle */}
             <div className="inline-flex items-center rounded-full bg-gray-100 p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setTextLayoutMode('edit')}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${textLayoutMode === 'edit' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'}`}
+                className={`inline-flex min-h-10 items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${textLayoutMode === 'edit' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3"><path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L3.05 10.476a.75.75 0 0 0-.188.333l-.758 2.842a.75.75 0 0 0 .915.915l2.842-.758a.75.75 0 0 0 .333-.188l7.963-7.963a1.75 1.75 0 0 0 0-2.475l-.67-.669Z" /></svg>
                 편집
@@ -623,7 +623,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
               <button
                 type="button"
                 onClick={() => setTextLayoutMode('preview')}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${textLayoutMode === 'preview' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'}`}
+                className={`inline-flex min-h-10 items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${textLayoutMode === 'preview' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /><path fillRule="evenodd" d="M1.38 8.28a.87.87 0 0 1 0-.56 7.003 7.003 0 0 1 13.24 0 .87.87 0 0 1 0 .56 7.003 7.003 0 0 1-13.24 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" clipRule="evenodd" /></svg>
                 정렬
@@ -632,16 +632,16 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
 
             {/* Center: font size */}
             <div className="flex items-center gap-1">
-              <button onClick={() => setFontSize(s => Math.max(FONT_SIZE_MIN, s - 2))} disabled={fontSize <= FONT_SIZE_MIN} className="w-7 h-7 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30 text-sm font-bold">-</button>
+              <button onClick={() => setFontSize(s => Math.max(FONT_SIZE_MIN, s - 2))} disabled={fontSize <= FONT_SIZE_MIN} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-30">-</button>
               <span className="w-10 text-center text-xs font-medium text-gray-600 tabular-nums">{fontSize}px</span>
-              <button onClick={() => setFontSize(s => Math.min(FONT_SIZE_MAX, s + 2))} disabled={fontSize >= FONT_SIZE_MAX} className="w-7 h-7 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30 text-sm font-bold">+</button>
+              <button onClick={() => setFontSize(s => Math.min(FONT_SIZE_MAX, s + 2))} disabled={fontSize >= FONT_SIZE_MAX} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-30">+</button>
             </div>
 
             {/* Right: font picker + save status */}
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setShowFontPicker(!showFontPicker)}
-                className="text-xs text-indigo-600 font-medium hover:text-indigo-700 whitespace-nowrap"
+                className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs font-medium text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
               >
                 {showFontPicker ? '닫기' : '글꼴'}
               </button>
@@ -658,7 +658,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                 <button
                   key={font.key}
                   onClick={() => { setSelectedFont(font); setShowFontPicker(false); }}
-                  className={`p-2 rounded-lg border text-center transition-all ${selectedFont?.key === font.key ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                  className={`min-h-11 rounded-lg border p-2 text-center transition-all ${selectedFont?.key === font.key ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
                 >
                   <span className="block text-lg leading-tight text-gray-800" style={{ fontFamily: `'${font.fontFamily}', sans-serif` }}>가나다라</span>
                   <span className="text-[10px] text-gray-500">{font.label}</span>
@@ -825,13 +825,15 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                 <button
                   key={i}
                   onClick={() => goTo(i)}
-                  className={`rounded-full transition-all ${
-                    i === currentPageIndex
-                      ? 'w-5 h-2 bg-indigo-500'
-                      : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
-                  }`}
-                  aria-label={`페이지 ${i + 1}`}
-                />
+	                  className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-gray-100"
+	                  aria-label={`페이지 ${i + 1}`}
+	                >
+	                  <span className={`block h-2 rounded-full transition-all ${
+	                    i === currentPageIndex
+	                      ? 'w-5 bg-indigo-500'
+	                      : 'w-2 bg-gray-300'
+	                  }`} />
+	                </button>
               ))}
             </div>
           </div>
@@ -872,7 +874,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                 <select
                   value={selectedTranslateLanguage}
                   onChange={(e) => setSelectedTranslateLanguage(e.target.value)}
-                  className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+                  className="min-h-11 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
                 >
                   {availableTranslationOptions.map(opt => (
                     <option key={opt.code} value={opt.code}>{opt.label}</option>
@@ -881,7 +883,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                 <button
                   onClick={handleTranslate}
                   disabled={translating}
-                  className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                  className="min-h-11 rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
                 >
                   {translating ? '번역 중...' : '번역 추가'}
                 </button>
@@ -898,7 +900,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                 <div className="space-y-2">
                   <p className="text-xs text-gray-500 font-medium">번역된 언어</p>
                   {availableTranslationEntries.map(([code, pages]) => (
-                    <div key={code} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
+	                    <div key={code} className="flex min-h-11 items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
                       <span className="text-sm font-medium text-gray-800">{getTranslationLanguageLabel(code)} ({pages.length}p)</span>
                       <button
                         onClick={() => {
@@ -912,7 +914,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                             translationPreviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                           });
                         }}
-                        className="text-xs text-indigo-600 font-medium"
+	                        className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs font-medium text-indigo-600"
                       >
                         {selectedPreviewLanguage === code ? '닫기' : '보기'}
                       </button>
@@ -925,7 +927,7 @@ export default function FinishPageContent({ storyId }: { storyId: string | null 
                 <div ref={translationPreviewRef} className="space-y-2 pt-2 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-gray-500 font-medium">{getTranslationLanguageLabel(selectedPreviewLanguage)} 미리보기</p>
-                    <select value={selectedPreviewLanguage} onChange={e => setSelectedPreviewLanguage(e.target.value)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs">
+	                    <select value={selectedPreviewLanguage} onChange={e => setSelectedPreviewLanguage(e.target.value)} className="min-h-10 rounded-lg border border-gray-200 px-2 py-1 text-xs">
                       {availableTranslationEntries.map(([code]) => <option key={code} value={code}>{getTranslationLanguageLabel(code)}</option>)}
                     </select>
                   </div>

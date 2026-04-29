@@ -1,7 +1,7 @@
-/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 
 const COUNTRY_SLIDES = [
   { name: '콜롬비아', flag: '🇨🇴', desc: '커피와 음악의 나라', image: '/generated-copyright-safe/country-colombia.jpg' },
@@ -29,10 +29,25 @@ export default function HomeCountryCarousel() {
   useEffect(() => {
     startTimer();
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return;
+      }
+
+      startTimer();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [startTimer]);
 
@@ -61,10 +76,12 @@ export default function HomeCountryCarousel() {
         </div>
 
         <div className="relative aspect-[16/9] overflow-hidden rounded-2xl bg-gray-900">
-          <img
+          <Image
             key={slide.image}
             src={slide.image}
             alt={slide.name}
+            fill
+            sizes="(min-width: 1024px) 960px, (min-width: 640px) calc(100vw - 6rem), calc(100vw - 4rem)"
             className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />

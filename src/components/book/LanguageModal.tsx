@@ -58,7 +58,7 @@ export default function LanguageModal({
                     <button
                       key={langCode}
                       onClick={() => onSelect(book.id, langCode)}
-                      className="flex items-center justify-center gap-3 w-full py-3.5 px-6
+                      className="flex min-h-11 items-center justify-center gap-3 w-full py-3.5 px-6
                                  rounded-xl border border-border bg-white
                                  hover:border-foreground/20 hover:bg-background
                                  transition-all text-sm font-medium"
@@ -73,7 +73,7 @@ export default function LanguageModal({
               {/* Close */}
               <button
                 onClick={onClose}
-                className="mt-4 w-full py-2 text-xs text-muted hover:text-foreground transition-colors"
+                className="mt-4 flex min-h-11 w-full items-center justify-center text-sm text-muted hover:text-foreground transition-colors"
               >
                 취소
               </button>

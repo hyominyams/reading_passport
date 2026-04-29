@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import MyStoryActionDock from '@/components/story/MyStoryActionDock';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import { createClient } from '@/lib/supabase/client';
 import { getDetailStepProgressLabel, getStepRouteWithLang } from '@/lib/mystory-steps';
@@ -382,7 +383,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
   return (
     <>
       <MyStoryStepSidebar currentStep={6} busy={saving} onStepSelect={handleStepSelect} />
-      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto lg:ml-auto lg:mr-[22rem] xl:mr-[25rem]">
+      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto xl:ml-auto xl:mr-[22rem] 2xl:mr-[25rem]">
       {/* Header */}
       <div className="text-center mb-8">
         <motion.h1
@@ -432,7 +433,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
               resetGeneratedCoverIfNeeded();
             }}
             placeholder="나만의 이야기 제목을 입력하세요"
-            className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
+            className="min-h-11 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
             maxLength={50}
           />
         </div>
@@ -454,7 +455,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
               resetGeneratedCoverIfNeeded();
             }}
             placeholder="글쓴이 이름"
-            className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
+            className="min-h-11 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
             maxLength={30}
           />
         </div>
@@ -521,7 +522,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
                   }
                 }}
                 className={`
-                  px-3.5 py-2 rounded-lg text-xs font-medium transition-all border
+	                  min-h-10 rounded-lg border px-3.5 py-2 text-xs font-medium transition-all
                   ${
                     coverImageMode === mode
                       ? 'bg-secondary text-white border-secondary'
@@ -562,7 +563,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
                   </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="mt-2 text-xs text-secondary hover:text-secondary-dark font-medium transition-colors"
+	                    className="mt-2 inline-flex min-h-10 items-center rounded-lg px-3 text-xs font-medium text-secondary transition-colors hover:text-secondary-dark"
                   >
                     다른 이미지로 변경
                   </button>
@@ -608,7 +609,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
                 }}
                 placeholder="표지에 어떤 장면을 그리고 싶은지 설명해 주세요. 예: 주인공이 숲속에서 동물 친구들과 함께 웃고 있는 장면"
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all resize-none"
+	                className="min-h-11 w-full resize-none rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
                 maxLength={300}
               />
               <p className="text-right text-xs text-muted mt-1">
@@ -619,7 +620,7 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
                   type="button"
                   onClick={() => void generateCoverImage()}
                   disabled={coverGenerating || !coverDescription.trim()}
-                  className="rounded-xl bg-secondary px-4 py-2.5 text-sm font-bold text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
+	                  className="min-h-11 rounded-xl bg-secondary px-4 py-2.5 text-sm font-bold text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {coverGenerating ? '표지 생성 중...' : generatedCoverUrl ? '표지 다시 생성하기' : '표지 생성하기'}
                 </button>
@@ -658,32 +659,24 @@ export default function StylePageContent({ storyId }: { storyId: string | null }
         </div>
       </motion.section>
 
-      {/* Submit */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="flex justify-center pb-8"
-      >
+      {/* Submit — sticky dock on mobile, inline on md+ */}
+      <MyStoryActionDock>
         <motion.button
           whileHover={{ scale: isFormValid ? 1.02 : 1 }}
           whileTap={{ scale: isFormValid ? 0.98 : 1 }}
           onClick={handleSubmit}
           disabled={!isFormValid || saving}
-          className={`
-            px-10 py-4 rounded-xl text-lg font-bold transition-all shadow-lg
-            ${
-              isFormValid
-                ? 'bg-accent text-white hover:bg-accent-dark shadow-accent/20 cursor-pointer'
-                : 'bg-border text-muted cursor-not-allowed shadow-none'
-            }
-          `}
+          className={`rounded-xl px-6 py-3 text-sm font-bold shadow-lg transition-all md:px-10 md:py-4 md:text-lg ${
+            isFormValid
+              ? 'cursor-pointer bg-accent text-white shadow-accent/20 hover:bg-accent-dark'
+              : 'cursor-not-allowed bg-border text-muted shadow-none'
+          }`}
         >
           {coverImageMode === 'describe' && !generatedCoverUrl
             ? '표지를 먼저 생성해 주세요'
             : '다음 단계로 이동'}
         </motion.button>
-      </motion.div>
+      </MyStoryActionDock>
       </main>
     </>
   );

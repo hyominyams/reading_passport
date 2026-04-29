@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import Header from '@/components/common/Header';
 import MyStoryPageContent from './MyStoryPageContent';
 import MyStoryEntryHub from './MyStoryEntryHub';
-import { getStudentClassSetting } from '@/lib/classroom';
 import { createClient } from '@/lib/supabase/server';
 import type { Activity, Book, Story } from '@/types/database';
 
@@ -29,12 +28,6 @@ export default async function MyStoryPage({
   if (!user) {
     redirect(`/login?redirect=/book/${bookId}/mystory?lang=${language}`);
   }
-
-  const { data: userProfile } = await supabase
-    .from('users')
-    .select('teacher_id, class')
-    .eq('id', user.id)
-    .single();
 
   const { data: bookData } = await supabase
     .from('books')
@@ -122,6 +115,8 @@ export default async function MyStoryPage({
         <Header />
         <MyStoryEntryHub
           bookId={bookId}
+          bookTitle={book.title}
+          bookCoverUrl={book.cover_url ?? null}
           language={language}
           activeDraft={activeDraft}
           completedStories={completedStories}
@@ -129,12 +124,6 @@ export default async function MyStoryPage({
       </>
     );
   }
-
-  const classSetting = await getStudentClassSetting(supabase, {
-    teacher_id: userProfile?.teacher_id ?? null,
-    class: userProfile?.class ?? null,
-  });
-  const requiredTurns = classSetting?.mystory_required_turns ?? 5;
 
   return (
     <>
@@ -159,13 +148,7 @@ export default async function MyStoryPage({
         }
         initialSelectedActivity={story.selected_activity}
         initialCurrentStep={story.current_step}
-        requiredTurns={requiredTurns}
         hasExistingDraft={Array.isArray(story.ai_draft) && story.ai_draft.length > 0}
-        initialChatLog={
-          Array.isArray(story.chat_log) && story.chat_log.length > 0
-            ? (story.chat_log as { role: 'user' | 'assistant' | 'system'; content: string; timestamp: string }[])
-            : null
-        }
       />
     </>
   );

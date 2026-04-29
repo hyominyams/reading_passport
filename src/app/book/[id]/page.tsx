@@ -41,8 +41,10 @@ export default async function BookPage({
   return (
     <>
       <Header />
-      <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <BookIntroClient book={book} language={language} initialActivity={activity} />
+      <main className="flex-1 flex w-full items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+        <div className="w-full max-w-4xl">
+          <BookIntroClient book={book} language={language} initialActivity={activity} />
+        </div>
       </main>
     </>
   );

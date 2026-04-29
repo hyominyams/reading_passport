@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import MyStoryActionDock from '@/components/story/MyStoryActionDock';
 import MyStoryStepSidebar from '@/components/story/MyStoryStepSidebar';
 import StepProgress from '@/components/story/StepProgress';
 import { createClient } from '@/lib/supabase/client';
@@ -316,7 +317,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
   return (
     <>
       <MyStoryStepSidebar currentStep={5} busy={saving || generatingIndex !== null} onStepSelect={handleStepSelect} />
-      <div className="flex-1 flex justify-center lg:mr-[22rem] xl:mr-[25rem]">
+      <div className="flex-1 flex justify-center xl:mr-[22rem] 2xl:mr-[25rem]">
       <main className="flex-1 px-4 py-6 max-w-3xl">
       {/* Step Progress */}
       <StepProgress currentStep={5} />
@@ -388,7 +389,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
           <button
             type="button"
             onClick={() => setShowStyleGallery((prev) => !prev)}
-            className="mt-2 inline-flex w-24 shrink-0 items-center justify-center rounded-xl border border-border bg-white px-3 py-2 text-xs font-medium text-foreground hover:bg-gray-50"
+            className="mt-2 inline-flex min-h-11 w-28 shrink-0 items-center justify-center rounded-xl border border-border bg-white px-3 py-2 text-xs font-medium text-foreground hover:bg-gray-50"
           >
             {showStyleGallery ? '접기' : '스타일 보기'}
           </button>
@@ -469,7 +470,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
                   <button
                     type="button"
                     onClick={() => setExpandedStyleImage(option.value)}
-                    className="absolute bottom-2 right-2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white"
+	                    className="absolute bottom-2 right-2 inline-flex min-h-10 items-center rounded-full bg-black/70 px-3 py-1 text-[11px] font-medium text-white"
                   >
                     확대
                   </button>
@@ -548,31 +549,23 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
         )}
       </motion.section>
 
-      {/* Section 3: Navigate */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="flex justify-center pb-8"
-      >
+      {/* Section 3: Navigate — sticky dock on mobile, inline on md+ */}
+      <MyStoryActionDock>
         <motion.button
           type="button"
           whileHover={{ scale: canSubmit ? 1.02 : 1 }}
           whileTap={{ scale: canSubmit ? 0.98 : 1 }}
           onClick={() => void handleNext()}
           disabled={!canSubmit}
-          className={`
-            px-10 py-4 rounded-xl text-lg font-bold transition-all shadow-lg
-            ${
-              canSubmit
-                ? 'bg-accent text-white hover:bg-accent-dark shadow-accent/20 cursor-pointer'
-                : 'bg-border text-muted cursor-not-allowed shadow-none'
-            }
-          `}
+          className={`rounded-xl px-6 py-3 text-sm font-bold shadow-lg transition-all md:px-10 md:py-4 md:text-lg ${
+            canSubmit
+              ? 'cursor-pointer bg-accent text-white shadow-accent/20 hover:bg-accent-dark'
+              : 'cursor-not-allowed bg-border text-muted shadow-none'
+          }`}
         >
           {saving ? '저장 중...' : '표지 만들러 가기'}
         </motion.button>
-      </motion.div>
+      </MyStoryActionDock>
       {expandedStyleImage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -611,7 +604,7 @@ export default function CharactersPageContent({ storyId }: { storyId: string | n
       </main>
 
       {/* Right-side CTA — desktop only */}
-      <aside className="hidden lg:block w-52 shrink-0 pt-32 pr-4">
+      <aside className="hidden xl:block w-52 shrink-0 pt-32 pr-4">
         <div className="sticky top-28">
           <div className="flex flex-col items-center text-center">
             {/* Wizard character */}
@@ -692,7 +685,7 @@ function CharacterCard({
           <button
             type="button"
             onClick={onRemove}
-            className="text-muted hover:text-red-500 transition-colors p-1"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-colors hover:bg-red-50 hover:text-red-500"
             title="삭제"
           >
             <svg
@@ -723,7 +716,7 @@ function CharacterCard({
           onChange={(e) => onUpdate({ name: e.target.value })}
           placeholder="예: 아리아"
           maxLength={30}
-          className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground text-sm
+          className="min-h-11 w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground
             placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30
             focus:border-secondary transition-all"
         />
@@ -737,7 +730,7 @@ function CharacterCard({
         <select
           value={character.gender}
           onChange={(e) => onUpdate({ gender: e.target.value as CharacterGender })}
-          className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground text-sm
+          className="min-h-11 w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground
             focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all"
         >
           {GENDER_OPTIONS.map((option) => (
@@ -759,7 +752,7 @@ function CharacterCard({
           placeholder="예: 갈색 피부, 긴 머리, 전통 옷 입은 소녀"
           rows={2}
           maxLength={200}
-          className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground text-sm
+          className="min-h-11 w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground
             placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30
             focus:border-secondary transition-all resize-none"
         />
@@ -776,7 +769,7 @@ function CharacterCard({
           onChange={(e) => onUpdate({ personality: e.target.value })}
           placeholder="예: 용감하고 호기심이 많음"
           maxLength={100}
-          className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground text-sm
+          className="min-h-11 w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground
             placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-secondary/30
             focus:border-secondary transition-all"
         />
@@ -788,7 +781,7 @@ function CharacterCard({
         onClick={onGenerate}
         disabled={!canGenerate}
         className={`
-          w-full py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2
+	          flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-all
           ${
             canGenerate
               ? 'bg-secondary text-white hover:bg-secondary-dark cursor-pointer'

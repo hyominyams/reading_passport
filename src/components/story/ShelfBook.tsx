@@ -2,6 +2,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import type { KeyboardEvent } from 'react';
 import type { LibraryStoryItem } from './LibraryGrid';
 
 const SPINE_COLORS: Record<string, string> = {
@@ -45,6 +46,12 @@ export default function ShelfBook({
     '이야기';
   const authorName = item.author_nickname?.trim() || item.story.author?.nickname || '작성자';
   const spineColor = SPINE_COLORS[item.country_id] || '#4f5b73';
+  const handleBookKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onItemClick(item);
+    }
+  };
 
   return (
     <motion.div
@@ -54,8 +61,11 @@ export default function ShelfBook({
       className="flex-shrink-0 w-[80px] sm:w-[96px] lg:w-[112px]"
       style={{ perspective: '600px' }}
     >
-      <motion.button
+      <motion.div
+        role="button"
+        tabIndex={0}
         onClick={() => onItemClick(item)}
+        onKeyDown={handleBookKeyDown}
         className="relative w-full group cursor-pointer"
         whileHover={{ y: -8, scale: 1.03 }}
         whileTap={{ scale: 0.97 }}
@@ -110,11 +120,13 @@ export default function ShelfBook({
         {/* Meta row below book */}
         <div className="flex items-center justify-between mt-1.5 px-0.5">
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onLike(item.story_id);
             }}
-            className={`flex items-center gap-0.5 text-[10px] transition-colors ${
+            aria-label={`${title} 좋아요`}
+            className={`flex min-h-11 min-w-11 items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] transition-colors ${
               isLiked ? 'text-error' : 'text-muted hover:text-error'
             }`}
           >
@@ -139,7 +151,7 @@ export default function ShelfBook({
             {authorName}
           </span>
         </div>
-      </motion.button>
+      </motion.div>
     </motion.div>
   );
 }

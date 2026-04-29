@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { logClientError } from '@/lib/network-error';
 import type { PurposeAnswers } from '@/types/database';
 
 type DisplayMode = 'hidden' | 'modal' | 'sidebar';
@@ -142,17 +143,37 @@ export default function StoryPurposeCoach({
       if (cancelled) return;
 
       if (error) {
-        console.error('Purpose coach load error:', error);
+        logClientError('Purpose coach load error:', error);
       }
 
       const nextAnswers = normalizePurposeAnswers(data?.purpose_answers);
       const hasSavedAnswers = hasAnyAnswer(nextAnswers);
 
+      // Only auto-open once per story: the first time the student arrives
+      // at step 3 (right after finishing the Tori chat). After that, stay
+      // collapsed on every page so it doesn't keep popping up.
+      const seenKey = `mystory:${storyId}:purposeCoachAutoOpened`;
+      let alreadySeen = false;
+      try {
+        alreadySeen = window.localStorage.getItem(seenKey) === '1';
+      } catch {
+        alreadySeen = false;
+      }
+
+      const shouldAutoOpen = autoOpen && !alreadySeen;
+      if (shouldAutoOpen) {
+        try {
+          window.localStorage.setItem(seenKey, '1');
+        } catch {
+          /* localStorage unavailable — still proceed with auto-open */
+        }
+      }
+
       setAnswers(nextAnswers);
       answersRef.current = nextAnswers;
       setEditing(!hasSavedAnswers);
-      setCollapsed(false);
-      setDisplayMode(autoOpen && !hasSavedAnswers ? 'modal' : 'sidebar');
+      setCollapsed(!shouldAutoOpen);
+      setDisplayMode(shouldAutoOpen && !hasSavedAnswers ? 'modal' : 'sidebar');
       setLoaded(true);
     };
 
@@ -183,7 +204,7 @@ export default function StoryPurposeCoach({
       }
 
       if (error) {
-        console.error('Purpose coach save error:', error);
+        logClientError('Purpose coach save error:', error);
         setSaveState('error');
         return false;
       }
@@ -323,7 +344,7 @@ function PurposeModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#e5d7bf] bg-white text-gray-500 transition-colors hover:bg-[#f7eedf] hover:text-gray-900"
+          className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e5d7bf] bg-white text-gray-500 transition-colors hover:bg-[#f7eedf] hover:text-gray-900"
           aria-label="나중에 적기"
         >
           <X className="h-4 w-4" />
@@ -357,7 +378,7 @@ function PurposeModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-[#e5d7bf] bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-[#f7eedf]"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#e5d7bf] bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-[#f7eedf]"
             >
               나중에 적기
             </button>
@@ -365,7 +386,7 @@ function PurposeModal({
               type="button"
               onClick={onSave}
               disabled={!canSave}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-950 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gray-950 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               <Save className="h-4 w-4" />
               저장하기
@@ -398,10 +419,10 @@ function PurposeSidebar({
 }) {
   return (
     <motion.aside
-      className="fixed bottom-24 left-3 right-3 z-30 max-h-[calc(100vh-8rem)] overflow-hidden rounded-3xl border border-[#e8dcc6] bg-[#fffaf0] shadow-2xl lg:bottom-auto lg:left-auto lg:right-4 lg:top-24 lg:w-[20rem] lg:max-w-[calc(100vw-2rem)] xl:w-[23rem]"
-      initial={{ opacity: 0, x: 28 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 28 }}
+      className="fixed top-[5.25rem] left-3 right-3 z-40 max-h-[calc(100vh-8rem)] overflow-hidden rounded-3xl border border-[#e8dcc6] bg-[#fffaf0] shadow-2xl lg:top-24 lg:left-auto lg:right-4 lg:w-[20rem] lg:max-w-[calc(100vw-2rem)] xl:w-[23rem]"
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.2 }}
     >
       <div className="flex items-start justify-between gap-3 border-b border-[#eadfc7] px-4 py-4">
@@ -417,7 +438,7 @@ function PurposeSidebar({
         <button
           type="button"
           onClick={onCollapse}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#e5d7bf] bg-white text-gray-500 transition-colors hover:bg-[#f7eedf] hover:text-gray-900"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#e5d7bf] bg-white text-gray-500 transition-colors hover:bg-[#f7eedf] hover:text-gray-900"
           aria-label="작가의 방향 접기"
         >
           <PanelRightClose className="h-4 w-4" />
@@ -441,7 +462,7 @@ function PurposeSidebar({
                 type="button"
                 onClick={onSave}
                 disabled={!canSave}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
               >
                 <Save className="h-4 w-4" />
                 저장하기
@@ -456,7 +477,7 @@ function PurposeSidebar({
               <button
                 type="button"
                 onClick={onEdit}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#e5d7bf] bg-white px-4 py-2.5 text-sm font-bold text-gray-800 transition-colors hover:bg-[#f7eedf]"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#e5d7bf] bg-white px-4 py-2.5 text-sm font-bold text-gray-800 transition-colors hover:bg-[#f7eedf]"
               >
                 <Pencil className="h-4 w-4" />
                 수정하기
@@ -474,10 +495,10 @@ function CollapsedCoachButton({ onOpen, hasAny }: { onOpen: () => void; hasAny: 
     <motion.button
       type="button"
       onClick={onOpen}
-      className="fixed bottom-24 right-4 z-30 inline-flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full border border-[#e8dcc6] bg-[#fffaf0] px-4 py-3 text-sm font-bold text-gray-900 shadow-xl transition-colors hover:bg-[#f7eedf] lg:top-24 lg:bottom-auto"
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 24 }}
+      className="fixed top-[4.5rem] right-3 z-40 inline-flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full border border-[#e8dcc6] bg-[#fffaf0] px-4 py-3 text-sm font-bold text-gray-900 shadow-xl transition-colors hover:bg-[#f7eedf] lg:top-24 lg:right-4"
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -12 }}
       aria-label="작가의 방향 열기"
     >
       {hasAny ? (

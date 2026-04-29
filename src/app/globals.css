@@ -276,3 +276,9 @@ body {
   border-radius: 28px;
   pointer-events: none;
 }
+
+@media (pointer: coarse) {
+  .coarse-pointer-visible {
+    opacity: 1;
+  }
+}

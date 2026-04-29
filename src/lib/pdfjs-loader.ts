@@ -7,7 +7,7 @@ export interface PdfPage {
     canvas: HTMLCanvasElement;
     canvasContext: CanvasRenderingContext2D;
     viewport: { width: number; height: number };
-  }): { promise: Promise<void> };
+  }): { promise: Promise<void>; cancel?: () => void };
 }
 
 export interface PdfDocument {
@@ -20,7 +20,7 @@ export interface PdfJsLib {
   GlobalWorkerOptions: { workerSrc: string };
   getDocument(
     src: string | PdfDocumentInitParams,
-  ): { promise: Promise<PdfDocument> };
+  ): { promise: Promise<PdfDocument>; destroy?: () => Promise<void> };
 }
 
 export interface PdfDocumentInitParams {

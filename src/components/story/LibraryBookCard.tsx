@@ -55,9 +55,17 @@ export default function LibraryBookCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => onItemClick(item)}
-        className="w-full text-left bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-all group"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onItemClick(item);
+          }
+        }}
+        className="w-full cursor-pointer overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:shadow-lg group"
         style={{ boxShadow: '-3px 0 6px -3px rgba(99,102,141,0.15)' }}
       >
         {/* Cover image with 3D book perspective */}
@@ -100,7 +108,7 @@ export default function LibraryBookCard({
                 e.stopPropagation();
                 onLike(item.story_id);
               }}
-              className={`flex items-center gap-1 text-xs transition-colors ${
+              className={`flex min-h-11 min-w-11 items-center gap-1 rounded-lg px-2 text-xs transition-colors ${
                 isLiked
                   ? 'text-error'
                   : 'text-muted hover:text-error'
@@ -124,7 +132,7 @@ export default function LibraryBookCard({
             </span>
           </div>
         </div>
-      </button>
+      </div>
     </motion.div>
   );
 }
