@@ -57,94 +57,6 @@ function drawRoundedPanel(ctx: CanvasContext, width: number, height: number, fil
   ctx.strokeRect(2, 2, width - 4, height - 4);
 }
 
-function drawRwandaHills() {
-  savePng('hidden-rwanda-hills.png', 1200, 800, (ctx) => {
-    drawRoundedPanel(ctx, 1200, 800, '#eef4e6');
-    ctx.fillStyle = '#cfe1ee';
-    ctx.fillRect(0, 0, 1200, 260);
-
-    ctx.fillStyle = '#fff1b3';
-    ctx.beginPath();
-    ctx.arc(960, 150, 54, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#5b8e6b';
-    ctx.beginPath();
-    ctx.moveTo(115, 455);
-    ctx.lineTo(245, 225);
-    ctx.lineTo(375, 455);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#a07a32';
-    ctx.beginPath();
-    ctx.moveTo(195, 325);
-    ctx.lineTo(245, 225);
-    ctx.lineTo(295, 325);
-    ctx.closePath();
-    ctx.fill();
-
-    const hills = [
-      { y: 500, fill: '#2f6b42', amp: 70 },
-      { y: 585, fill: '#43814a', amp: 58 },
-      { y: 655, fill: '#64a05f', amp: 42 },
-      { y: 735, fill: '#8abb7b', amp: 35 },
-    ];
-
-    hills.forEach((hill, index) => {
-      ctx.fillStyle = hill.fill;
-      ctx.beginPath();
-      ctx.moveTo(0, hill.y);
-      for (let x = 0; x <= 1200; x += 80) {
-        const y = hill.y - Math.sin((x / 1200) * Math.PI * 3 + index) * hill.amp;
-        ctx.quadraticCurveTo(x + 40, y - 18, x + 80, y);
-      }
-      ctx.lineTo(1200, 800);
-      ctx.lineTo(0, 800);
-      ctx.closePath();
-      ctx.fill();
-    });
-
-    ctx.fillStyle = '#7db0d2';
-    ctx.beginPath();
-    ctx.ellipse(95, 615, 200, 32, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const houses = [
-      [455, 550],
-      [735, 520],
-      [930, 590],
-    ];
-    houses.forEach(([x, y]) => {
-      ctx.fillStyle = '#fffaf0';
-      ctx.fillRect(x, y, 38, 30);
-      ctx.fillStyle = '#9b6230';
-      ctx.beginPath();
-      ctx.moveTo(x - 6, y);
-      ctx.lineTo(x + 19, y - 22);
-      ctx.lineTo(x + 44, y);
-      ctx.closePath();
-      ctx.fill();
-    });
-
-    ctx.strokeStyle = '#1f7a4f';
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    for (const [x, y, s] of [
-      [630, 190, 1],
-      [705, 225, 0.7],
-    ]) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.quadraticCurveTo(x + 12 * s, y - 12 * s, x + 24 * s, y);
-      ctx.quadraticCurveTo(x + 36 * s, y - 12 * s, x + 48 * s, y);
-      ctx.stroke();
-    }
-
-    label(ctx, 'Le pays des mille collines', 600, 72, 34, '#1f7a4f');
-    label(ctx, '천 개의 언덕이 만든 나라', 600, 118, 26, '#3a6f43');
-  });
-}
-
 function drawTanzaniaElevation() {
   savePng('hidden-diagram-tanzania-elevation.png', 1200, 360, (ctx) => {
     drawRoundedPanel(ctx, 1200, 360, '#f8f0dd');
@@ -559,50 +471,6 @@ function drawKite(ctx: CanvasContext, accent: string) {
   ctx.stroke();
 }
 
-function drawHillLine(ctx: CanvasContext, accent: string) {
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.moveTo(18, 92);
-  ctx.quadraticCurveTo(38, 34, 64, 92);
-  ctx.quadraticCurveTo(90, 34, 110, 92);
-  ctx.moveTo(18, 94);
-  ctx.lineTo(110, 94);
-  ctx.stroke();
-}
-
-function drawBasket(ctx: CanvasContext, accent: string) {
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.ellipse(64, 72, 42, 20, 0, 0, Math.PI * 2);
-  ctx.moveTo(24, 72);
-  ctx.lineTo(34, 98);
-  ctx.quadraticCurveTo(64, 112, 94, 98);
-  ctx.lineTo(104, 72);
-  ctx.moveTo(64, 52);
-  ctx.lineTo(64, 28);
-  ctx.arc(64, 24, 9, 0, Math.PI * 2);
-  ctx.stroke();
-}
-
-function drawConnectedCircles(ctx: CanvasContext, accent: string) {
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.arc(48, 52, 22, 0, Math.PI * 2);
-  ctx.arc(80, 78, 22, 0, Math.PI * 2);
-  ctx.moveTo(48, 30);
-  ctx.lineTo(48, 18);
-  ctx.moveTo(24, 52);
-  ctx.lineTo(12, 52);
-  ctx.moveTo(102, 78);
-  ctx.lineTo(116, 78);
-  ctx.moveTo(80, 100);
-  ctx.lineTo(80, 114);
-  ctx.stroke();
-}
-
 const icons: IconSpec[] = [
   { file: 'hidden-icon-kenya-harambee.png', label: '하람비', accent: '#2f7a4e', draw: drawPeople },
   { file: 'hidden-icon-kenya-savanna.png', label: '사바나', accent: '#2f7a4e', draw: drawTree },
@@ -620,10 +488,6 @@ const icons: IconSpec[] = [
   { file: 'hidden-icon-cambodia-mekong.png', label: '메콩', accent: '#1e528f', draw: drawWaves },
   { file: 'hidden-icon-cambodia-apsara.png', label: '압사라', accent: '#b8862a', draw: drawDancer },
   { file: 'hidden-icon-cambodia-kite.png', label: '파란 연', accent: '#1e528f', draw: drawKite },
-  { file: 'hidden-icon-rwanda-hills.png', label: '천 개의 언덕', accent: '#1f7a4f', draw: drawHillLine },
-  { file: 'hidden-icon-rwanda-imigongo.png', label: '이미공고', accent: '#1f7a4f', draw: drawMountain },
-  { file: 'hidden-icon-rwanda-agaseke.png', label: '아가세케', accent: '#2f6db3', draw: drawBasket },
-  { file: 'hidden-icon-rwanda-umuganda.png', label: '우무간다', accent: '#1f7a4f', draw: drawConnectedCircles },
 ];
 
 function drawIcons() {
@@ -638,7 +502,6 @@ function drawIcons() {
 function main() {
   registerFonts();
   mkdirSync(OUT_DIR, { recursive: true });
-  drawRwandaHills();
   drawTanzaniaElevation();
   drawNepalElevation();
   drawCambodiaLakeCycle();

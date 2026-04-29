@@ -27,7 +27,7 @@ const OUT_DIR = resolve(ROOT, 'public/generated-copyright-safe');
 const MODEL_SOURCE = 'GPT image generation via OpenAI gpt-image-2';
 const MAP_SOURCE = 'Natural Earth 1:10m public domain vector data rendered locally with scripts/generate-country-map-images.ts';
 const LOCAL_RASTER_SOURCE = 'Original local raster rendering with @napi-rs/canvas via scripts/generate-hidden-story-raster-assets.ts';
-const GENERATED_DATE = '2026-04-28';
+const GENERATED_DATE = '2026-04-29';
 
 function readEnvFile() {
   const envPath = resolve(ROOT, '.env.local');
@@ -353,10 +353,9 @@ const mapAssets: DocumentedAsset[] = [
   {
     file: 'hidden-map-rwanda.png',
     aspectRatio: '8:7',
-    use: 'Step2 HTML Rwanda map image and hidden stories index tile image',
+    use: 'Rwanda reference map image; current Rwanda HTML visual panels use generated photos',
     replaces: [
       'inline SVG map in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html',
-      'inline SVG thumbnail in public/virtual-picture-books/hidden-stories-html/index.html',
     ],
     source: MAP_SOURCE,
     dataFiles: ['ne_10m_admin_0_countries.geojson', 'ne_10m_lakes.geojson'],
@@ -366,8 +365,73 @@ const mapAssets: DocumentedAsset[] = [
   },
 ];
 
+const rwandaHtmlPhotoAssets: DocumentedAsset[] = [
+  {
+    file: 'hidden-rwanda-hills.png',
+    aspectRatio: '3:2',
+    use: 'Step2 HTML Rwanda hero photo',
+    replaces: ['SVG-style Rwanda hill illustration in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html'],
+    source: MODEL_SOURCE,
+    promptLabel: 'Prompt',
+    prompt:
+      'Photorealistic original Rwanda landscape: rolling green highlands with terraced farms, a calm lake in the distance, a faint volcanic mountain on the horizon, rural footpaths, and small homes. No identifiable people, no copied photo, no logo, no watermark, no readable text, no map labels, no illustration, no vector art, no SVG look.',
+  },
+  {
+    file: 'hidden-rwanda-geography-photo.png',
+    aspectRatio: '3:2',
+    use: 'Step2 HTML Rwanda geography photo and hidden stories index tile image',
+    replaces: [
+      'SVG-style Rwanda map panel image in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html',
+      'SVG-style Rwanda map thumbnail in public/virtual-picture-books/hidden-stories-html/index.html',
+    ],
+    source: MODEL_SOURCE,
+    promptLabel: 'Prompt',
+    prompt:
+      'Photorealistic original Rwanda geography scene: Lake Kivu-like blue water beside steep green terraced hills, red earth paths, banana plants, small lakeside village rooftops, and distant soft mountains. No identifiable people, no copied photo, no brand, no logo, no watermark, no readable text, no map labels, no illustration, no vector art, no SVG look.',
+  },
+  {
+    file: 'hidden-icon-rwanda-hills.png',
+    aspectRatio: '1:1',
+    use: 'Step2 HTML Rwanda culture photo thumbnail: 천 개의 언덕',
+    replaces: ['SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html'],
+    source: MODEL_SOURCE,
+    promptLabel: 'Prompt',
+    prompt:
+      'Photorealistic original square thumbnail of lush terraced green hills in Rwanda with red earth footpaths and a small rural valley. No identifiable people, no copied photo, no logo, no watermark, no readable text, no SVG look.',
+  },
+  {
+    file: 'hidden-icon-rwanda-imigongo.png',
+    aspectRatio: '1:1',
+    use: 'Step2 HTML Rwanda culture photo thumbnail: 이미공고',
+    replaces: ['SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html'],
+    source: MODEL_SOURCE,
+    promptLabel: 'Prompt',
+    prompt:
+      'Photorealistic original square thumbnail of Imigongo-inspired Rwandan geometric relief panels on an interior wall, with tactile clay-like texture and earthy pigments. No copied specific artwork, no logo, no watermark, no readable text, no SVG look.',
+  },
+  {
+    file: 'hidden-icon-rwanda-agaseke.png',
+    aspectRatio: '1:1',
+    use: 'Step2 HTML Rwanda culture photo thumbnail: 아가세케',
+    replaces: ['SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html'],
+    source: MODEL_SOURCE,
+    promptLabel: 'Prompt',
+    prompt:
+      'Photorealistic original square thumbnail of a handwoven Rwandan Agaseke peace basket on a simple wooden table with natural craft materials nearby. No copied photo, no logo, no watermark, no readable text, no SVG look.',
+  },
+  {
+    file: 'hidden-icon-rwanda-umuganda.png',
+    aspectRatio: '1:1',
+    use: 'Step2 HTML Rwanda culture photo thumbnail: 우무간다',
+    replaces: ['SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html'],
+    source: MODEL_SOURCE,
+    promptLabel: 'Prompt',
+    prompt:
+      'Photorealistic original square thumbnail of Umuganda community work in Rwanda, with adults sweeping, planting small trees, and tidying a neighborhood roadside from a respectful distance. No copied photo, no logo, no watermark, no readable text, no political signage, no SVG look.',
+  },
+];
+
 const localRasterAssets: DocumentedAsset[] = [
-  ['hidden-rwanda-hills.png', 'Step2 HTML Rwanda hero raster illustration', 'inline SVG hill illustration in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html', 'Render an original raster classroom illustration of Rwanda as the land of a thousand hills: layered green hills, a northwest volcano, Lake Kivu-inspired water, small houses, birds, sun, and Korean/French title labels. No copied artwork or external image source.'],
   ['hidden-diagram-tanzania-elevation.png', 'Step2 HTML Tanzania elevation diagram image', 'inline SVG Kilimanjaro elevation diagram in public/virtual-picture-books/hidden-stories-html/tanzania-hero-community.html', 'Render an original raster educational diagram of Kilimanjaro elevation zones: savanna/cropland, rain forest, moorland, alpine desert, summit glacier, and Korean labels. No copied diagram or external image source.'],
   ['hidden-diagram-nepal-elevation.png', 'Step2 HTML Nepal elevation diagram image', 'inline SVG Nepal elevation diagram in public/virtual-picture-books/hidden-stories-html/nepal-school-road.html', 'Render an original raster educational south-to-north Nepal elevation diagram: Terai plain, middle hills, Himalaya, elevation markers, and Korean labels. No copied diagram or external image source.'],
   ['hidden-diagram-cambodia-tonle-sap.png', 'Step2 HTML Cambodia Tonle Sap comparison diagram image', 'inline SVG Tonle Sap dry/wet season diagram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html', 'Render an original raster educational comparison of Tonle Sap in dry season and wet season: smaller dry-season lake, larger wet-season lake, five-times arrow, Mekong backflow label, and Korean labels. No copied diagram or external image source.'],
@@ -387,10 +451,6 @@ const localRasterAssets: DocumentedAsset[] = [
   ['hidden-icon-cambodia-mekong.png', 'Step2 HTML Cambodia pictogram: 메콩', 'inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html', 'Render an original raster pictogram for Mekong River: two flowing wave lines, blue accent, clean educational icon style.'],
   ['hidden-icon-cambodia-apsara.png', 'Step2 HTML Cambodia pictogram: 압사라', 'inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html', 'Render an original raster pictogram for Apsara dance: dancer silhouette lines, gold accent, clean educational icon style.'],
   ['hidden-icon-cambodia-kite.png', 'Step2 HTML Cambodia pictogram: 파란 연', 'inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html', 'Render an original raster pictogram for a blue kite: diamond kite and tail, blue accent, clean educational icon style.'],
-  ['hidden-icon-rwanda-hills.png', 'Step2 HTML Rwanda pictogram: 천 개의 언덕', 'inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html', 'Render an original raster pictogram for Rwanda hills: repeating hill curves, green accent, clean educational icon style.'],
-  ['hidden-icon-rwanda-imigongo.png', 'Step2 HTML Rwanda pictogram: 이미공고', 'inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html', 'Render an original raster pictogram for Imigongo: geometric peak pattern, green accent, clean educational icon style.'],
-  ['hidden-icon-rwanda-agaseke.png', 'Step2 HTML Rwanda pictogram: 아가세케', 'inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html', 'Render an original raster pictogram for Agaseke basket: lidded basket with handle, blue accent, clean educational icon style.'],
-  ['hidden-icon-rwanda-umuganda.png', 'Step2 HTML Rwanda pictogram: 우무간다', 'inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html', 'Render an original raster pictogram for Umuganda: connected community circles and lines, green accent, clean educational icon style.'],
 ].map(([file, use, replaces, prompt]) => ({
   file,
   aspectRatio: file.includes('icon') ? '1:1' : file.includes('rwanda-hills') ? '3:2' : '10:3',
@@ -404,6 +464,7 @@ const localRasterAssets: DocumentedAsset[] = [
 const documentedAssets: DocumentedAsset[] = [
   ...allAssets.map((asset) => ({ ...asset, source: MODEL_SOURCE, promptLabel: 'Prompt' })),
   ...mapAssets,
+  ...rwandaHtmlPhotoAssets,
   ...localRasterAssets,
 ];
 

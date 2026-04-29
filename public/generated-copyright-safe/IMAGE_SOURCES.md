@@ -1,6 +1,6 @@
 # Copyright-Safe Generated Image Sources
 
-Generated date: 2026-04-28
+Generated date: 2026-04-29
 
 Source for original illustrative/photo-style files in this folder: GPT image generation via OpenAI gpt-image-2.
 
@@ -96,8 +96,9 @@ The images were generated as original project assets for the World Docent readin
 | hidden-map-tanzania.png | /generated-copyright-safe/hidden-map-tanzania.png | Step2 HTML Tanzania map image | inline SVG map in public/virtual-picture-books/hidden-stories-html/tanzania-hero-community.html |
 | hidden-map-nepal.png | /generated-copyright-safe/hidden-map-nepal.png | Step2 HTML Nepal map image | inline SVG map in public/virtual-picture-books/hidden-stories-html/nepal-school-road.html |
 | hidden-map-cambodia.png | /generated-copyright-safe/hidden-map-cambodia.png | Step2 HTML Cambodia map image | inline SVG map in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html |
-| hidden-map-rwanda.png | /generated-copyright-safe/hidden-map-rwanda.png | Step2 HTML Rwanda map image and hidden stories index tile image | inline SVG map in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html<br>inline SVG thumbnail in public/virtual-picture-books/hidden-stories-html/index.html |
-| hidden-rwanda-hills.png | /generated-copyright-safe/hidden-rwanda-hills.png | Step2 HTML Rwanda hero raster illustration | inline SVG hill illustration in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
+| hidden-map-rwanda.png | /generated-copyright-safe/hidden-map-rwanda.png | Rwanda reference map image; current Rwanda HTML visual panels use generated photos | inline SVG map in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
+| hidden-rwanda-hills.png | /generated-copyright-safe/hidden-rwanda-hills.png | Step2 HTML Rwanda hero photo | SVG-style Rwanda hill illustration in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
+| hidden-rwanda-geography-photo.png | /generated-copyright-safe/hidden-rwanda-geography-photo.png | Step2 HTML Rwanda geography photo and hidden stories index tile image | SVG-style Rwanda map panel image in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html<br>SVG-style Rwanda map thumbnail in public/virtual-picture-books/hidden-stories-html/index.html |
 | hidden-diagram-tanzania-elevation.png | /generated-copyright-safe/hidden-diagram-tanzania-elevation.png | Step2 HTML Tanzania elevation diagram image | inline SVG Kilimanjaro elevation diagram in public/virtual-picture-books/hidden-stories-html/tanzania-hero-community.html |
 | hidden-diagram-nepal-elevation.png | /generated-copyright-safe/hidden-diagram-nepal-elevation.png | Step2 HTML Nepal elevation diagram image | inline SVG Nepal elevation diagram in public/virtual-picture-books/hidden-stories-html/nepal-school-road.html |
 | hidden-diagram-cambodia-tonle-sap.png | /generated-copyright-safe/hidden-diagram-cambodia-tonle-sap.png | Step2 HTML Cambodia Tonle Sap comparison diagram image | inline SVG Tonle Sap dry/wet season diagram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html |
@@ -117,10 +118,10 @@ The images were generated as original project assets for the World Docent readin
 | hidden-icon-cambodia-mekong.png | /generated-copyright-safe/hidden-icon-cambodia-mekong.png | Step2 HTML Cambodia pictogram: 메콩 | inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html |
 | hidden-icon-cambodia-apsara.png | /generated-copyright-safe/hidden-icon-cambodia-apsara.png | Step2 HTML Cambodia pictogram: 압사라 | inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html |
 | hidden-icon-cambodia-kite.png | /generated-copyright-safe/hidden-icon-cambodia-kite.png | Step2 HTML Cambodia pictogram: 파란 연 | inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/cambodia-mekong-memory.html |
-| hidden-icon-rwanda-hills.png | /generated-copyright-safe/hidden-icon-rwanda-hills.png | Step2 HTML Rwanda pictogram: 천 개의 언덕 | inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
-| hidden-icon-rwanda-imigongo.png | /generated-copyright-safe/hidden-icon-rwanda-imigongo.png | Step2 HTML Rwanda pictogram: 이미공고 | inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
-| hidden-icon-rwanda-agaseke.png | /generated-copyright-safe/hidden-icon-rwanda-agaseke.png | Step2 HTML Rwanda pictogram: 아가세케 | inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
-| hidden-icon-rwanda-umuganda.png | /generated-copyright-safe/hidden-icon-rwanda-umuganda.png | Step2 HTML Rwanda pictogram: 우무간다 | inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
+| hidden-icon-rwanda-hills.png | /generated-copyright-safe/hidden-icon-rwanda-hills.png | Step2 HTML Rwanda culture photo thumbnail: 천 개의 언덕 | SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
+| hidden-icon-rwanda-imigongo.png | /generated-copyright-safe/hidden-icon-rwanda-imigongo.png | Step2 HTML Rwanda culture photo thumbnail: 이미공고 | SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
+| hidden-icon-rwanda-agaseke.png | /generated-copyright-safe/hidden-icon-rwanda-agaseke.png | Step2 HTML Rwanda culture photo thumbnail: 아가세케 | SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
+| hidden-icon-rwanda-umuganda.png | /generated-copyright-safe/hidden-icon-rwanda-umuganda.png | Step2 HTML Rwanda culture photo thumbnail: 우무간다 | SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html |
 
 ## Prompts
 
@@ -1225,8 +1226,8 @@ Render a copyright-safe educational PNG map of Cambodia from public-domain Natur
 - App path: `/generated-copyright-safe/hidden-map-rwanda.png`
 - Source: Natural Earth 1:10m public domain vector data rendered locally with scripts/generate-country-map-images.ts
 - Aspect ratio: 8:7
-- Use: Step2 HTML Rwanda map image and hidden stories index tile image
-- Replaces: `inline SVG map in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`, `inline SVG thumbnail in public/virtual-picture-books/hidden-stories-html/index.html`
+- Use: Rwanda reference map image; current Rwanda HTML visual panels use generated photos
+- Replaces: `inline SVG map in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
 - Data files: `ne_10m_admin_0_countries.geojson`, `ne_10m_lakes.geojson`
 
 Render spec:
@@ -1238,15 +1239,29 @@ Render a copyright-safe educational PNG map of Rwanda from public-domain Natural
 ### hidden-rwanda-hills.png
 
 - App path: `/generated-copyright-safe/hidden-rwanda-hills.png`
-- Source: Original local raster rendering with @napi-rs/canvas via scripts/generate-hidden-story-raster-assets.ts
+- Source: GPT image generation via OpenAI gpt-image-2
 - Aspect ratio: 3:2
-- Use: Step2 HTML Rwanda hero raster illustration
-- Replaces: `inline SVG hill illustration in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
+- Use: Step2 HTML Rwanda hero photo
+- Replaces: `SVG-style Rwanda hill illustration in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
 
-Render spec:
+Prompt:
 
 ```text
-Render an original raster classroom illustration of Rwanda as the land of a thousand hills: layered green hills, a northwest volcano, Lake Kivu-inspired water, small houses, birds, sun, and Korean/French title labels. No copied artwork or external image source.
+Photorealistic original Rwanda landscape: rolling green highlands with terraced farms, a calm lake in the distance, a faint volcanic mountain on the horizon, rural footpaths, and small homes. No identifiable people, no copied photo, no logo, no watermark, no readable text, no map labels, no illustration, no vector art, no SVG look.
+```
+
+### hidden-rwanda-geography-photo.png
+
+- App path: `/generated-copyright-safe/hidden-rwanda-geography-photo.png`
+- Source: GPT image generation via OpenAI gpt-image-2
+- Aspect ratio: 3:2
+- Use: Step2 HTML Rwanda geography photo and hidden stories index tile image
+- Replaces: `SVG-style Rwanda map panel image in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`, `SVG-style Rwanda map thumbnail in public/virtual-picture-books/hidden-stories-html/index.html`
+
+Prompt:
+
+```text
+Photorealistic original Rwanda geography scene: Lake Kivu-like blue water beside steep green terraced hills, red earth paths, banana plants, small lakeside village rooftops, and distant soft mountains. No identifiable people, no copied photo, no brand, no logo, no watermark, no readable text, no map labels, no illustration, no vector art, no SVG look.
 ```
 
 ### hidden-diagram-tanzania-elevation.png
@@ -1518,55 +1533,55 @@ Render an original raster pictogram for a blue kite: diamond kite and tail, blue
 ### hidden-icon-rwanda-hills.png
 
 - App path: `/generated-copyright-safe/hidden-icon-rwanda-hills.png`
-- Source: Original local raster rendering with @napi-rs/canvas via scripts/generate-hidden-story-raster-assets.ts
+- Source: GPT image generation via OpenAI gpt-image-2
 - Aspect ratio: 1:1
-- Use: Step2 HTML Rwanda pictogram: 천 개의 언덕
-- Replaces: `inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
+- Use: Step2 HTML Rwanda culture photo thumbnail: 천 개의 언덕
+- Replaces: `SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
 
-Render spec:
+Prompt:
 
 ```text
-Render an original raster pictogram for Rwanda hills: repeating hill curves, green accent, clean educational icon style.
+Photorealistic original square thumbnail of lush terraced green hills in Rwanda with red earth footpaths and a small rural valley. No identifiable people, no copied photo, no logo, no watermark, no readable text, no SVG look.
 ```
 
 ### hidden-icon-rwanda-imigongo.png
 
 - App path: `/generated-copyright-safe/hidden-icon-rwanda-imigongo.png`
-- Source: Original local raster rendering with @napi-rs/canvas via scripts/generate-hidden-story-raster-assets.ts
+- Source: GPT image generation via OpenAI gpt-image-2
 - Aspect ratio: 1:1
-- Use: Step2 HTML Rwanda pictogram: 이미공고
-- Replaces: `inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
+- Use: Step2 HTML Rwanda culture photo thumbnail: 이미공고
+- Replaces: `SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
 
-Render spec:
+Prompt:
 
 ```text
-Render an original raster pictogram for Imigongo: geometric peak pattern, green accent, clean educational icon style.
+Photorealistic original square thumbnail of Imigongo-inspired Rwandan geometric relief panels on an interior wall, with tactile clay-like texture and earthy pigments. No copied specific artwork, no logo, no watermark, no readable text, no SVG look.
 ```
 
 ### hidden-icon-rwanda-agaseke.png
 
 - App path: `/generated-copyright-safe/hidden-icon-rwanda-agaseke.png`
-- Source: Original local raster rendering with @napi-rs/canvas via scripts/generate-hidden-story-raster-assets.ts
+- Source: GPT image generation via OpenAI gpt-image-2
 - Aspect ratio: 1:1
-- Use: Step2 HTML Rwanda pictogram: 아가세케
-- Replaces: `inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
+- Use: Step2 HTML Rwanda culture photo thumbnail: 아가세케
+- Replaces: `SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
 
-Render spec:
+Prompt:
 
 ```text
-Render an original raster pictogram for Agaseke basket: lidded basket with handle, blue accent, clean educational icon style.
+Photorealistic original square thumbnail of a handwoven Rwandan Agaseke peace basket on a simple wooden table with natural craft materials nearby. No copied photo, no logo, no watermark, no readable text, no SVG look.
 ```
 
 ### hidden-icon-rwanda-umuganda.png
 
 - App path: `/generated-copyright-safe/hidden-icon-rwanda-umuganda.png`
-- Source: Original local raster rendering with @napi-rs/canvas via scripts/generate-hidden-story-raster-assets.ts
+- Source: GPT image generation via OpenAI gpt-image-2
 - Aspect ratio: 1:1
-- Use: Step2 HTML Rwanda pictogram: 우무간다
-- Replaces: `inline SVG pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
+- Use: Step2 HTML Rwanda culture photo thumbnail: 우무간다
+- Replaces: `SVG-style pictogram in public/virtual-picture-books/hidden-stories-html/rwanda-thousand-hills.html`
 
-Render spec:
+Prompt:
 
 ```text
-Render an original raster pictogram for Umuganda: connected community circles and lines, green accent, clean educational icon style.
+Photorealistic original square thumbnail of Umuganda community work in Rwanda, with adults sweeping, planting small trees, and tidying a neighborhood roadside from a respectful distance. No copied photo, no logo, no watermark, no readable text, no political signage, no SVG look.
 ```

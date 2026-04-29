@@ -1149,7 +1149,7 @@ img { max-width: 100%; }
   border-radius: 2px;
 }
 
-/* 지도 이미지 컨테이너 */
+/* 지리 사진 컨테이너 */
 .country-map {
   position: relative;
   width: 100%;
@@ -1158,6 +1158,11 @@ img { max-width: 100%; }
   padding: 14px;
   border: 1px dashed var(--line);
 }
+.country-map.geography-photo {
+  padding: 0;
+  overflow: hidden;
+  border-style: solid;
+}
 .country-map .country-map-image {
   display: block;
   width: 100%;
@@ -1165,6 +1170,12 @@ img { max-width: 100%; }
   border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--paper);
+}
+.country-map.geography-photo .country-map-image {
+  aspect-ratio: 8 / 5;
+  object-fit: cover;
+  border: 0;
+  border-radius: 12px;
 }
 .country-map .legend {
   display: flex;
@@ -1368,10 +1379,13 @@ img { max-width: 100%; }
   border-radius: 12px;
 }
 .picto .picto-image {
-  width: 38px;
-  height: 38px;
-  margin-bottom: 8px;
-  object-fit: contain;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  height: auto;
+  margin-bottom: 10px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 .picto .pname {
   font-size: 13px;
